@@ -6,7 +6,11 @@
 2. Press <kbd>Tab</kbd> or <kbd>Space</kbd> to leave the call field. QRZero looks the call up and fills in name, QTH, state, county, grid, country and DXCC where those boxes are empty.
 3. Adjust the reports, add a comment if you like, and press <kbd>Enter</kbd>.
 
-The QSO is saved immediately with the start time as `TIME_ON` and the moment you pressed Enter as `TIME_OFF`. The form clears and the cursor goes back to the call field. Frequency, band, mode and power stay as they were for the next QSO.
+The QSO is saved immediately with the start time as `TIME_ON` and the moment you pressed Enter as `TIME_OFF`. The form clears and the cursor goes back to the call field. Frequency, band, mode and any field marked *keep* stay as they were for the next QSO.
+
+Boxes filled in by the lookup are shown in a different colour, so you can tell them from what you typed. Typing over them is fine; what you type wins.
+
+The fields below the first line can be changed: see **Entry fields**.
 
 | Key | Action |
 | --- | --- |
@@ -37,6 +41,27 @@ After a lookup the panel shows:
 - **History**: your most recent QSOs with the call.
 
 DXCC flags need the DXCC entity number, which comes from the QRZ lookup. Without lookups, only the per-call history is shown.
+
+## The map
+
+The map shows your location (from its grid, or latitude/longitude) and the station you are working (from the lookup, or the grid you typed). The solid line is the **short path**, the dashed line the **long path**. Below the map:
+
+- **SP**: the beam heading for the short path, with compass point and distance.
+- **LP**: the long-path heading (short path + 180°) and distance.
+
+The shaded area is night, so you can see the grey line. **Flat** shows the whole world centred on your longitude; **Azimuthal** is a great-circle map centred on you, where straight lines from the centre are true beam headings. Choose kilometres or miles in **Settings → General**.
+
+## Rig, antenna and amplifier
+
+If you have set up equipment for the location (see **Equipment**), the **Rig**, **Ant** and **Amp** boxes in the QSO panel's title bar pick what you are using. QRZero remembers your choice for each location. Each QSO records:
+
+| Choice | ADIF field |
+| --- | --- |
+| Rig | `MY_RIG` |
+| Antenna | `MY_ANTENNA` |
+| Amplifier | `APP_QRZERO_AMPLIFIER` |
+
+The power box fills from the amplifier's power, or the rig's when no amplifier is picked.
 
 ## Station callsigns and locations
 

@@ -136,6 +136,11 @@ fn router(state: Shared) -> Router {
             post(import).layer(DefaultBodyLimit::max(512 * 1024 * 1024)),
         )
         .route("/logs/{id}/export", post(export))
+        .route("/logs/{id}/equipment", get(list_equipment))
+        .route("/locations/{id}/equipment", post(create_equipment))
+        .route("/equipment/{id}", put(update_equipment).delete(delete_equipment))
+        .route("/equipment/{id}/move", post(move_equipment))
+        .route("/prefs/{key}", get(get_pref).put(put_pref))
         .route("/settings", get(get_settings).put(put_settings))
         .route("/settings/qrz/test", post(test_qrz))
         .layer(middleware::from_fn_with_state(state.clone(), require_token))
@@ -298,6 +303,70 @@ async fn delete_location(State(s): State<Shared>, Path(id): Path<i64>) -> ApiRes
 
 async fn default_location(State(s): State<Shared>, Path(id): Path<i64>) -> ApiResult<()> {
     db(&s, move |st| st.set_default_location(id)).await.map(Json)
+}
+
+#[derive(Deserialize)]
+struct EquipmentBody {
+    location_id: Option<i64>,
+    kind: String,
+    name: String,
+    #[serde(default)]
+    fields: Fields,
+}
+
+async fn list_equipment(State(s): State<Shared>, Path(id): Path<i64>) -> ApiResult<Vec<Equipment>> {
+    db(&s, move |st| st.list_equipment(id)).await.map(Json)
+}
+
+async fn create_equipment(State(s): State<Shared>, Path(loc): Path<i64>, Json(b): Json<EquipmentBody>) -> ApiResult<Equipment> {
+    db(&s, move |st| st.create_equipment(loc, &b.kind, &b.name, &b.fields)).await.map(Json)
+}
+
+async fn update_equipment(State(s): State<Shared>, Path(id): Path<i64>, Json(b): Json<EquipmentBody>) -> ApiResult<Equipment> {
+    db(&s, move |st| {
+        let loc = match b.location_id {
+            Some(l) => l,
+            None => st.get_equipment(id)?.location_id,
+        };
+        st.update_equipment(id, loc, &b.kind, &b.name, &b.fields)
+    })
+    .await
+    .map(Json)
+}
+
+async fn delete_equipment(State(s): State<Shared>, Path(id): Path<i64>) -> ApiResult<()> {
+    db(&s, move |st| st.delete_equipment(id)).await.map(Json)
+}
+
+#[derive(Deserialize)]
+struct MoveBody {
+    delta: i64,
+}
+
+async fn move_equipment(State(s): State<Shared>, Path(id): Path<i64>, Json(b): Json<MoveBody>) -> ApiResult<()> {
+    db(&s, move |st| st.move_equipment(id, b.delta)).await.map(Json)
+}
+
+/// UI preferences (entry field layout, grid columns, ...) stored as JSON in
+/// the database so they survive reinstalls and follow the log file.
+fn pref_key(key: &str) -> Result<String, ApiError> {
+    if key.is_empty() || key.len() > 64 || !key.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c)) {
+        return Err(ApiError(StatusCode::BAD_REQUEST, "bad preference name".into()));
+    }
+    Ok(format!("pref.{key}"))
+}
+
+async fn get_pref(State(s): State<Shared>, Path(key): Path<String>) -> ApiResult<serde_json::Value> {
+    let key = pref_key(&key)?;
+    let raw = db(&s, move |st| st.get_setting(&key)).await?;
+    Ok(Json(raw.and_then(|r| serde_json::from_str(&r).ok()).unwrap_or(serde_json::Value::Null)))
+}
+
+async fn put_pref(State(s): State<Shared>, Path(key): Path<String>, Json(v): Json<serde_json::Value>) -> ApiResult<()> {
+    let key = pref_key(&key)?;
+    db(&s, move |st| if v.is_null() { st.delete_setting(&key) } else { st.set_setting(&key, &v.to_string()) })
+        .await
+        .map(Json)
 }
 
 #[derive(Deserialize)]

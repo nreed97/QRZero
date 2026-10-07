@@ -1,9 +1,9 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { api } from "../api";
-import { BANDS, MODES, modeLabel } from "../modes";
-import type { Qso, QsoFilter } from "../types";
-import { fmtDate, fmtTime } from "../util";
+import { BANDS, MODES } from "../modes";
+import { COLUMNS, DEFAULT_COLUMNS } from "../fields";
+import type { Location, Qso, QsoFilter } from "../types";
 
 const PAGE = 200;
 const ROW = 26;
@@ -18,29 +18,19 @@ interface Props {
   onEdit: (q: Qso) => void;
   onDeleted: () => void;
   onExportSelected: () => void;
+  columns: string[];
+  onColumns: (c: string[]) => void;
+  locations: Location[];
 }
 
-const COLUMNS: { label: string; cls?: string; get: (q: Qso) => string }[] = [
-  { label: "Date", get: (q) => fmtDate(q.fields) },
-  { label: "UTC", get: (q) => fmtTime(q.fields) },
-  { label: "Call", cls: "call", get: (q) => q.fields.CALL },
-  { label: "Band", get: (q) => q.fields.BAND ?? "" },
-  { label: "Freq", get: (q) => q.fields.FREQ ?? "" },
-  { label: "Mode", get: (q) => modeLabel(q.fields) },
-  { label: "Sent", get: (q) => q.fields.RST_SENT ?? "" },
-  { label: "Rcvd", get: (q) => q.fields.RST_RCVD ?? "" },
-  { label: "Name", get: (q) => q.fields.NAME ?? "" },
-  { label: "QTH", get: (q) => [q.fields.QTH, q.fields.STATE].filter(Boolean).join(", ") },
-  { label: "Country", get: (q) => q.fields.COUNTRY ?? "" },
-  { label: "Grid", get: (q) => q.fields.GRIDSQUARE ?? "" },
-  { label: "Station", get: (q) => q.fields.STATION_CALLSIGN ?? "" },
-  { label: "Comment", get: (q) => q.fields.COMMENT ?? "" },
-];
-
-export default function LogGrid({ logId, refreshKey, filter, onFilter, selection, onSelection, onEdit, onDeleted, onExportSelected }: Props) {
+export default function LogGrid({ logId, refreshKey, filter, onFilter, selection, onSelection, onEdit, onDeleted, onExportSelected, columns, onColumns, locations }: Props) {
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
   const [search, setSearch] = useState(filter.call ?? "");
+  const [picking, setPicking] = useState(false);
+  const cols = (columns.length ? columns : DEFAULT_COLUMNS).map((k) => COLUMNS.find((c) => c.key === k)).filter((c) => c !== undefined);
+  const template = `28px ${cols.map((c) => c.width).join(" ")}`;
+  const ctx = { locationName: (id: number | null) => locations.find((l) => l.id === id)?.name ?? "" };
   const pages = useRef(new Map<number, Qso[]>());
   const loading = useRef(new Set<number>());
   const generation = useRef(0);
@@ -141,7 +131,7 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
   const one = (v: string) => (v ? [v] : undefined);
 
   return (
-    <section className="grid">
+    <section className="panel grid">
       <div className="grid-tools">
         <input placeholder="Search call (W1, *ABC*)" value={search} onChange={(e) => setSearch(e.target.value)} data-testid="search" />
         <select value={filter.bands?.[0] ?? ""} onChange={(e) => onFilter({ ...filter, bands: one(e.target.value) })}>
@@ -162,14 +152,40 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
         </span>
         <span className="spacer" />
         {error && <span className="err">{error}</span>}
+        <button onClick={() => setPicking(!picking)}>Columns</button>
         <button disabled={!selection.size} onClick={() => onSelection(new Set())}>Clear selection</button>
         <button disabled={!selection.size} onClick={onExportSelected}>Export selected</button>
         <button disabled={!selection.size} className="danger" onClick={deleteSelected}>Delete</button>
       </div>
-      <div className="grid-head">
+      {picking && (
+        <div className="column-picker">
+          <span className="muted">Show columns:</span>
+          {COLUMNS.map((c) => {
+            const on = cols.some((x) => x.key === c.key);
+            return (
+              <label key={c.key} className="chip">
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={() => {
+                    const current = cols.map((x) => x.key);
+                    // Keep the catalog order so columns don't jump around.
+                    const next = on ? current.filter((k) => k !== c.key) : COLUMNS.map((x) => x.key).filter((k) => k === c.key || current.includes(k));
+                    onColumns(next);
+                  }}
+                />
+                {c.label}
+              </label>
+            );
+          })}
+          <button className="tiny" onClick={() => onColumns(DEFAULT_COLUMNS)}>Reset</button>
+          <button className="tiny" onClick={() => setPicking(false)}>Done</button>
+        </div>
+      )}
+      <div className="grid-head" style={{ gridTemplateColumns: template }}>
         <span className="sel" />
-        {COLUMNS.map((c) => (
-          <span key={c.label} className={c.cls}>{c.label}</span>
+        {cols.map((c) => (
+          <span key={c.key} className={c.cls}>{c.label}</span>
         ))}
       </div>
       <div className="grid-body" ref={scroller}>
@@ -180,7 +196,7 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
               <div
                 key={v.key}
                 className={`grid-row ${q && selection.has(q.id) ? "selected" : ""} ${v.index % 2 ? "odd" : ""}`}
-                style={{ transform: `translateY(${v.start}px)`, height: ROW }}
+                style={{ transform: `translateY(${v.start}px)`, height: ROW, gridTemplateColumns: template }}
                 onClick={(e) => q && click(e, v.index, q)}
                 onDoubleClick={() => q && onEdit(q)}
                 title={q ? "Double-click to edit" : undefined}
@@ -188,8 +204,8 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
                 <span className="sel">
                   {q && <input type="checkbox" checked={selection.has(q.id)} onChange={() => toggle(q)} onClick={(e) => e.stopPropagation()} />}
                 </span>
-                {COLUMNS.map((c) => (
-                  <span key={c.label} className={c.cls}>{q ? c.get(q) : ""}</span>
+                {cols.map((c) => (
+                  <span key={c.key} className={c.cls}>{q ? c.get(q, ctx) : ""}</span>
                 ))}
               </div>
             );

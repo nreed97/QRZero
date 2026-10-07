@@ -16,7 +16,9 @@ use crate::band;
 use crate::error::{Error, Result};
 use crate::model::*;
 
-const SCHEMA_VERSION: i32 = 1;
+/// Migrations in order; migration N brings the schema to user_version N.
+const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2];
+const SCHEMA_VERSION: i32 = MIGRATIONS.len() as i32;
 
 const SCHEMA_V1: &str = r#"
 CREATE TABLE logs (
@@ -70,6 +72,21 @@ CREATE TABLE lookup_cache (
 );
 "#;
 
+const SCHEMA_V2: &str = r#"
+CREATE TABLE equipment (
+    id INTEGER PRIMARY KEY,
+    location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    fields TEXT NOT NULL DEFAULT '{}',
+    sort INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX equipment_location ON equipment (location_id, kind, sort);
+"#;
+
+/// Kinds of station equipment a location can hold.
+pub const EQUIPMENT_KINDS: &[&str] = &["rig", "antenna", "amplifier", "rotator", "other"];
+
 /// MY_* fields that a location stamps onto QSOs.
 pub const LOCATION_FIELDS: &[&str] = &[
     "MY_GRIDSQUARE", "MY_CITY", "MY_STATE", "MY_CNTY", "MY_COUNTRY", "MY_DXCC", "MY_CQ_ZONE",
@@ -120,10 +137,10 @@ impl Store {
                 "this log was created by a newer QRZero (schema {version})"
             )));
         }
-        if version < 1 {
+        for (i, sql) in MIGRATIONS.iter().enumerate().skip(version as usize) {
             let tx = self.conn.transaction()?;
-            tx.execute_batch(SCHEMA_V1)?;
-            tx.execute_batch(&format!("PRAGMA user_version = {SCHEMA_VERSION}"))?;
+            tx.execute_batch(sql)?;
+            tx.execute_batch(&format!("PRAGMA user_version = {}", i + 1))?;
             tx.commit()?;
         }
         Ok(())
@@ -526,6 +543,87 @@ impl Store {
         Ok((out, count))
     }
 
+    // ---- equipment -----------------------------------------------------
+
+    /// All equipment at all locations of a log, grouped by location then kind.
+    pub fn list_equipment(&self, log_id: i64) -> Result<Vec<Equipment>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT e.id, e.location_id, e.kind, e.name, e.fields, e.sort FROM equipment e
+             JOIN locations l ON l.id = e.location_id WHERE l.log_id = ?1
+             ORDER BY e.location_id, e.kind, e.sort, e.id",
+        )?;
+        let rows = stmt.query_map([log_id], row_to_equipment)?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    pub fn get_equipment(&self, id: i64) -> Result<Equipment> {
+        self.conn
+            .query_row(
+                "SELECT id, location_id, kind, name, fields, sort FROM equipment WHERE id = ?1",
+                [id],
+                row_to_equipment,
+            )
+            .optional()?
+            .ok_or_else(|| Error::NotFound(format!("equipment {id}")))
+    }
+
+    pub fn create_equipment(&self, location_id: i64, kind: &str, name: &str, fields: &Fields) -> Result<Equipment> {
+        let (kind, name) = check_equipment(kind, name)?;
+        self.get_location(location_id)?;
+        let sort: i64 = self.conn.query_row(
+            "SELECT IFNULL(MAX(sort), -1) + 1 FROM equipment WHERE location_id = ?1 AND kind = ?2",
+            params![location_id, kind],
+            |r| r.get(0),
+        )?;
+        self.conn.execute(
+            "INSERT INTO equipment (location_id, kind, name, fields, sort) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![location_id, kind, name, serde_json::to_string(&clean_fields(fields))?, sort],
+        )?;
+        self.get_equipment(self.conn.last_insert_rowid())
+    }
+
+    /// Updates an item. Moving it to another location is allowed.
+    pub fn update_equipment(&self, id: i64, location_id: i64, kind: &str, name: &str, fields: &Fields) -> Result<Equipment> {
+        let (kind, name) = check_equipment(kind, name)?;
+        self.get_location(location_id)?;
+        self.expect_changed(
+            self.conn.execute(
+                "UPDATE equipment SET location_id = ?1, kind = ?2, name = ?3, fields = ?4 WHERE id = ?5",
+                params![location_id, kind, name, serde_json::to_string(&clean_fields(fields))?, id],
+            )?,
+            "equipment",
+        )?;
+        self.get_equipment(id)
+    }
+
+    /// Moves an item up (-1) or down (+1) within its location and kind.
+    pub fn move_equipment(&mut self, id: i64, delta: i64) -> Result<()> {
+        let item = self.get_equipment(id)?;
+        let tx = self.conn.transaction()?;
+        let ids: Vec<i64> = {
+            let mut stmt = tx.prepare(
+                "SELECT id FROM equipment WHERE location_id = ?1 AND kind = ?2 ORDER BY sort, id",
+            )?;
+            let rows = stmt.query_map(params![item.location_id, item.kind], |r| r.get(0))?;
+            rows.collect::<std::result::Result<_, _>>()?
+        };
+        let mut ids = ids;
+        if let Some(pos) = ids.iter().position(|x| *x == id) {
+            let to = (pos as i64 + delta).clamp(0, ids.len() as i64 - 1) as usize;
+            let v = ids.remove(pos);
+            ids.insert(to, v);
+        }
+        for (i, eid) in ids.iter().enumerate() {
+            tx.execute("UPDATE equipment SET sort = ?1 WHERE id = ?2", params![i as i64, eid])?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn delete_equipment(&self, id: i64) -> Result<()> {
+        self.expect_changed(self.conn.execute("DELETE FROM equipment WHERE id = ?1", [id])?, "equipment")
+    }
+
     // ---- settings and lookup cache -------------------------------------
 
     pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
@@ -813,6 +911,37 @@ fn row_to_qso(r: &rusqlite::Row) -> rusqlite::Result<Qso> {
     })
 }
 
+fn row_to_equipment(r: &rusqlite::Row) -> rusqlite::Result<Equipment> {
+    let json: String = r.get(4)?;
+    Ok(Equipment {
+        id: r.get(0)?,
+        location_id: r.get(1)?,
+        kind: r.get(2)?,
+        name: r.get(3)?,
+        fields: serde_json::from_str(&json).unwrap_or_default(),
+        sort: r.get(5)?,
+    })
+}
+
+fn check_equipment(kind: &str, name: &str) -> Result<(String, String)> {
+    let kind = kind.trim().to_ascii_lowercase();
+    if !EQUIPMENT_KINDS.contains(&kind.as_str()) {
+        return Err(Error::Invalid(format!("unknown equipment kind {kind}")));
+    }
+    Ok((kind, non_empty(name, "name")?))
+}
+
+/// Trims values and drops empty ones; keys are kept as given.
+fn clean_fields(fields: &Fields) -> Fields {
+    fields
+        .iter()
+        .filter_map(|(k, v)| {
+            let (k, v) = (k.trim(), v.trim());
+            (!k.is_empty() && !v.is_empty()).then(|| (k.to_string(), v.to_string()))
+        })
+        .collect()
+}
+
 fn row_to_location(r: &rusqlite::Row) -> rusqlite::Result<Location> {
     let json: String = r.get(4)?;
     Ok(Location {
@@ -830,5 +959,34 @@ fn non_empty(s: &str, what: &str) -> Result<String> {
         Err(Error::Invalid(format!("{what} is required")))
     } else {
         Ok(s.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn upgrades_a_v1_database_in_place() {
+        let dir = std::env::temp_dir().join(format!("qrzero-mig-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("v1.db");
+        let _ = std::fs::remove_file(&path);
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(SCHEMA_V1).unwrap();
+            conn.execute_batch("PRAGMA user_version = 1;
+                INSERT INTO logs (id, name, created_at) VALUES (1, 'Old', 0);
+                INSERT INTO locations (id, log_id, name) VALUES (1, 1, 'Home');
+                INSERT INTO qsos (log_id, call, time_on, fields, created_at, updated_at)
+                VALUES (1, 'W1AW', 0, '{\"CALL\":\"W1AW\"}', 0, 0);").unwrap();
+        }
+        let st = Store::open(&path).unwrap();
+        let v: i32 = st.conn.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
+        assert_eq!(v, SCHEMA_VERSION);
+        assert_eq!(st.list_logs().unwrap()[0].qso_count, 1);
+        st.create_equipment(1, "rig", "K3", &Fields::new()).unwrap();
+        drop(st);
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

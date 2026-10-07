@@ -16,11 +16,35 @@ A location is somewhere you operate from: home, a holiday QTH, a park. Each has 
 | City, State, County, Country | `MY_CITY`, `MY_STATE`, `MY_CNTY`, `MY_COUNTRY` |
 | DXCC, CQ zone, ITU zone | `MY_DXCC`, `MY_CQ_ZONE`, `MY_ITU_ZONE` |
 | IOTA, SOTA, POTA, WWFF references | `MY_IOTA`, `MY_SOTA_REF`, `MY_POTA_REF`, `MY_WWFF_REF` |
-| Rig, Antenna | `MY_RIG`, `MY_ANTENNA` |
+| Rig, Antenna | `MY_RIG`, `MY_ANTENNA` (only used when no equipment is picked) |
 
 One location is the **default**: it's selected when QRZero starts and offered first when importing. Pick a different location in the top bar before logging from somewhere else.
 
 Removing a location doesn't change QSOs already logged from it; they keep their details.
+
+## Equipment
+
+The **Equipment** tab lists what you have at each location as a tree: radios, antennas, amplifiers, rotators and other gear. A location can have as many of each as you like.
+
+- **add radio**, **add antenna** and so on add an item under that location.
+- **Edit** changes its name and details: model, power in watts, bands, height (antennas) and notes. You can also move it to another location.
+- The arrows change the order, which is the order shown in the QSO panel.
+
+Equipment is chosen per QSO from the QSO panel (see **Logging QSOs**).
+
+## Entry fields
+
+The **Entry fields** tab chooses what you type for each QSO. Call, reports, frequency, band and mode are always on the first line; up to three more lines are yours.
+
+- **Start from** loads a ready-made layout, then you can adjust it.
+- **Add a field** adds any common ADIF field, or **Your own field…** for something QRZero doesn't know (it's saved as `APP_QRZERO_…`).
+- Give a field your own **label**, a **width**, and a **default** that fills every new QSO.
+- Tick **keep** to hold the value from one QSO to the next (handy for a park reference, or your power).
+- The arrows move a field left or right, or up and down a line.
+
+## General
+
+Distances in kilometres or miles, and **Run the setup wizard**.
 
 ## Logs
 

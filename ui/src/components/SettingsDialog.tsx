@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import type { Fields, Location, Log, Settings, StationCallsign } from "../types";
+import type { Equipment, Fields, Location, Log, Settings, StationCallsign } from "../types";
+import type { EntryLayout } from "../fields";
 import Modal from "./Modal";
+import EquipmentTree from "./EquipmentTree";
+import EntryFieldsEditor from "./EntryFieldsEditor";
+
+export interface GeneralPrefs { units: "km" | "mi" }
 
 interface Props {
   logId: number;
@@ -11,9 +16,25 @@ interface Props {
   onChanged: () => void;
   onSwitchLog: (id: number) => void;
   onClose: () => void;
+  equipment: Equipment[];
+  layout: EntryLayout;
+  onLayout: (l: EntryLayout) => void;
+  general: GeneralPrefs;
+  onGeneral: (g: GeneralPrefs) => void;
+  onWizard: () => void;
 }
 
-type Tab = "station" | "locations" | "logs" | "lookup";
+type Tab = "station" | "locations" | "equipment" | "fields" | "logs" | "lookup" | "general";
+
+const TAB_NAMES: Record<Tab, string> = {
+  station: "Callsigns",
+  locations: "Locations",
+  equipment: "Equipment",
+  fields: "Entry fields",
+  logs: "Logs",
+  lookup: "Callsign lookup",
+  general: "General",
+};
 
 export default function SettingsDialog(props: Props) {
   const [tab, setTab] = useState<Tab>("station");
@@ -31,17 +52,35 @@ export default function SettingsDialog(props: Props) {
   return (
     <Modal title="Settings" onClose={props.onClose} wide>
       <nav className="tabs">
-        {(["station", "locations", "logs", "lookup"] as Tab[]).map((t) => (
-          <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
-            {{ station: "Station callsigns", locations: "Locations", logs: "Logs", lookup: "Callsign lookup" }[t]}
-          </button>
+        {(Object.keys(TAB_NAMES) as Tab[]).map((t) => (
+          <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{TAB_NAMES[t]}</button>
         ))}
       </nav>
       {error && <p className="err">{error}</p>}
       {tab === "station" && <StationTab {...props} guard={guard} />}
       {tab === "locations" && <LocationsTab {...props} guard={guard} />}
       {tab === "logs" && <LogsTab {...props} guard={guard} />}
+      {tab === "equipment" && (
+        <>
+          <p className="muted">The radios, antennas, amplifiers and rotators at each location. Pick which ones you're using from the QSO panel; they are saved with each QSO as MY_RIG and MY_ANTENNA, and the power fills TX_PWR.</p>
+          <EquipmentTree locations={props.locations} equipment={props.equipment} onChanged={props.onChanged} />
+        </>
+      )}
+      {tab === "fields" && <EntryFieldsEditor layout={props.layout} onChange={props.onLayout} />}
       {tab === "lookup" && <LookupTab />}
+      {tab === "general" && (
+        <div>
+          <label className="block">
+            <span>Distances</span>
+            <select value={props.general.units} onChange={(e) => props.onGeneral({ ...props.general, units: e.target.value as "km" | "mi" })}>
+              <option value="km">Kilometres</option>
+              <option value="mi">Miles</option>
+            </select>
+          </label>
+          <p className="muted">The setup wizard walks through callsigns, your home location, equipment, entry fields and importing an old log. Running it again doesn't remove anything.</p>
+          <button onClick={props.onWizard}>Run the setup wizard</button>
+        </div>
+      )}
     </Modal>
   );
 }

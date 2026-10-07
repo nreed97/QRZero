@@ -1,4 +1,4 @@
-import type { Fields, ImportReport, Location, Log, LookupResult, Qso, QsoFilter, Settings, StationCallsign } from "./types";
+import type { Equipment, Fields, ImportReport, Location, Log, LookupResult, Qso, QsoFilter, Settings, StationCallsign } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
 function sessionToken(): string {
@@ -74,6 +74,17 @@ export const api = {
     const resp = await request("POST", `/logs/${logId}/export`, { filter, profile });
     return { text: await resp.text(), count: Number(resp.headers.get("x-qso-count") ?? 0) };
   },
+
+  equipment: (logId: number) => json<Equipment[]>("GET", `/logs/${logId}/equipment`),
+  createEquipment: (locationId: number, kind: string, name: string, fields: Fields) =>
+    json<Equipment>("POST", `/locations/${locationId}/equipment`, { kind, name, fields }),
+  updateEquipment: (id: number, e: { location_id: number; kind: string; name: string; fields: Fields }) =>
+    json<Equipment>("PUT", `/equipment/${id}`, e),
+  moveEquipment: (id: number, delta: number) => json<null>("POST", `/equipment/${id}/move`, { delta }),
+  deleteEquipment: (id: number) => json<null>("DELETE", `/equipment/${id}`),
+
+  getPref: <T>(key: string) => json<T | null>("GET", `/prefs/${key}`),
+  setPref: (key: string, value: unknown) => json<null>("PUT", `/prefs/${key}`, value),
 
   settings: () => json<Settings>("GET", "/settings"),
   saveSettings: (s: { qrz_enabled?: boolean; qrz_username?: string; qrz_password?: string }) => json<Settings>("PUT", "/settings", s),
