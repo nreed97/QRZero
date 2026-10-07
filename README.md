@@ -48,3 +48,7 @@ cd ui && npm run e2e                                                       # bro
 ```
 
 CI runs all of these and attaches the Windows installer to each run.
+
+## Releases
+
+Pushing a tag builds the Windows installers and attaches them to that tag's GitHub Release (creating a pre-release if none exists). For a tag that already exists, run **Actions → Release → Run workflow** and enter the tag name. Each release gets the MSI, the setup `.exe`, and `QRZero-portable.exe` (no install; needs the WebView2 runtime that ships with Windows 10 and 11).
