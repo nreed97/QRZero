@@ -179,3 +179,28 @@ fn reopens_existing_database() {
     let st = Store::open(&path).unwrap();
     assert_eq!(st.list_logs().unwrap()[0].qso_count, 1);
 }
+
+#[test]
+fn equipment_per_location() {
+    let (mut st, log) = setup();
+    let home = st.create_location(log, "Home", &Fields::new()).unwrap();
+    let park = st.create_location(log, "Park", &Fields::new()).unwrap();
+    let k3 = st.create_equipment(home.id, "rig", "K3", &f(&[("POWER_W", "100"), ("EMPTY", " ")])).unwrap();
+    let ic7300 = st.create_equipment(home.id, "Rig", "IC-7300", &Fields::new()).unwrap();
+    st.create_equipment(home.id, "antenna", "Hex beam", &Fields::new()).unwrap();
+    st.create_equipment(park.id, "rig", "KX2", &Fields::new()).unwrap();
+    assert!(st.create_equipment(home.id, "toaster", "x", &Fields::new()).is_err());
+    assert_eq!(k3.fields.len(), 1);
+    assert_eq!(ic7300.kind, "rig");
+
+    st.move_equipment(ic7300.id, -1).unwrap();
+    let all = st.list_equipment(log).unwrap();
+    let home_rigs: Vec<_> = all.iter().filter(|e| e.location_id == home.id && e.kind == "rig").map(|e| e.name.as_str()).collect();
+    assert_eq!(home_rigs, ["IC-7300", "K3"]);
+    assert_eq!(all.len(), 4);
+
+    let moved = st.update_equipment(k3.id, park.id, "rig", "K3", &k3.fields).unwrap();
+    assert_eq!(moved.location_id, park.id);
+    st.delete_location(park.id).unwrap();
+    assert_eq!(st.list_equipment(log).unwrap().len(), 2, "equipment goes with its location");
+}

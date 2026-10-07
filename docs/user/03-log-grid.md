@@ -18,3 +18,7 @@ With rows selected you can **Export selected** or **Delete** them. Deleting asks
 ## Editing a QSO
 
 Double-click a row to edit it. The editor shows every ADIF field the QSO has, including ones the entry panel doesn't show. Change a value, clear it to remove the field, or **Add field** for a new one. Dates are `YYYYMMDD` and times `HHMM` or `HHMMSS`, in UTC.
+
+## Choosing columns
+
+Click **Columns** above the grid to choose which columns are shown. Tick the ones you want; **Reset** goes back to the standard set. Besides the usual QSO fields you can show your rig, antenna, location, POTA/SOTA references, QSL status and more. Your choice is saved with your settings.

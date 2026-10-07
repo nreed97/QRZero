@@ -44,3 +44,6 @@ export interface ImportReport {
 }
 
 export interface Settings { qrz_enabled: boolean; qrz_username: string; qrz_password_set: boolean }
+
+export type EquipmentKind = "rig" | "antenna" | "amplifier" | "rotator" | "other";
+export interface Equipment { id: number; location_id: number; kind: EquipmentKind; name: string; fields: Fields; sort: number }

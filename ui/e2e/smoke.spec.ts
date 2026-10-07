@@ -10,17 +10,36 @@ const ADIF = `Test file<EOH>
 test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.goto("/?token=e2e");
 
-  // First run asks for a callsign and location.
-  await page.getByLabel("Your callsign").fill("n0call");
-  await page.getByLabel("Grid").fill("EN34");
-  await page.getByRole("button", { name: "Start logging" }).click();
-  await expect(page.getByText("Logging as N0CALL from Home")).toBeVisible();
+  // First run opens the setup wizard.
+  const wizard = page.getByRole("dialog", { name: "QRZero setup" });
+  await wizard.getByLabel("Callsign", { exact: true }).fill("n0call");
+  await wizard.getByLabel(/Previous callsigns/).fill("n0old");
+  await wizard.getByRole("button", { name: "Next" }).click();
+  await wizard.getByRole("button", { name: "Skip" }).click(); // QRZ lookup
+  await expect(wizard.getByRole("heading", { name: "Home location" })).toBeVisible();
+  await wizard.getByLabel("Grid").fill("EN34");
+  await wizard.getByRole("button", { name: "Next" }).click();
+  // The home location step also has a Name box; wait for the equipment step.
+  await expect(wizard.getByRole("heading", { name: "Equipment" })).toBeVisible();
+  await wizard.getByLabel("Name", { exact: true }).fill("K3");
+  await wizard.getByLabel("Power W").fill("100");
+  await wizard.getByRole("button", { name: "Add" }).click();
+  await expect(wizard.getByRole("cell", { name: "K3" })).toBeVisible();
+  await wizard.getByRole("button", { name: "Next" }).click();
+  await wizard.getByLabel(/Parks and summits/).check();
+  await wizard.getByRole("button", { name: "Next" }).click();
+  await wizard.getByRole("button", { name: "Skip" }).click(); // import
+  await wizard.getByRole("button", { name: "Start logging" }).click();
+  await expect(page.getByText("N0CALL · Home")).toBeVisible();
+  await expect(page.getByLabel("Their POTA")).toBeVisible();
 
   // Log a QSO from the keyboard.
   const call = page.getByTestId("call");
   await call.fill("w1aw");
   await call.press("Space");
   await expect(page.locator("#rst-sent")).toBeFocused();
+  await page.getByLabel("Grid").fill("FN31pr");
+  await expect(page.locator(".map-info")).toContainText("SP");
   await page.locator("#rst-sent").press("Enter");
   await expect(page.getByText("Logged W1AW on 20m CW")).toBeVisible();
   await expect(call).toBeFocused();
@@ -40,6 +59,12 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByText("1 duplicates skipped")).toBeVisible();
   await page.getByRole("button", { name: "Done" }).click();
   await expect(page.locator(".grid-tools")).toContainText("3 QSOs");
+
+  // Show the rig column; the QSO logged from the keyboard recorded the K3 and its power.
+  await page.getByRole("button", { name: "Columns" }).click();
+  await page.locator(".column-picker label.chip", { hasText: /^Rig$/ }).locator("input").check();
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(page.locator(".grid-row", { hasText: "W1AW" })).toContainText("K3");
 
   // Search by call prefix and by wildcard.
   await page.getByTestId("search").fill("K1");

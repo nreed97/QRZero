@@ -1,51 +1,44 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
-import type { Location, Log, LookupResult, Qso, QsoFilter, StationCallsign } from "./types";
+import type { Equipment, Location, Log, LookupResult, Qso, QsoFilter, StationCallsign } from "./types";
 import { utcClock } from "./util";
+import { DEFAULT_COLUMNS, DEFAULT_LAYOUT, type EntryLayout } from "./fields";
+import { gridToLatLon, positionOf } from "./geo";
+import { localGet, localSet, usePref } from "./prefs";
 import EntryPanel, { type EntryContext } from "./components/EntryPanel";
 import LookupPanel from "./components/LookupPanel";
+import MapPanel, { type MapView } from "./components/MapPanel";
 import LogGrid from "./components/LogGrid";
 import ImportDialog from "./components/ImportDialog";
 import ExportDialog from "./components/ExportDialog";
-import SettingsDialog from "./components/SettingsDialog";
+import SettingsDialog, { type GeneralPrefs } from "./components/SettingsDialog";
 import EditQsoDialog from "./components/EditQsoDialog";
 import HelpView from "./components/HelpView";
-import SetupCard from "./components/SetupCard";
+import SetupWizard from "./components/SetupWizard";
 
-type Dialog = "import" | "export" | "settings" | "help" | null;
-
-function remembered(key: string): number | null {
-  try {
-    const v = localStorage.getItem(key);
-    return v ? Number(v) : null;
-  } catch {
-    return null;
-  }
-}
-
-function remember(key: string, v: number | null) {
-  try {
-    if (v === null) localStorage.removeItem(key);
-    else localStorage.setItem(key, String(v));
-  } catch { /* storage unavailable */ }
-}
+type Dialog = "import" | "export" | "settings" | "help" | "wizard" | null;
 
 export default function App() {
   const [logs, setLogs] = useState<Log[]>([]);
   const [logId, setLogId] = useState<number | null>(null);
-  const [callsigns, setCallsigns] = useState<StationCallsign[]>([]);
+  const [callsigns, setCallsigns] = useState<StationCallsign[] | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [stationCall, setStationCall] = useState("");
   const [locationId, setLocationId] = useState<number | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [editing, setEditing] = useState<Qso | null>(null);
   const [lookup, setLookup] = useState<LookupResult | null>(null);
-  const [entry, setEntry] = useState<EntryContext>({ band: "", mode: "" });
+  const [entry, setEntry] = useState<EntryContext>({ band: "", mode: "", fields: {} });
   const [filter, setFilter] = useState<QsoFilter>({});
   const [selection, setSelection] = useState<Set<number>>(new Set());
   const [refreshKey, setRefreshKey] = useState(0);
   const [error, setError] = useState("");
   const [now, setNow] = useState(new Date());
+  const [layout, setLayout, layoutLoaded] = usePref<EntryLayout>("entry_layout", DEFAULT_LAYOUT);
+  const [columns, setColumns] = usePref<string[]>("grid_columns", DEFAULT_COLUMNS);
+  const [general, setGeneral] = usePref<GeneralPrefs>("general", { units: "km" });
+  const [mapView, setMapView] = useState<MapView>(localGet("qrzero.map", { view: "flat" as MapView }).view);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -56,17 +49,19 @@ export default function App() {
     const list = await api.logs();
     setLogs(list);
     setLogId((cur) => {
-      const want = cur ?? remembered("qrzero.log");
+      const want = cur ?? localGet("qrzero.log", { id: 0 }).id;
       return list.some((l) => l.id === want) ? want : list[0]?.id ?? null;
     });
   }, []);
 
   const loadStation = useCallback(async (id: number) => {
-    const [calls, locs] = await Promise.all([api.callsigns(id), api.locations(id)]);
+    const [calls, locs, gear] = await Promise.all([api.callsigns(id), api.locations(id), api.equipment(id)]);
     setCallsigns(calls);
     setLocations(locs);
+    setEquipment(gear);
     setStationCall((cur) => (calls.some((c) => c.callsign === cur) ? cur : calls.find((c) => c.is_default)?.callsign ?? calls[0]?.callsign ?? ""));
     setLocationId((cur) => (locs.some((l) => l.id === cur) ? cur : locs.find((l) => l.is_default)?.id ?? null));
+    return calls;
   }, []);
 
   useEffect(() => {
@@ -79,10 +74,15 @@ export default function App() {
 
   useEffect(() => {
     if (logId === null) return;
-    remember("qrzero.log", logId);
+    localSet("qrzero.log", { id: logId });
     setSelection(new Set());
     setLookup(null);
-    loadStation(logId).catch((e) => setError(String(e.message ?? e)));
+    loadStation(logId)
+      .then((calls) => {
+        // First launch: walk through setup.
+        if (!calls.length) setDialog("wizard");
+      })
+      .catch((e) => setError(String(e.message ?? e)));
   }, [logId, loadStation]);
 
   const refreshGrid = () => {
@@ -92,13 +92,16 @@ export default function App() {
 
   const location = locations.find((l) => l.id === locationId) ?? null;
   const currentLog = logs.find((l) => l.id === logId);
+  const home = location ? positionOf(location.fields, "MY_") : null;
+  const dxStation = lookup?.station ?? null;
+  const dx = (dxStation && positionOf(dxStation)) || gridToLatLon(entry.fields.GRIDSQUARE ?? "") || null;
 
-  if (error) {
-    return <div className="fatal">{error}</div>;
-  }
-  if (logId === null) {
-    return <div className="fatal">Loading…</div>;
-  }
+  if (error) return <div className="fatal">{error}</div>;
+  if (logId === null || callsigns === null || !layoutLoaded) return <div className="fatal">Loading…</div>;
+
+  const reloadStation = async () => {
+    await loadStation(logId);
+  };
 
   return (
     <div className="app">
@@ -107,17 +110,13 @@ export default function App() {
         <label>
           Log
           <select value={logId} onChange={(e) => setLogId(Number(e.target.value))}>
-            {logs.map((l) => (
-              <option key={l.id} value={l.id}>{l.name}</option>
-            ))}
+            {logs.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
         </label>
         <label>
           Station
           <select value={stationCall} onChange={(e) => setStationCall(e.target.value)} disabled={!callsigns.length}>
-            {callsigns.map((c) => (
-              <option key={c.id} value={c.callsign}>{c.callsign}</option>
-            ))}
+            {callsigns.map((c) => <option key={c.id} value={c.callsign}>{c.callsign}</option>)}
           </select>
         </label>
         <label>
@@ -125,27 +124,38 @@ export default function App() {
           <select value={locationId ?? ""} onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : null)}>
             <option value="">(none)</option>
             {locations.map((l) => (
-              <option key={l.id} value={l.id}>{l.name}{l.fields.MY_GRIDSQUARE ? ` · ${l.fields.MY_GRIDSQUARE}` : ""}</option>
+              <option key={l.id} value={l.id}>{l.name}{l.fields.MY_GRIDSQUARE ? ` (${l.fields.MY_GRIDSQUARE})` : ""}</option>
             ))}
           </select>
         </label>
-        <span className="clock" title="UTC">{utcClock(now)}</span>
         <span className="spacer" />
         <span className="muted">{currentLog?.qso_count.toLocaleString() ?? 0} QSOs</span>
-        <button onClick={() => setDialog("import")}>Import</button>
-        <button onClick={() => setDialog("export")}>Export</button>
-        <button onClick={() => setDialog("settings")}>Settings</button>
-        <button onClick={() => setDialog("help")} title="User guide (F1)">Help</button>
+        <span className="clock" title="UTC">{utcClock(now)}</span>
+        <nav className="menu">
+          <button onClick={() => setDialog("import")}>Import</button>
+          <button onClick={() => setDialog("export")}>Export</button>
+          <button onClick={() => setDialog("settings")}>Settings</button>
+          <button onClick={() => setDialog("help")} title="User guide (F1)">Help</button>
+        </nav>
       </header>
 
-      <section className="top">
+      <div className="top">
         {callsigns.length === 0 ? (
-          <SetupCard logId={logId} onDone={() => loadStation(logId)} />
+          <section className="panel entry">
+            <div className="panel-title"><span>Welcome</span></div>
+            <div className="panel-body">
+              <p>QRZero needs your callsign and home location before you can log.</p>
+              <button className="primary" onClick={() => setDialog("wizard")}>Start setup</button>
+            </div>
+          </section>
         ) : (
           <EntryPanel
+            key={`${logId}-${location?.id ?? 0}`}
             logId={logId}
             stationCall={stationCall}
             location={location}
+            layout={layout}
+            equipment={equipment.filter((e) => e.location_id === location?.id)}
             onLogged={refreshGrid}
             onLookup={setLookup}
             onContext={setEntry}
@@ -153,7 +163,19 @@ export default function App() {
           />
         )}
         <LookupPanel result={lookup} entry={entry} />
-      </section>
+        <MapPanel
+          home={home}
+          homeLabel={stationCall}
+          dx={dx}
+          dxLabel={entry.fields.CALL || dxStation?.CALL || ""}
+          units={general.units}
+          view={mapView}
+          onView={(v) => {
+            setMapView(v);
+            localSet("qrzero.map", { view: v });
+          }}
+        />
+      </div>
 
       <LogGrid
         logId={logId}
@@ -165,8 +187,25 @@ export default function App() {
         onEdit={setEditing}
         onDeleted={refreshGrid}
         onExportSelected={() => setDialog("export")}
+        columns={columns}
+        onColumns={setColumns}
+        locations={locations}
       />
 
+      {dialog === "wizard" && (
+        <SetupWizard
+          logId={logId}
+          callsigns={callsigns}
+          locations={locations}
+          equipment={equipment}
+          onChanged={async () => {
+            await reloadStation();
+            refreshGrid();
+          }}
+          onLayout={setLayout}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog === "import" && (
         <ImportDialog
           logId={logId}
@@ -175,7 +214,7 @@ export default function App() {
           onClose={() => setDialog(null)}
           onImported={() => {
             refreshGrid();
-            loadStation(logId);
+            reloadStation();
           }}
         />
       )}
@@ -196,9 +235,15 @@ export default function App() {
           logs={logs}
           callsigns={callsigns}
           locations={locations}
+          equipment={equipment}
+          layout={layout}
+          onLayout={setLayout}
+          general={general}
+          onGeneral={setGeneral}
+          onWizard={() => setDialog("wizard")}
           onChanged={() => {
             loadLogs();
-            loadStation(logId);
+            reloadStation();
           }}
           onSwitchLog={setLogId}
           onClose={() => setDialog(null)}

@@ -28,6 +28,19 @@ pub struct Location {
     pub fields: Fields,
 }
 
+/// A piece of station equipment at a location: a rig, antenna, amplifier, ...
+/// `fields` holds free-form details (model, power, bands, notes, and later the
+/// rig-control connection).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Equipment {
+    pub id: i64,
+    pub location_id: i64,
+    pub kind: String,
+    pub name: String,
+    pub fields: Fields,
+    pub sort: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Qso {
     pub id: i64,

@@ -6,9 +6,12 @@ import type { EntryContext } from "./EntryPanel";
 export default function LookupPanel({ result, entry }: { result: LookupResult | null; entry: EntryContext }) {
   if (!result) {
     return (
-      <aside className="lookup empty">
-        <p className="muted">Type a call and leave the field (Tab or Space) to see station details and your history with it.</p>
-      </aside>
+      <section className="panel lookup">
+        <div className="panel-title"><span>Station</span></div>
+        <div className="panel-body">
+          <p className="muted">Type a call and leave the field (Tab or Space) to see station details and your history with it.</p>
+        </div>
+      </section>
     );
   }
   const s = result.station;
@@ -27,7 +30,9 @@ export default function LookupPanel({ result, entry }: { result: LookupResult | 
   }
 
   return (
-    <aside className="lookup">
+    <section className="panel lookup">
+      <div className="panel-title"><span>Station</span><span className="spacer" /><span className="small muted">{result.source}</span></div>
+      <div className="panel-body">
       {s ? (
         <div className="station">
           <div className="station-call">{s.CALL}</div>
@@ -37,10 +42,7 @@ export default function LookupPanel({ result, entry }: { result: LookupResult | 
             {[s.GRIDSQUARE && `Grid ${s.GRIDSQUARE}`, s.DXCC && `DXCC ${s.DXCC}`, s.CQZ && `CQ ${s.CQZ}`, s.ITUZ && `ITU ${s.ITUZ}`].filter(Boolean).join(" · ")}
           </div>
           {s.QSL_VIA && <div className="muted">QSL via {s.QSL_VIA}</div>}
-          <div className="muted small">
-            {result.source}
-            {s.QRZ_LOTW === "1" && " · LoTW user"}
-          </div>
+          {s.QRZ_LOTW === "1" && <div className="muted small">Uses LoTW</div>}
         </div>
       ) : (
         <div className="muted">{result.error ? `Lookup: ${result.error}` : "No station details (lookup is off or the call wasn't found)."}</div>
@@ -68,6 +70,7 @@ export default function LookupPanel({ result, entry }: { result: LookupResult | 
           </table>
         </div>
       )}
-    </aside>
+      </div>
+    </section>
   );
 }
