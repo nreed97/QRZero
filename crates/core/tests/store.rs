@@ -204,3 +204,59 @@ fn equipment_per_location() {
     st.delete_location(park.id).unwrap();
     assert_eq!(st.list_equipment(log).unwrap().len(), 2, "equipment goes with its location");
 }
+
+#[test]
+fn duplicates_lookups_and_worked_index() {
+    let (st, log) = setup();
+    let qso = f(&[("CALL", "W1AW"), ("QSO_DATE", "20240101"), ("TIME_ON", "1200"), ("BAND", "20m"), ("MODE", "CW"), ("DXCC", "291"), ("APP_N1MM_ID", "abc")]);
+    let id = st.insert_qso(log, None, &qso).unwrap().id;
+    let near = f(&[("CALL", "w1aw"), ("QSO_DATE", "20240101"), ("TIME_ON", "120045"), ("BAND", "20M"), ("MODE", "cw")]);
+    assert_eq!(st.find_duplicate(log, &near).unwrap(), Some(id));
+    let other_band = f(&[("CALL", "W1AW"), ("QSO_DATE", "20240101"), ("TIME_ON", "1200"), ("BAND", "40m"), ("MODE", "CW")]);
+    assert_eq!(st.find_duplicate(log, &other_band).unwrap(), None);
+
+    assert_eq!(st.find_qso_by_field(log, "APP_N1MM_ID", "abc").unwrap(), Some(id));
+    assert_eq!(st.find_qso_by_field(log, "APP_N1MM_ID", "zzz").unwrap(), None);
+    assert!(st.find_qso_by_field(log, "X') OR 1=1 --", "abc").is_err());
+
+    let idx = st.worked_index(log, |_| None).unwrap();
+    assert!(!idx.needed("W1AW", Some(291), Some("20m"), Some("CW")).new_call);
+    assert!(idx.needed("W1AW", Some(291), Some("40m"), Some("CW")).new_band);
+}
+
+#[test]
+fn pending_uploads_and_marking() {
+    let (mut st, log) = setup();
+    let home = st.create_location(log, "Home", &Fields::new()).unwrap();
+    let q = |call: &str, date: &str, extra: &[(&str, &str)]| {
+        let mut v = vec![("CALL", call), ("QSO_DATE", date), ("TIME_ON", "1200"), ("BAND", "20m"), ("MODE", "CW"), ("STATION_CALLSIGN", "N0CALL")];
+        v.extend_from_slice(extra);
+        f(&v)
+    };
+    let a = st.insert_qso(log, Some(home.id), &q("W1AW", "20240101", &[])).unwrap();
+    let b = st.insert_qso(log, Some(home.id), &q("K1ABC", "20240201", &[("QRZCOM_QSO_UPLOAD_STATUS", "Y")])).unwrap();
+    st.insert_qso(log, None, &q("K2ABC", "20240301", &[("STATION_CALLSIGN", "N0OLD")])).unwrap();
+    st.insert_qso(log, Some(home.id), &q("K3ABC", "20230101", &[])).unwrap();
+    let calls = vec!["N0CALL".to_string()];
+    let since = qrzero_core::store::parse_time("20240101", "0000").unwrap();
+    let key = "QRZCOM_QSO_UPLOAD_STATUS";
+    let pending = st.pending_uploads(log, key, &calls, None, since, 100).unwrap();
+    assert_eq!(pending.iter().map(|q| q.id).collect::<Vec<_>>(), [a.id], "uploaded, other callsign and too old are skipped");
+    assert_eq!(st.count_pending(log, key, &calls, Some(home.id), 0).unwrap(), 2);
+    assert!(st.pending_uploads(log, "X') --", &calls, None, 0, 10).is_err());
+
+    st.mark_qsos(&[a.id], &f(&[(key, "Y"), ("QRZCOM_QSO_UPLOAD_DATE", "20240102")])).unwrap();
+    assert_eq!(st.count_pending(log, key, &calls, None, since).unwrap(), 0);
+    assert!(st.mark_qsos(&[a.id], &f(&[("CALL", "X")])).is_err());
+
+    // Editing an uploaded QSO marks it modified, so it goes up again.
+    let mut changed = b.fields.clone();
+    changed.insert("RST_SENT".into(), "579".into());
+    assert_eq!(st.update_qso(b.id, b.location_id, &changed).unwrap().fields[key], "M");
+    assert_eq!(st.count_pending(log, key, &calls, None, since).unwrap(), 1);
+    // Changing only QSL fields doesn't.
+    let a2 = st.get_qso(a.id).unwrap();
+    let mut qsl_only = a2.fields.clone();
+    qsl_only.insert("QSL_RCVD".into(), "Y".into());
+    assert_eq!(st.update_qso(a.id, a2.location_id, &qsl_only).unwrap().fields[key], "Y");
+}

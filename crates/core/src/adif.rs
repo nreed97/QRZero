@@ -80,11 +80,7 @@ pub fn parse(input: &[u8]) -> AdifFile {
                     in_header = false;
                     current.clear();
                 }
-                "EOR" => {
-                    if !current.is_empty() {
-                        file.records.push(std::mem::take(&mut current));
-                    }
-                }
+                "EOR" if !current.is_empty() => file.records.push(std::mem::take(&mut current)),
                 _ => {}
             }
             pos = value_start;

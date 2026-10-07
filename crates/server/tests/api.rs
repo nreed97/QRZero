@@ -50,6 +50,7 @@ impl Api {
         cfg.qrz_endpoint = qrz_endpoint;
         // Keep test passwords away from the real credential store entries.
         cfg.secret_service = format!("QRZero-test-{}", std::process::id());
+        cfg.update_cty = false;
         let running = start(cfg).await.unwrap();
         Api {
             base: format!("http://{}/api", running.addr),

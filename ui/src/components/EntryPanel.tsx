@@ -3,7 +3,7 @@ import { api } from "../api";
 import { BANDS, MODES, bandForFreq, choiceFor } from "../modes";
 import { fieldDef, freshValues, type EntryLayout } from "../fields";
 import { localGet, localSet } from "../prefs";
-import type { Equipment, Fields, Location, LookupResult } from "../types";
+import type { Equipment, Fields, Location, LookupResult, Radio } from "../types";
 import { adifDateTime } from "../util";
 
 export interface EntryContext {
@@ -23,6 +23,35 @@ interface Props {
   onLookup: (r: LookupResult | null) => void;
   onContext: (c: EntryContext) => void;
   onHelp: () => void;
+  /** Radios the panel can follow; the selected one sets frequency, band and mode. */
+  radios: Radio[];
+  radioKey: string;
+  onRadio: (key: string) => void;
+  /** A station picked from the FTx monitor or a spot. */
+  prefill: Prefill | null;
+}
+
+export interface Prefill {
+  nonce: number;
+  call: string;
+  grid?: string | null;
+  band?: string | null;
+  mode?: string;
+  freq_hz?: number;
+}
+
+/** MHz as typed in the entry panel: 14.025 or 14.07412. */
+export function mhz(hz: number): string {
+  const s = (hz / 1e6).toFixed(6).replace(/0+$/, "");
+  const [whole, frac = ""] = s.split(".");
+  return `${whole}.${frac.padEnd(3, "0")}`;
+}
+
+// What the radio reports as its mode, as an entry-panel mode.
+function radioMode(r: Radio): string | null {
+  if (r.mode) return r.mode;
+  if (r.source === "wsjtx" && MODES.some((m) => m.label === r.rig_mode)) return r.rig_mode;
+  return null;
 }
 
 // Lookup fields logged even when they aren't shown in the form.
@@ -30,7 +59,7 @@ const CARRIED = ["CQZ", "ITUZ", "CONT", "LAT", "LON", "IOTA", "EMAIL", "QSL_VIA"
 
 interface Gear { rig?: number; antenna?: number; amplifier?: number }
 
-export default function EntryPanel({ logId, stationCall, location, layout, equipment, onLogged, onLookup, onContext, onHelp }: Props) {
+export default function EntryPanel({ logId, stationCall, location, layout, equipment, onLogged, onLookup, onContext, onHelp, radios, radioKey, onRadio, prefill }: Props) {
   const prefs = useRef(localGet("qrzero.entry", { freq: "", band: "20m", mode: "CW", last: {} as Fields })).current;
   const [freq, setFreq] = useState(prefs.freq);
   const [band, setBand] = useState(prefs.band);
@@ -55,8 +84,12 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
 
   const visibleKeys = useMemo(() => new Set(layout.rows.flat().map((i) => i.key)), [layout]);
   const byKind = (kind: string) => equipment.filter((e) => e.kind === kind);
+  const radio = radios.find((r) => r.key === radioKey) ?? null;
   const pick = (kind: keyof Gear) => {
     const list = byKind(kind);
+    // A controlled rig is the rig in use while the panel follows it.
+    const controlled = kind === "rig" && radio?.source === "rig" ? list.find((e) => radio.key.startsWith(`rig:${e.id}:`)) : undefined;
+    if (controlled) return controlled;
     if (kind !== "amplifier" && gear[kind] === undefined) return list[0];
     return list.find((e) => e.id === gear[kind]);
   };
@@ -87,13 +120,38 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
     if (b) setBand(b);
   };
 
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
   const changeMode = (m: string) => {
-    const before = choiceFor(mode).rst;
+    const before = choiceFor(modeRef.current).rst;
     const rst = choiceFor(m).rst;
     setMode(m);
     // Swap default reports, but keep any the operator typed.
     setRstSent((r) => (!r || r === before ? rst : r));
     setRstRcvd((r) => (!r || r === before ? rst : r));
+  };
+
+  // Follow the selected radio.
+  useEffect(() => {
+    if (!radio?.connected || !radio.freq_hz) return;
+    setFreq(mhz(radio.freq_hz));
+    const b = bandForFreq(radio.freq_hz / 1e6);
+    if (b) setBand(b);
+    const m = radioMode(radio);
+    if (m && m !== modeRef.current) changeMode(m);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [radio?.key, radio?.connected, radio?.freq_hz, radio?.mode, radio?.rig_mode]);
+
+  const tuneTo = (freqText: string) => {
+    const hz = Math.round(Number(freqText) * 1e6);
+    if (radio?.can_tune && hz > 0 && Math.abs(hz - radio.freq_hz) >= 1) {
+      api.tune(radio.key, hz).catch((e) => setStatus({ text: `Couldn't tune: ${(e as Error).message}`, kind: "err" }));
+    }
+  };
+
+  const pickMode = (m: string) => {
+    changeMode(m);
+    if (radio?.can_tune) api.tune(radio.key, undefined, m).catch((e) => setStatus({ text: `Couldn't set the mode: ${(e as Error).message}`, kind: "err" }));
   };
 
   const chooseGear = (kind: keyof Gear, id: string) => {
@@ -103,8 +161,8 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
   };
 
   type Found = { fill: Fields };
-  const runLookup = async (): Promise<Found | null> => {
-    const c = call.trim().toUpperCase();
+  const runLookup = async (typed = call): Promise<Found | null> => {
+    const c = typed.trim().toUpperCase();
     if (c.length < 3 || c === lookedUp.current) return null;
     lookedUp.current = c;
     const seq = ++lookupSeq.current;
@@ -142,6 +200,25 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
     onLookup(null);
     callRef.current?.focus();
   };
+
+  // A station picked in the FTx monitor (or a spot): fill it in and tune to it.
+  useEffect(() => {
+    if (!prefill) return;
+    clear();
+    setCall(prefill.call);
+    setStart(new Date());
+    if (prefill.grid) setForm((f) => ({ ...f, GRIDSQUARE: prefill.grid! }));
+    const m = prefill.mode && MODES.some((x) => x.label === prefill.mode) ? prefill.mode : null;
+    if (radio?.can_tune && prefill.freq_hz) {
+      api.tune(radio.key, prefill.freq_hz, m ?? undefined).catch(() => {});
+    } else if (radio?.source !== "wsjtx") {
+      if (prefill.freq_hz) setFreq(mhz(prefill.freq_hz));
+      if (prefill.band) setBand(prefill.band);
+    }
+    if (m) changeMode(m);
+    void runLookup(prefill.call);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill?.nonce]);
 
   const log = async (found: Found | null = null) => {
     const c = call.trim().toUpperCase();
@@ -218,6 +295,13 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
     } else if (e.key === "Escape") {
       e.preventDefault();
       clear();
+    } else if (e.altKey && /^[1-9]$/.test(e.key) && radios[Number(e.key) - 1]) {
+      e.preventDefault();
+      onRadio(radios[Number(e.key) - 1].key);
+    } else if (e.key === "`" && radios.length > 1) {
+      // SO2R: swap between the first two radios.
+      e.preventDefault();
+      onRadio(radio?.key === radios[0].key ? radios[1].key : radios[0].key);
     } else if (e.key === "F1") {
       e.preventDefault();
       onHelp();
@@ -244,6 +328,19 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
       <div className="panel-title">
         <span>QSO</span>
         <span className="spacer" />
+        {radios.length > 0 && (
+          <label className="gear" title="The radio this panel follows (Alt+1, Alt+2 … or ` to swap)">
+            Radio
+            <select value={radio ? radio.key : ""} onChange={(e) => onRadio(e.target.value)} data-testid="radio">
+              <option value="">manual</option>
+              {radios.map((r, i) => (
+                <option key={r.key} value={r.key}>
+                  {i + 1}: {r.name} {r.connected && r.freq_hz ? mhz(r.freq_hz) : r.error ? "(no link)" : "…"}{r.tx ? " TX" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {gearSelect("rig", "Rig")}
         {gearSelect("antenna", "Ant")}
         {gearSelect("amplifier", "Amp")}
@@ -271,7 +368,7 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
           </label>
           <label className="f w-s"><span>Sent</span><input id="rst-sent" value={rstSent} onChange={(e) => setRstSent(e.target.value)} /></label>
           <label className="f w-s"><span>Rcvd</span><input value={rstRcvd} onChange={(e) => setRstRcvd(e.target.value)} /></label>
-          <label className="f w-m"><span>Freq MHz</span><input value={freq} onChange={(e) => changeFreq(e.target.value)} inputMode="decimal" /></label>
+          <label className="f w-m"><span>Freq MHz</span><input value={freq} onChange={(e) => changeFreq(e.target.value)} onBlur={(e) => tuneTo(e.target.value)} inputMode="decimal" /></label>
           <label className="f w-s">
             <span>Band</span>
             <select value={band} onChange={(e) => setBand(e.target.value)}>
@@ -280,7 +377,7 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
           </label>
           <label className="f w-m">
             <span>Mode</span>
-            <select value={mode} onChange={(e) => changeMode(e.target.value)}>
+            <select value={mode} onChange={(e) => pickMode(e.target.value)}>
               {MODES.map((m) => <option key={m.label}>{m.label}</option>)}
             </select>
           </label>
@@ -327,7 +424,7 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
             </>
           )}
           <div className={`status ${status.kind}`} role="status">
-            {status.text || `${stationCall || "No callsign"} · ${location ? location.name : "no location"}`}
+            {status.text || (radio?.error ? `${radio.name}: ${radio.error}` : `${stationCall || "No callsign"} · ${location ? location.name : "no location"}${radio ? ` · ${radio.name}` : ""}`)}
           </div>
           <div className="actions">
             <button className="primary" onClick={() => void log()} disabled={busy || !call}>Log <kbd>Enter</kbd></button>
