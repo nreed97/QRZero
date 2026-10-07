@@ -37,6 +37,8 @@ pub struct Config {
     pub token: Option<String>,
     /// QRZ XML endpoint (overridable for tests).
     pub qrz_endpoint: String,
+    /// Credential store namespace for saved passwords.
+    pub secret_service: String,
 }
 
 impl Config {
@@ -46,6 +48,7 @@ impl Config {
             addr: SocketAddr::from(([127, 0, 0, 1], 0)),
             token: None,
             qrz_endpoint: DEFAULT_ENDPOINT.to_string(),
+            secret_service: "QRZero".to_string(),
         }
     }
 }
@@ -67,6 +70,7 @@ struct AppState {
     store: Arc<Mutex<Store>>,
     qrz: tokio::sync::Mutex<Option<QrzClient>>,
     qrz_endpoint: String,
+    secret_service: String,
     token: String,
     data_dir: PathBuf,
 }
@@ -90,6 +94,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
         store: Arc::new(Mutex::new(store)),
         qrz: tokio::sync::Mutex::new(None),
         qrz_endpoint: cfg.qrz_endpoint,
+        secret_service: cfg.secret_service,
         token: token.clone(),
         data_dir: cfg.data_dir,
     });
@@ -407,7 +412,8 @@ async fn qrz_client(s: &Shared) -> Result<Option<tokio::sync::MutexGuard<'_, Opt
     if !settings.qrz_enabled || settings.qrz_username.is_empty() {
         return Ok(None);
     }
-    let password = db(s, |st| secrets::get(st, "qrz")).await.map_err(|e| e.1)?.unwrap_or_default();
+    let svc = s.secret_service.clone();
+    let password = db(s, move |st| secrets::get(st, &svc, "qrz")).await.map_err(|e| e.1)?.unwrap_or_default();
     if password.is_empty() {
         return Err("QRZ password is not set".into());
     }
@@ -475,9 +481,10 @@ fn load_settings(st: &Store) -> qrzero_core::Result<Settings> {
 }
 
 async fn get_settings(State(s): State<Shared>) -> ApiResult<Settings> {
-    db(&s, |st| {
+    let svc = s.secret_service.clone();
+    db(&s, move |st| {
         let mut out = load_settings(st)?;
-        out.qrz_password_set = secrets::get(st, "qrz")?.is_some_and(|p| !p.is_empty());
+        out.qrz_password_set = secrets::get(st, &svc, "qrz")?.is_some_and(|p| !p.is_empty());
         Ok(out)
     })
     .await
@@ -493,6 +500,7 @@ struct SettingsUpdate {
 }
 
 async fn put_settings(State(s): State<Shared>, Json(b): Json<SettingsUpdate>) -> ApiResult<Settings> {
+    let svc = s.secret_service.clone();
     db(&s, move |st| {
         if let Some(e) = b.qrz_enabled {
             st.set_setting("qrz.enabled", if e { "1" } else { "0" })?;
@@ -501,7 +509,7 @@ async fn put_settings(State(s): State<Shared>, Json(b): Json<SettingsUpdate>) ->
             st.set_setting("qrz.username", u.trim())?;
         }
         if let Some(p) = b.qrz_password {
-            secrets::set(st, "qrz", if p.is_empty() { None } else { Some(&p) })?;
+            secrets::set(st, &svc, "qrz", if p.is_empty() { None } else { Some(&p) })?;
         }
         Ok(())
     })
@@ -512,7 +520,8 @@ async fn put_settings(State(s): State<Shared>, Json(b): Json<SettingsUpdate>) ->
 
 async fn test_qrz(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
     let settings = db(&s, |st| load_settings(st)).await?;
-    let password = db(&s, |st| secrets::get(st, "qrz")).await?.unwrap_or_default();
+    let svc = s.secret_service.clone();
+    let password = db(&s, move |st| secrets::get(st, &svc, "qrz")).await?.unwrap_or_default();
     let mut client = QrzClient::new(&s.qrz_endpoint, &settings.qrz_username, &password);
     client.test_login().await.map_err(ApiError::from)?;
     Ok(Json(json!({ "ok": true })))

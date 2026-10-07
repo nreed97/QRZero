@@ -48,6 +48,8 @@ impl Api {
         let dir = tempfile::tempdir().unwrap();
         let mut cfg = Config::local(dir.path().to_path_buf());
         cfg.qrz_endpoint = qrz_endpoint;
+        // Keep test passwords away from the real credential store entries.
+        cfg.secret_service = format!("QRZero-test-{}", std::process::id());
         let running = start(cfg).await.unwrap();
         Api {
             base: format!("http://{}/api", running.addr),
@@ -171,4 +173,8 @@ async fn qrz_lookup_and_cache() {
 
     let r = api.get(&format!("/logs/{log}/lookup/ZZ9ZZ")).await;
     assert!(r["station"].is_null() && r["error"].is_null());
+
+    // Clearing the password removes it from the credential store.
+    let (_, s) = api.call(reqwest::Method::PUT, "/settings", Some(json!({"qrz_password": ""}))).await;
+    assert_eq!(s["qrz_password_set"], false);
 }

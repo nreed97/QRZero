@@ -418,7 +418,7 @@ impl Store {
                 Ok(rows.collect::<std::result::Result<_, _>>()?)
             };
             wb.dxcc_bands = distinct("band")?;
-            wb.dxcc_modes = distinct("mode")?;
+            wb.dxcc_modes = distinct("IFNULL(submode, mode)")?;
         }
         Ok(wb)
     }

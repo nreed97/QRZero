@@ -106,7 +106,7 @@ pub struct WorkedBefore {
     pub recent: Vec<Qso>,
     /// Distinct band/mode pairs worked with this call.
     pub call_slots: Vec<(String, String)>,
-    /// For the call's DXCC entity, when known.
+    /// For the call's DXCC entity, when known. Modes are SUBMODE where set (FT4), else MODE.
     pub dxcc: Option<i64>,
     pub dxcc_count: i64,
     pub dxcc_bands: Vec<String>,

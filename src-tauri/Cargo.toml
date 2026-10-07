@@ -1,0 +1,14 @@
+[package]
+name = "qrzero"
+description = "QRZero amateur radio logger (desktop app)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+qrzero-server = { path = "../crates/server" }
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
