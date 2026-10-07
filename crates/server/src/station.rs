@@ -217,7 +217,15 @@ impl Hub {
         f(&mut st)
     }
 
-    fn emit(&self, v: serde_json::Value) {
+    pub(crate) fn setting(&self, key: &str) -> Option<String> {
+        self.with_store(|st| st.get_setting(key)).ok().flatten()
+    }
+
+    pub(crate) fn set_setting(&self, key: &str, value: &str) -> Result<(), String> {
+        self.with_store(|st| st.set_setting(key, value)).map_err(|e| e.to_string())
+    }
+
+    pub(crate) fn emit(&self, v: serde_json::Value) {
         let _ = self.events.send(v.to_string().into());
     }
 
@@ -249,6 +257,11 @@ impl Hub {
         if loc_changed {
             self.reload_rigs();
         }
+    }
+
+    /// What's new about a station for the active log, or None before the log is indexed.
+    pub fn needed(&self, call: &str, dxcc: Option<u32>, band: Option<&str>, mode: Option<&str>) -> Option<Needed> {
+        self.lock().worked.as_ref().map(|(_, idx)| idx.needed(call, dxcc, band, mode))
     }
 
     pub fn active(&self) -> Active {

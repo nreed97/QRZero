@@ -23,7 +23,11 @@ use qrzero_core::{secrets, Error, Store};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+mod cluster;
+mod qsl;
 mod station;
+use cluster::{Cluster, ClusterConfig};
+use qsl::{Qsl, QslConfig, SecretsUpdate};
 use station::{Active, Hub, Integrations};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -44,6 +48,9 @@ pub struct Config {
     pub secret_service: String,
     /// Download the country file when it's missing or old.
     pub update_cty: bool,
+    /// QRZ Logbook and Club Log endpoints (overridable for tests).
+    pub qrz_logbook_endpoint: String,
+    pub clublog_endpoint: String,
 }
 
 impl Config {
@@ -55,6 +62,8 @@ impl Config {
             qrz_endpoint: DEFAULT_ENDPOINT.to_string(),
             secret_service: "QRZero".to_string(),
             update_cty: true,
+            qrz_logbook_endpoint: qrzero_core::qsl::QRZ_LOGBOOK_ENDPOINT.to_string(),
+            clublog_endpoint: qrzero_core::qsl::CLUBLOG_ENDPOINT.to_string(),
         }
     }
 }
@@ -80,6 +89,8 @@ struct AppState {
     token: String,
     data_dir: PathBuf,
     hub: Arc<Hub>,
+    cluster: Arc<Cluster>,
+    qsl: Arc<Qsl>,
 }
 
 type Shared = Arc<AppState>;
@@ -100,9 +111,14 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
     let store = Arc::new(Mutex::new(store));
     let hub = Hub::new(store.clone(), cfg.data_dir.clone());
     hub.start(cfg.update_cty);
+    let cluster = Cluster::new(&hub);
+    let qsl = Qsl::new(store.clone(), hub.clone(), cfg.secret_service.clone(), cfg.data_dir.clone(), (cfg.qrz_logbook_endpoint, cfg.clublog_endpoint));
+    qsl.start();
     let state = Arc::new(AppState {
         store,
         hub,
+        cluster,
+        qsl,
         qrz: tokio::sync::Mutex::new(None),
         qrz_endpoint: cfg.qrz_endpoint,
         secret_service: cfg.secret_service,
@@ -163,6 +179,12 @@ fn router(state: Shared) -> Router {
         .route("/rotator", post(rotate))
         .route("/cty", get(cty_status).post(cty_install))
         .route("/cty/update", post(cty_update))
+        .route("/cluster", get(cluster_get).put(cluster_put))
+        .route("/cluster/connect", post(cluster_connect))
+        .route("/cluster/send", post(cluster_send))
+        .route("/qsl", get(qsl_get).put(qsl_put))
+        .route("/qsl/qrz/test", post(qsl_test_qrz))
+        .route("/qsl/upload/{service}", post(qsl_upload))
         .layer(middleware::from_fn_with_state(state.clone(), require_token))
         .with_state(state);
     Router::new().nest("/api", api).fallback(static_file)
@@ -736,4 +758,74 @@ async fn cty_update(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
         .map_err(|e| ApiError(StatusCode::BAD_GATEWAY, format!("couldn't download the country file: {e}")))?;
     s.hub.rebuild_worked();
     Ok(Json(s.hub.cty_status()))
+}
+
+// ---- cluster -------------------------------------------------------------
+
+async fn cluster_get(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
+    Ok(Json(s.cluster.snapshot()))
+}
+
+async fn cluster_put(State(s): State<Shared>, Json(cfg): Json<ClusterConfig>) -> ApiResult<serde_json::Value> {
+    s.cluster.save_config(cfg).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(Json(s.cluster.snapshot()))
+}
+
+#[derive(Deserialize)]
+struct ConnectBody {
+    connect: bool,
+}
+
+async fn cluster_connect(State(s): State<Shared>, Json(b): Json<ConnectBody>) -> ApiResult<()> {
+    if b.connect {
+        s.cluster.connect();
+    } else {
+        s.cluster.disconnect();
+    }
+    Ok(Json(()))
+}
+
+#[derive(Deserialize)]
+struct LineBody {
+    line: String,
+}
+
+async fn cluster_send(State(s): State<Shared>, Json(b): Json<LineBody>) -> ApiResult<()> {
+    s.cluster.send(&b.line).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(()))
+}
+
+// ---- QSL services ----------------------------------------------------------
+
+async fn qsl_get(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
+    let q = s.qsl.clone();
+    let v = tokio::task::spawn_blocking(move || q.overview())
+        .await
+        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(v))
+}
+
+#[derive(Deserialize)]
+struct QslBody {
+    config: QslConfig,
+    #[serde(default)]
+    secrets: SecretsUpdate,
+}
+
+async fn qsl_put(State(s): State<Shared>, Json(b): Json<QslBody>) -> ApiResult<serde_json::Value> {
+    s.qsl.save(b.config, b.secrets).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    qsl_get(State(s)).await
+}
+
+async fn qsl_test_qrz(State(s): State<Shared>, Json(b): Json<CallsignBody>) -> ApiResult<serde_json::Value> {
+    let call = s.qsl.test_qrz(&b.callsign).await.map_err(|e| ApiError(StatusCode::BAD_GATEWAY, e))?;
+    Ok(Json(json!({ "callsign": call })))
+}
+
+async fn qsl_upload(State(s): State<Shared>, Path(service): Path<String>) -> ApiResult<qsl::Run> {
+    let run = match service.as_str() {
+        "lotw" => s.qsl.upload_lotw().await,
+        other => s.qsl.upload(other).await,
+    };
+    Ok(Json(run))
 }

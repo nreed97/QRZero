@@ -166,6 +166,8 @@ export const COLUMNS: ColumnDef[] = [
   { key: "CONTEST_ID", label: "Contest", width: "90px", get: f("CONTEST_ID") },
   { key: "LOTW_QSL_SENT", label: "LoTW S", width: "52px", get: f("LOTW_QSL_SENT") },
   { key: "LOTW_QSL_RCVD", label: "LoTW R", width: "52px", get: f("LOTW_QSL_RCVD") },
+  { key: "QRZCOM_QSO_UPLOAD_STATUS", label: "QRZ", width: "40px", get: f("QRZCOM_QSO_UPLOAD_STATUS") },
+  { key: "CLUBLOG_QSO_UPLOAD_STATUS", label: "Club Log", width: "60px", get: f("CLUBLOG_QSO_UPLOAD_STATUS") },
   { key: "QSL_SENT", label: "QSL S", width: "46px", get: f("QSL_SENT") },
   { key: "QSL_RCVD", label: "QSL R", width: "46px", get: f("QSL_RCVD") },
   { key: "COMMENT", label: "Comment", width: "minmax(100px,2fr)", get: f("COMMENT") },

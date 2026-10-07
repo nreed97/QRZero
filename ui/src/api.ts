@@ -1,4 +1,4 @@
-import type { CtyStatus, Equipment, Fields, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Qso, QsoFilter, Settings, StationCallsign } from "./types";
+import type { ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Qso, QsoFilter, Settings, StationCallsign } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
 function sessionToken(): string {
@@ -102,4 +102,13 @@ export const api = {
   cty: () => json<CtyStatus>("GET", "/cty"),
   updateCty: () => json<CtyStatus>("POST", "/cty/update"),
   installCty: async (file: Blob) => (await request("POST", "/cty", undefined, file)).json() as Promise<CtyStatus>,
+
+  cluster: () => json<ClusterSnapshot>("GET", "/cluster"),
+  saveCluster: (c: ClusterConfig) => json<ClusterSnapshot>("PUT", "/cluster", c),
+  clusterConnect: (connect: boolean) => json<null>("POST", "/cluster/connect", { connect }),
+  clusterSend: (line: string) => json<null>("POST", "/cluster/send", { line }),
+  qsl: () => json<QslOverview>("GET", "/qsl"),
+  saveQsl: (config: QslConfig, secrets: QslSecrets) => json<QslOverview>("PUT", "/qsl", { config, secrets }),
+  testQrzLogbook: (callsign: string) => json<{ callsign: string }>("POST", "/qsl/qrz/test", { callsign }),
+  qslUpload: (service: "qrz" | "clublog" | "lotw") => json<QslRun>("POST", `/qsl/upload/${service}`),
 };
