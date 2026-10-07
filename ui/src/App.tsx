@@ -5,7 +5,9 @@ import { utcClock } from "./util";
 import { DEFAULT_COLUMNS, DEFAULT_LAYOUT, type EntryLayout } from "./fields";
 import { gridToLatLon, positionOf } from "./geo";
 import { localGet, localSet, usePref } from "./prefs";
-import EntryPanel, { type EntryContext } from "./components/EntryPanel";
+import EntryPanel, { type EntryContext, type Prefill } from "./components/EntryPanel";
+import FtxMonitor from "./components/FtxMonitor";
+import { onLive, useIntegrations, useRadios, useRotator } from "./live";
 import LookupPanel from "./components/LookupPanel";
 import MapPanel, { type MapView } from "./components/MapPanel";
 import LogGrid from "./components/LogGrid";
@@ -38,6 +40,14 @@ export default function App() {
   const [layout, setLayout, layoutLoaded] = usePref<EntryLayout>("entry_layout", DEFAULT_LAYOUT);
   const [columns, setColumns] = usePref<string[]>("grid_columns", DEFAULT_COLUMNS);
   const [general, setGeneral] = usePref<GeneralPrefs>("general", { units: "km" });
+  const radios = useRadios();
+  const rotatorAz = useRotator();
+  const integrations = useIntegrations();
+  const rotator = integrations?.rotator_enabled ? rotatorAz : undefined;
+  const [radioKey, setRadioKey] = useState(localGet("qrzero.radio", { key: "" }).key);
+  const [prefill, setPrefill] = useState<Prefill | null>(null);
+  const [pane, setPane] = useState<"log" | "ftx" | "split">(localGet("qrzero.pane", { pane: "log" as "log" | "ftx" | "split" }).pane);
+  const [notice, setNotice] = useState("");
   const [mapView, setMapView] = useState<MapView>(localGet("qrzero.map", { view: "flat" as MapView }).view);
 
   useEffect(() => {
@@ -85,6 +95,39 @@ export default function App() {
       .catch((e) => setError(String(e.message ?? e)));
   }, [logId, loadStation]);
 
+  // Tell the server where QSOs from WSJT-X and N1MM go, and which rigs to connect.
+  useEffect(() => {
+    if (logId !== null && callsigns !== null) api.setActive(logId, locationId, stationCall).catch(() => {});
+  }, [logId, locationId, stationCall, callsigns]);
+
+  useEffect(
+    () =>
+      onLive((e) => {
+        if (e.type === "qso_logged" && e.log_id === logId) {
+          setRefreshKey((k) => k + 1);
+          loadLogs().catch(() => {});
+          if (e.call) setNotice(e.added ? `Logged ${e.call} from ${e.source}` : `${e.call} from ${e.source} was already in the log`);
+        }
+        if (e.type === "error") setNotice(e.message);
+      }),
+    [logId, loadLogs],
+  );
+
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(""), 8000);
+    return () => clearTimeout(t);
+  }, [notice]);
+
+  const chooseRadio = (key: string) => {
+    setRadioKey(key);
+    localSet("qrzero.radio", { key });
+  };
+  const choosePane = (p: "log" | "ftx" | "split") => {
+    setPane(p);
+    localSet("qrzero.pane", { pane: p });
+  };
+
   const refreshGrid = () => {
     setRefreshKey((k) => k + 1);
     loadLogs().catch(() => {});
@@ -94,7 +137,12 @@ export default function App() {
   const currentLog = logs.find((l) => l.id === logId);
   const home = location ? positionOf(location.fields, "MY_") : null;
   const dxStation = lookup?.station ?? null;
-  const dx = (dxStation && positionOf(dxStation)) || gridToLatLon(entry.fields.GRIDSQUARE ?? "") || null;
+  const dxEntity = lookup?.entity;
+  const dx =
+    (dxStation && positionOf(dxStation)) ||
+    gridToLatLon(entry.fields.GRIDSQUARE ?? "") ||
+    (dxEntity && entry.fields.CALL ? { lat: dxEntity.lat, lon: dxEntity.lon } : null) ||
+    null;
 
   if (error) return <div className="fatal">{error}</div>;
   if (logId === null || callsigns === null || !layoutLoaded) return <div className="fatal">Loading…</div>;
@@ -129,6 +177,7 @@ export default function App() {
           </select>
         </label>
         <span className="spacer" />
+        {notice && <span className="notice" role="status">{notice}</span>}
         <span className="muted">{currentLog?.qso_count.toLocaleString() ?? 0} QSOs</span>
         <span className="clock" title="UTC">{utcClock(now)}</span>
         <nav className="menu">
@@ -160,6 +209,10 @@ export default function App() {
             onLookup={setLookup}
             onContext={setEntry}
             onHelp={() => setDialog("help")}
+            radios={radios}
+            radioKey={radioKey}
+            onRadio={chooseRadio}
+            prefill={prefill}
           />
         )}
         <LookupPanel result={lookup} entry={entry} />
@@ -169,6 +222,7 @@ export default function App() {
           dx={dx}
           dxLabel={entry.fields.CALL || dxStation?.CALL || ""}
           units={general.units}
+          rotator={rotator}
           view={mapView}
           onView={(v) => {
             setMapView(v);
@@ -177,7 +231,13 @@ export default function App() {
         />
       </div>
 
-      <LogGrid
+      <nav className="pane-tabs">
+        <button className={pane === "log" ? "active" : ""} onClick={() => choosePane("log")}>Log</button>
+        <button className={pane === "ftx" ? "active" : ""} onClick={() => choosePane("ftx")}>FTx monitor</button>
+        <button className={pane === "split" ? "active" : ""} onClick={() => choosePane("split")} title="Log and FTx monitor side by side">Both</button>
+      </nav>
+      <div className={`bottom pane-${pane}`}>
+      {pane !== "ftx" && <LogGrid
         logId={logId}
         refreshKey={refreshKey}
         filter={filter}
@@ -190,7 +250,14 @@ export default function App() {
         columns={columns}
         onColumns={setColumns}
         locations={locations}
-      />
+      />}
+      {pane !== "log" && (
+        <FtxMonitor
+          mycall={stationCall}
+          onPick={(p) => setPrefill({ nonce: Date.now(), call: p.call, grid: p.grid, band: p.band, mode: p.mode, freq_hz: p.freq_hz })}
+        />
+      )}
+      </div>
 
       {dialog === "wizard" && (
         <SetupWizard

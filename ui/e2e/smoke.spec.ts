@@ -99,6 +99,15 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   expect(text).toContain("<MY_GRIDSQUARE:4>EN34");
   expect(text).not.toContain("W1AW");
 
+  // The FTx monitor waits for WSJT-X, and the integrations are set up in Settings.
+  await page.getByRole("button", { name: "FTx monitor" }).click();
+  await expect(page.getByText("Waiting for WSJT-X or JTDX")).toBeVisible();
+  await page.getByRole("button", { name: "Log", exact: true }).click();
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("button", { name: "Radios and programs" }).click();
+  await expect(page.getByLabel("Listen to WSJT-X / JTDX")).toBeChecked();
+  await page.getByRole("button", { name: "Close" }).click();
+
   // The user guide opens from the top bar.
   await page.getByRole("button", { name: "Help" }).click();
   await expect(page.getByRole("heading", { name: "Getting started" })).toBeVisible();

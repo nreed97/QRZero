@@ -44,6 +44,12 @@ export default function LookupPanel({ result, entry }: { result: LookupResult | 
           {s.QSL_VIA && <div className="muted">QSL via {s.QSL_VIA}</div>}
           {s.QRZ_LOTW === "1" && <div className="muted small">Uses LoTW</div>}
         </div>
+      ) : result.entity ? (
+        <div className="station">
+          <div>{result.entity.name}</div>
+          <div className="muted">{[`CQ ${result.entity.cq}`, `ITU ${result.entity.itu}`, result.entity.cont, result.entity.dxcc && `DXCC ${result.entity.dxcc}`].filter(Boolean).join(" · ")}</div>
+          {result.error && <div className="muted small">Lookup: {result.error}</div>}
+        </div>
       ) : (
         <div className="muted">{result.error ? `Lookup: ${result.error}` : "No station details (lookup is off or the call wasn't found)."}</div>
       )}

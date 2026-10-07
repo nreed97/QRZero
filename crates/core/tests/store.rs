@@ -204,3 +204,22 @@ fn equipment_per_location() {
     st.delete_location(park.id).unwrap();
     assert_eq!(st.list_equipment(log).unwrap().len(), 2, "equipment goes with its location");
 }
+
+#[test]
+fn duplicates_lookups_and_worked_index() {
+    let (st, log) = setup();
+    let qso = f(&[("CALL", "W1AW"), ("QSO_DATE", "20240101"), ("TIME_ON", "1200"), ("BAND", "20m"), ("MODE", "CW"), ("DXCC", "291"), ("APP_N1MM_ID", "abc")]);
+    let id = st.insert_qso(log, None, &qso).unwrap().id;
+    let near = f(&[("CALL", "w1aw"), ("QSO_DATE", "20240101"), ("TIME_ON", "120045"), ("BAND", "20M"), ("MODE", "cw")]);
+    assert_eq!(st.find_duplicate(log, &near).unwrap(), Some(id));
+    let other_band = f(&[("CALL", "W1AW"), ("QSO_DATE", "20240101"), ("TIME_ON", "1200"), ("BAND", "40m"), ("MODE", "CW")]);
+    assert_eq!(st.find_duplicate(log, &other_band).unwrap(), None);
+
+    assert_eq!(st.find_qso_by_field(log, "APP_N1MM_ID", "abc").unwrap(), Some(id));
+    assert_eq!(st.find_qso_by_field(log, "APP_N1MM_ID", "zzz").unwrap(), None);
+    assert!(st.find_qso_by_field(log, "X') OR 1=1 --", "abc").is_err());
+
+    let idx = st.worked_index(log, |_| None).unwrap();
+    assert!(!idx.needed("W1AW", Some(291), Some("20m"), Some("CW")).new_call);
+    assert!(idx.needed("W1AW", Some(291), Some("40m"), Some("CW")).new_band);
+}

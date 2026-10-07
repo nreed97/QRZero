@@ -2,11 +2,13 @@
 
 pub mod adif;
 pub mod band;
+pub mod cty;
 pub mod error;
 pub mod model;
 pub mod qrz;
 pub mod secrets;
 pub mod store;
+pub mod worked;
 
 pub use error::{Error, Result};
 pub use store::Store;

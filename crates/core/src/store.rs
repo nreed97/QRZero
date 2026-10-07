@@ -15,6 +15,7 @@ use crate::adif::{self, Fields};
 use crate::band;
 use crate::error::{Error, Result};
 use crate::model::*;
+use crate::worked::WorkedIndex;
 
 /// Migrations in order; migration N brings the schema to user_version N.
 const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2];
@@ -438,6 +439,55 @@ impl Store {
             wb.dxcc_modes = distinct("IFNULL(submode, mode)")?;
         }
         Ok(wb)
+    }
+
+    /// Builds the worked-before sets for flagging decodes and spots. `resolve`
+    /// supplies the DXCC entity for QSOs logged without one.
+    pub fn worked_index(&self, log_id: i64, resolve: impl Fn(&str) -> Option<u32>) -> Result<WorkedIndex> {
+        let mut idx = WorkedIndex::default();
+        let mut stmt = self
+            .conn
+            .prepare("SELECT call, dxcc, band, IFNULL(submode, mode) FROM qsos WHERE log_id = ?1")?;
+        let mut rows = stmt.query([log_id])?;
+        while let Some(r) = rows.next()? {
+            let call: String = r.get(0)?;
+            let dxcc: Option<i64> = r.get(1)?;
+            let band: Option<String> = r.get(2)?;
+            let mode: Option<String> = r.get(3)?;
+            let dxcc = dxcc.and_then(|d| u32::try_from(d).ok()).or_else(|| resolve(&call));
+            idx.add(&call, dxcc, band.as_deref(), mode.as_deref());
+        }
+        Ok(idx)
+    }
+
+    /// A QSO already in the log with the same call, band and mode within a minute of this one.
+    pub fn find_duplicate(&self, log_id: i64, fields: &Fields) -> Result<Option<i64>> {
+        let cols = Columns::from_fields(&normalize(fields))?;
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT id FROM qsos WHERE log_id = ?1 AND call = ?2
+                 AND time_on BETWEEN ?3 - 60 AND ?3 + 60
+                 AND IFNULL(band, '') = IFNULL(?4, '') AND IFNULL(mode, '') = IFNULL(?5, '') LIMIT 1",
+                params![log_id, cols.call, cols.time_on, cols.band, cols.mode],
+                |r| r.get(0),
+            )
+            .optional()?)
+    }
+
+    /// Finds a QSO by the value of one of its fields (e.g. another program's record id).
+    pub fn find_qso_by_field(&self, log_id: i64, key: &str, value: &str) -> Result<Option<i64>> {
+        if !key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            return Err(Error::Invalid(format!("bad field name {key}")));
+        }
+        Ok(self
+            .conn
+            .query_row(
+                &format!("SELECT id FROM qsos WHERE log_id = ?1 AND json_extract(fields, '$.{key}') = ?2 ORDER BY id DESC LIMIT 1"),
+                params![log_id, value],
+                |r| r.get(0),
+            )
+            .optional()?)
     }
 
     // ---- ADIF ----------------------------------------------------------

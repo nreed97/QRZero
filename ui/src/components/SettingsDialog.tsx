@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import type { Equipment, Fields, Location, Log, Settings, StationCallsign } from "../types";
+import type { CtyStatus, Equipment, Fields, IntegrationStatus, Integrations, Location, Log, Settings, StationCallsign } from "../types";
 import type { EntryLayout } from "../fields";
 import Modal from "./Modal";
 import EquipmentTree from "./EquipmentTree";
@@ -24,13 +24,14 @@ interface Props {
   onWizard: () => void;
 }
 
-type Tab = "station" | "locations" | "equipment" | "fields" | "logs" | "lookup" | "general";
+type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "logs" | "lookup" | "general";
 
 const TAB_NAMES: Record<Tab, string> = {
   station: "Callsigns",
   locations: "Locations",
   equipment: "Equipment",
   fields: "Entry fields",
+  radios: "Radios and programs",
   logs: "Logs",
   lookup: "Callsign lookup",
   general: "General",
@@ -68,6 +69,7 @@ export default function SettingsDialog(props: Props) {
       )}
       {tab === "fields" && <EntryFieldsEditor layout={props.layout} onChange={props.onLayout} />}
       {tab === "lookup" && <LookupTab />}
+      {tab === "radios" && <RadiosTab />}
       {tab === "general" && (
         <div>
           <label className="block">
@@ -255,6 +257,115 @@ function LookupTab() {
         <button onClick={test} disabled={!s.qrz_username}>Save and test login</button>
         <button className="primary" onClick={save}>Save</button>
       </div>
+    </div>
+  );
+}
+
+function RadiosTab() {
+  const [cfg, setCfg] = useState<Integrations | null>(null);
+  const [status, setStatus] = useState<IntegrationStatus | null>(null);
+  const [cty, setCty] = useState<CtyStatus | null>(null);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  useEffect(() => {
+    api.integrations().then((r) => { setCfg(r.config); setStatus(r.status); }).catch((e) => setMsg({ text: e.message, ok: false }));
+    api.cty().then(setCty).catch(() => {});
+  }, []);
+  if (!cfg) return <p className="muted">Loading…</p>;
+
+  const set = (patch: Partial<Integrations>) => setCfg({ ...cfg, ...patch });
+  const save = async () => {
+    try {
+      const r = await api.saveIntegrations(cfg);
+      setCfg(r.config);
+      setStatus(r.status);
+      setMsg({ text: "Saved.", ok: true });
+    } catch (e) {
+      setMsg({ text: (e as Error).message, ok: false });
+    }
+  };
+  const ctyRun = async (fn: () => Promise<CtyStatus>) => {
+    setMsg({ text: "Loading the country file…", ok: true });
+    try {
+      setCty(await fn());
+      setMsg({ text: "Country file loaded.", ok: true });
+    } catch (e) {
+      setMsg({ text: (e as Error).message, ok: false });
+    }
+  };
+  const check = (k: keyof Integrations, label: string) => (
+    <label className="check"><input type="checkbox" checked={cfg[k] as boolean} onChange={(e) => set({ [k]: e.target.checked })} /> {label}</label>
+  );
+  const text = (k: keyof Integrations, label: string, cls = "w-m", placeholder?: string) => (
+    <label className={`f ${cls}`}><span>{label}</span><input value={cfg[k] as string} placeholder={placeholder} onChange={(e) => set({ [k]: e.target.value })} /></label>
+  );
+
+  return (
+    <div className="radios-tab">
+      <p className="muted">
+        Rigs are set up under <b>Equipment</b>: edit a radio and choose how QRZero talks to it (Hamlib, TCI, CAT or CI-V).
+        Here are the programs QRZero listens to.
+      </p>
+
+      <fieldset>
+        <legend>WSJT-X and JTDX</legend>
+        {check("wsjtx_enabled", "Listen to WSJT-X / JTDX")}
+        <div className="row">
+          {text("wsjtx_listen", "Listen on", "w-m", "127.0.0.1:2237")}
+          {text("wsjtx_multicast", "Multicast group (optional)", "w-l", "224.0.0.1")}
+          <label className="f w-xl">
+            <span>Pass on to (GridTracker, JTAlert …)</span>
+            <input value={cfg.wsjtx_forward.join(", ")} placeholder="127.0.0.1:2238" onChange={(e) => set({ wsjtx_forward: e.target.value.split(/[,\s]+/).filter(Boolean) })} />
+          </label>
+        </div>
+        {check("wsjtx_auto_log", "Log QSOs that WSJT-X / JTDX log")}
+        <p className="small muted">
+          In WSJT-X: File, Settings, Reporting. Set UDP Server to the address above (127.0.0.1, port 2237) and tick
+          "Accept UDP requests" so double-clicking a decode here can call the station. Run several copies with
+          different names (wsjtx --rig-name=…) and they all show in the FTx monitor.
+        </p>
+        {status?.wsjtx && <p className="small">Status: {status.wsjtx}</p>}
+      </fieldset>
+
+      <fieldset>
+        <legend>N1MM Logger+</legend>
+        {check("n1mm_enabled", "Listen to N1MM Logger+")}
+        <div className="row">{text("n1mm_listen", "Listen on", "w-m", "127.0.0.1:12060")}</div>
+        {check("n1mm_auto_log", "Copy QSOs logged in N1MM into this log (edits and deletes follow)")}
+        <p className="small muted">In N1MM: Config, Configure Ports…, Broadcast Data. Tick Contacts and Radio and set the address to 127.0.0.1:12060.</p>
+        {status?.n1mm && <p className="small">Status: {status.n1mm}</p>}
+      </fieldset>
+
+      <fieldset>
+        <legend>PstRotatorAz</legend>
+        {check("rotator_enabled", "Turn the rotator with PstRotatorAz")}
+        <div className="row">{text("rotator_addr", "PstRotatorAz UDP address", "w-m", "127.0.0.1:12000")}</div>
+        <p className="small muted">In PstRotatorAz: Setup, UDP Control, port 12000. The map gets Turn SP / LP buttons.</p>
+        {status?.rotator && <p className="small">Status: {status.rotator}</p>}
+      </fieldset>
+
+      {msg && <p className={msg.ok ? "ok" : "err"}>{msg.text}</p>}
+      <div className="buttons"><button className="primary" onClick={save}>Save</button></div>
+
+      <fieldset>
+        <legend>Country file</legend>
+        <p className="small muted">
+          Works out the DXCC entity of a call for the FTx monitor, spots and the map, from AD1C's country files
+          (country-files.com). QRZero downloads it every two weeks.
+        </p>
+        <p>
+          {cty && cty.entities > 0
+            ? `${cty.entities} entities loaded from ${cty.file}${cty.age_days !== null ? `, ${cty.age_days} day${cty.age_days === 1 ? "" : "s"} old` : ""}.`
+            : "No country file loaded yet."}
+        </p>
+        <div className="row">
+          <button onClick={() => ctyRun(api.updateCty)}>Download now</button>
+          <label className="button-like">
+            Load cty.csv or cty.dat…
+            <input type="file" accept=".csv,.dat,text/plain" hidden onChange={(e) => e.target.files?.[0] && ctyRun(() => api.installCty(e.target.files![0]))} />
+          </label>
+        </div>
+      </fieldset>
     </div>
   );
 }

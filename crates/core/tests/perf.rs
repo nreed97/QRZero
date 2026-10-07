@@ -59,6 +59,10 @@ fn large_log_speed() {
     let band_only = timed("all 20m", &|| st.search(log, &QsoFilter { bands: vec!["20m".into()], ..Default::default() }, Sort::Newest, 0, 200).unwrap().0);
     let wb = timed("worked before", &|| st.worked_before(log, "K5Q100", Some(291)).unwrap().call_count);
     let t = Instant::now();
+    let idx = st.worked_index(log, |c| Some(c.len() as u32)).unwrap();
+    println!("worked index of {} calls: {:?}", idx.len(), t.elapsed());
+    assert!(t.elapsed().as_millis() < 2000, "worked index is built in the background, but shouldn't take long");
+    let t = Instant::now();
     let (_, n) = st.export_adif(log, &QsoFilter::default(), ExportProfile::Full, "perf").unwrap();
     println!("export {n} QSOs: {:?}", t.elapsed());
 

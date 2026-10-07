@@ -3,6 +3,7 @@ import { geoAzimuthalEquidistant, geoCircle, geoEquirectangular, geoGraticule10,
 import { feature, mesh } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import world from "world-atlas/countries-110m.json";
+import { api } from "../api";
 import { compass, fmtDistance, pathInfo, subsolarPoint, type LatLon } from "../geo";
 
 const topo = world as unknown as Topology<{ countries: GeometryCollection; land: GeometryCollection }>;
@@ -19,9 +20,16 @@ interface Props {
   units: "km" | "mi";
   view: MapView;
   onView: (v: MapView) => void;
+  /** Rotator heading, when PstRotatorAz is connected; undefined when it isn't set up. */
+  rotator?: number | null;
 }
 
-export default function MapPanel({ home, homeLabel, dx, dxLabel, units, view, onView }: Props) {
+export default function MapPanel({ home, homeLabel, dx, dxLabel, units, view, onView, rotator }: Props) {
+  const [turnErr, setTurnErr] = useState("");
+  const turn = (az: number) => {
+    setTurnErr("");
+    api.rotate(az).catch((e) => setTurnErr((e as Error).message));
+  };
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 380, h: 210 });
   const [now, setNow] = useState(new Date());
@@ -105,8 +113,16 @@ export default function MapPanel({ home, homeLabel, dx, dxLabel, units, view, on
           <>
             <span title="Short path">SP <b>{Math.round(info.sp)}°</b> {compass(info.sp)} · {fmtDistance(info.spKm, units)}</span>
             <span title="Long path">LP <b>{Math.round(info.lp)}°</b> · {fmtDistance(info.lpKm, units)}</span>
+            {rotator !== undefined && (
+              <span className="turn">
+                <button className="tiny" onClick={() => turn(info.sp)} title="Turn the rotator to the short path">Turn SP</button>
+                <button className="tiny" onClick={() => turn(info.lp)} title="Turn the rotator to the long path">LP</button>
+              </span>
+            )}
           </>
         )}
+        {rotator !== undefined && <span className="muted rot" title="Rotator heading">Rot {rotator === null ? "?" : `${Math.round(rotator)}°`}</span>}
+        {turnErr && <span className="err">{turnErr}</span>}
       </div>
     </section>
   );

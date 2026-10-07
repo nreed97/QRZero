@@ -1,4 +1,4 @@
-import type { Equipment, Fields, ImportReport, Location, Log, LookupResult, Qso, QsoFilter, Settings, StationCallsign } from "./types";
+import type { CtyStatus, Equipment, Fields, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Qso, QsoFilter, Settings, StationCallsign } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
 function sessionToken(): string {
@@ -38,6 +38,7 @@ async function json<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 export const api = {
+  token: () => token,
   hasToken: () => token !== "",
   info: () => json<{ version: string; data_dir: string }>("GET", "/info"),
 
@@ -89,4 +90,16 @@ export const api = {
   settings: () => json<Settings>("GET", "/settings"),
   saveSettings: (s: { qrz_enabled?: boolean; qrz_username?: string; qrz_password?: string }) => json<Settings>("PUT", "/settings", s),
   testQrz: () => json<{ ok: boolean }>("POST", "/settings/qrz/test"),
+
+  setActive: (logId: number, locationId: number | null, stationCallsign: string) =>
+    json<null>("POST", "/station/active", { log_id: logId, location_id: locationId, station_callsign: stationCallsign }),
+  tune: (key: string, freqHz?: number, mode?: string) => json<null>("POST", "/radios/tune", { key, freq_hz: freqHz, mode }),
+  integrations: () => json<{ config: Integrations; status: IntegrationStatus }>("GET", "/integrations"),
+  saveIntegrations: (c: Integrations) => json<{ config: Integrations; status: IntegrationStatus }>("PUT", "/integrations", c),
+  ftx: () => json<{ instances: FtxInstance[]; decodes: FtxDecode[] }>("GET", "/ftx"),
+  ftxReply: (seq: number) => json<null>("POST", "/ftx/reply", { seq }),
+  rotate: (azimuth: number) => json<null>("POST", "/rotator", { azimuth }),
+  cty: () => json<CtyStatus>("GET", "/cty"),
+  updateCty: () => json<CtyStatus>("POST", "/cty/update"),
+  installCty: async (file: Blob) => (await request("POST", "/cty", undefined, file)).json() as Promise<CtyStatus>,
 };
