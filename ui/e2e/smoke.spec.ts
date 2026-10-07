@@ -108,6 +108,22 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByLabel("Listen to WSJT-X / JTDX")).toBeChecked();
   await page.getByRole("button", { name: "Close" }).click();
 
+  // With no cluster set up, the Cluster pane sends you to Settings to add one.
+  await page.getByRole("button", { name: "Cluster" }).click();
+  await page.getByRole("button", { name: "Add a cluster…" }).click();
+  await page.getByRole("button", { name: "VE7CC" }).click();
+  await expect(page.locator("input[aria-label=Host]").first()).toHaveValue("dxc.ve7cc.net");
+  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "Log", exact: true }).click();
+
+  // QSL uploads: keys are saved, never shown back.
+  await page.getByRole("button", { name: "QSL", exact: true }).click();
+  await page.getByLabel("QRZ API key for N0OLD").fill("ABCD-1234");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Saved.")).toBeVisible();
+  await expect(page.getByLabel("QRZ API key for N0OLD")).toHaveAttribute("placeholder", "API key saved");
+  await page.getByRole("button", { name: "Close" }).click();
+
   // The user guide opens from the top bar.
   await page.getByRole("button", { name: "Help" }).click();
   await expect(page.getByRole("heading", { name: "Getting started" })).toBeVisible();

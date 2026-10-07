@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import type { CtyStatus, Equipment, Fields, IntegrationStatus, Integrations, Location, Log, Settings, StationCallsign } from "../types";
+import type { ClusterConfig, ClusterNode, CtyStatus, Equipment, Fields, IntegrationStatus, Integrations, Location, Log, Settings, StationCallsign } from "../types";
 import type { EntryLayout } from "../fields";
 import Modal from "./Modal";
 import EquipmentTree from "./EquipmentTree";
@@ -22,9 +22,10 @@ interface Props {
   general: GeneralPrefs;
   onGeneral: (g: GeneralPrefs) => void;
   onWizard: () => void;
+  initialTab?: string;
 }
 
-type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "logs" | "lookup" | "general";
+type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "cluster" | "logs" | "lookup" | "general";
 
 const TAB_NAMES: Record<Tab, string> = {
   station: "Callsigns",
@@ -32,13 +33,14 @@ const TAB_NAMES: Record<Tab, string> = {
   equipment: "Equipment",
   fields: "Entry fields",
   radios: "Radios and programs",
+  cluster: "DX cluster",
   logs: "Logs",
   lookup: "Callsign lookup",
   general: "General",
 };
 
 export default function SettingsDialog(props: Props) {
-  const [tab, setTab] = useState<Tab>("station");
+  const [tab, setTab] = useState<Tab>(props.initialTab && props.initialTab in TAB_NAMES ? (props.initialTab as Tab) : "station");
   const [error, setError] = useState("");
   const guard = (fn: () => Promise<unknown>) => async () => {
     setError("");
@@ -70,6 +72,7 @@ export default function SettingsDialog(props: Props) {
       {tab === "fields" && <EntryFieldsEditor layout={props.layout} onChange={props.onLayout} />}
       {tab === "lookup" && <LookupTab />}
       {tab === "radios" && <RadiosTab />}
+      {tab === "cluster" && <ClusterTab />}
       {tab === "general" && (
         <div>
           <label className="block">
@@ -366,6 +369,81 @@ function RadiosTab() {
           </label>
         </div>
       </fieldset>
+    </div>
+  );
+}
+
+// Well-known nodes offered as a starting point.
+const KNOWN_NODES: ClusterNode[] = [
+  { name: "VE7CC", host: "dxc.ve7cc.net", port: 23, login: "", password: "", commands: [] },
+  { name: "NC7J", host: "dxc.nc7j.com", port: 7373, login: "", password: "", commands: [] },
+  { name: "RBN (CW, RTTY)", host: "telnet.reversebeacon.net", port: 7000, login: "", password: "", commands: [] },
+  { name: "RBN (FT8)", host: "telnet.reversebeacon.net", port: 7001, login: "", password: "", commands: [] },
+];
+
+function ClusterTab() {
+  const [cfg, setCfg] = useState<ClusterConfig | null>(null);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  useEffect(() => {
+    api.cluster().then((c) => setCfg(c.config)).catch((e) => setMsg({ text: e.message, ok: false }));
+  }, []);
+  if (!cfg) return <p className="muted">Loading…</p>;
+
+  const setNode = (i: number, patch: Partial<ClusterNode>) => setCfg({ ...cfg, nodes: cfg.nodes.map((n, j) => (j === i ? { ...n, ...patch } : n)) });
+  const move = (i: number, d: number) => {
+    const nodes = [...cfg.nodes];
+    const [n] = nodes.splice(i, 1);
+    nodes.splice(i + d, 0, n);
+    setCfg({ ...cfg, nodes });
+  };
+  const save = async () => {
+    try {
+      const r = await api.saveCluster({ ...cfg, nodes: cfg.nodes.filter((n) => n.host.trim()) });
+      setCfg(r.config);
+      setMsg({ text: "Saved.", ok: true });
+    } catch (e) {
+      setMsg({ text: (e as Error).message, ok: false });
+    }
+  };
+
+  return (
+    <div>
+      <p className="muted">
+        QRZero connects to the first node in the list and moves down the list if it can't get through. It logs in with
+        the station callsign you've picked in the top bar unless you give a login.
+      </p>
+      <table className="list nodes">
+        <thead>
+          <tr><th>Name</th><th>Host</th><th>Port</th><th>Login</th><th>Password</th><th>Commands after login</th><th /></tr>
+        </thead>
+        <tbody>
+          {cfg.nodes.map((n, i) => (
+            <tr key={i}>
+              <td><input value={n.name} onChange={(e) => setNode(i, { name: e.target.value })} aria-label="Name" /></td>
+              <td><input value={n.host} onChange={(e) => setNode(i, { host: e.target.value })} aria-label="Host" /></td>
+              <td><input className="w-port" value={n.port || ""} inputMode="numeric" onChange={(e) => setNode(i, { port: Number(e.target.value) || 0 })} aria-label="Port" /></td>
+              <td><input value={n.login} placeholder="your call" onChange={(e) => setNode(i, { login: e.target.value.toUpperCase() })} aria-label="Login" /></td>
+              <td><input type="password" value={n.password} onChange={(e) => setNode(i, { password: e.target.value })} aria-label="Password" /></td>
+              <td><input value={n.commands.join("; ")} placeholder="e.g. set/skimmer; set/ft8" onChange={(e) => setNode(i, { commands: e.target.value.split(";").map((c) => c.trim()).filter(Boolean) })} aria-label="Commands" /></td>
+              <td className="nowrap">
+                <button className="tiny" disabled={i === 0} onClick={() => move(i, -1)} title="Try earlier">↑</button>
+                <button className="tiny" disabled={i === cfg.nodes.length - 1} onClick={() => move(i, 1)} title="Try later">↓</button>
+                <button className="tiny danger" onClick={() => setCfg({ ...cfg, nodes: cfg.nodes.filter((_, j) => j !== i) })}>Remove</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="row">
+        <button onClick={() => setCfg({ ...cfg, nodes: [...cfg.nodes, { name: "", host: "", port: 23, login: "", password: "", commands: [] }] })}>Add a node</button>
+        <span className="muted small">or add</span>
+        {KNOWN_NODES.filter((k) => !cfg.nodes.some((n) => n.host === k.host && n.port === k.port)).map((k) => (
+          <button key={k.name} className="tiny" onClick={() => setCfg({ ...cfg, nodes: [...cfg.nodes, k] })}>{k.name}</button>
+        ))}
+      </div>
+      <label className="check"><input type="checkbox" checked={cfg.auto_connect} onChange={(e) => setCfg({ ...cfg, auto_connect: e.target.checked })} /> Connect when QRZero starts</label>
+      {msg && <p className={msg.ok ? "ok" : "err"}>{msg.text}</p>}
+      <div className="buttons"><button className="primary" onClick={save}>Save</button></div>
     </div>
   );
 }

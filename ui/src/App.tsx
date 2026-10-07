@@ -6,7 +6,9 @@ import { DEFAULT_COLUMNS, DEFAULT_LAYOUT, type EntryLayout } from "./fields";
 import { gridToLatLon, positionOf } from "./geo";
 import { localGet, localSet, usePref } from "./prefs";
 import EntryPanel, { type EntryContext, type Prefill } from "./components/EntryPanel";
-import FtxMonitor from "./components/FtxMonitor";
+import FtxMonitor, { type DecodePick } from "./components/FtxMonitor";
+import ClusterPane from "./components/ClusterPane";
+import QslDialog from "./components/QslDialog";
 import { onLive, useIntegrations, useRadios, useRotator } from "./live";
 import LookupPanel from "./components/LookupPanel";
 import MapPanel, { type MapView } from "./components/MapPanel";
@@ -18,7 +20,8 @@ import EditQsoDialog from "./components/EditQsoDialog";
 import HelpView from "./components/HelpView";
 import SetupWizard from "./components/SetupWizard";
 
-type Dialog = "import" | "export" | "settings" | "help" | "wizard" | null;
+type Dialog = "import" | "export" | "settings" | "help" | "wizard" | "qsl" | null;
+interface Pane { tab: "log" | "ftx" | "cluster"; beside: boolean }
 
 export default function App() {
   const [logs, setLogs] = useState<Log[]>([]);
@@ -46,7 +49,11 @@ export default function App() {
   const rotator = integrations?.rotator_enabled ? rotatorAz : undefined;
   const [radioKey, setRadioKey] = useState(localGet("qrzero.radio", { key: "" }).key);
   const [prefill, setPrefill] = useState<Prefill | null>(null);
-  const [pane, setPane] = useState<"log" | "ftx" | "split">(localGet("qrzero.pane", { pane: "log" as "log" | "ftx" | "split" }).pane);
+  const [pane, setPane] = useState<Pane>(() => {
+    const saved = localGet<Pane>("qrzero.pane2", { tab: "log", beside: false });
+    return saved.tab === "log" || saved.tab === "ftx" || saved.tab === "cluster" ? saved : { tab: "log", beside: false };
+  });
+  const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState("");
   const [mapView, setMapView] = useState<MapView>(localGet("qrzero.map", { view: "flat" as MapView }).view);
 
@@ -123,10 +130,13 @@ export default function App() {
     setRadioKey(key);
     localSet("qrzero.radio", { key });
   };
-  const choosePane = (p: "log" | "ftx" | "split") => {
-    setPane(p);
-    localSet("qrzero.pane", { pane: p });
+  const choosePane = (p: Partial<Pane>) => {
+    const next = { ...pane, ...p };
+    setPane(next);
+    localSet("qrzero.pane2", next);
   };
+
+  const pick = (p: DecodePick) => setPrefill({ nonce: Date.now(), call: p.call, grid: p.grid, band: p.band, mode: p.mode, freq_hz: p.freq_hz });
 
   const refreshGrid = () => {
     setRefreshKey((k) => k + 1);
@@ -183,6 +193,7 @@ export default function App() {
         <nav className="menu">
           <button onClick={() => setDialog("import")}>Import</button>
           <button onClick={() => setDialog("export")}>Export</button>
+          <button onClick={() => setDialog("qsl")} title="Upload to LoTW, QRZ and Club Log">QSL</button>
           <button onClick={() => setDialog("settings")}>Settings</button>
           <button onClick={() => setDialog("help")} title="User guide (F1)">Help</button>
         </nav>
@@ -232,12 +243,17 @@ export default function App() {
       </div>
 
       <nav className="pane-tabs">
-        <button className={pane === "log" ? "active" : ""} onClick={() => choosePane("log")}>Log</button>
-        <button className={pane === "ftx" ? "active" : ""} onClick={() => choosePane("ftx")}>FTx monitor</button>
-        <button className={pane === "split" ? "active" : ""} onClick={() => choosePane("split")} title="Log and FTx monitor side by side">Both</button>
+        <button className={pane.tab === "log" ? "active" : ""} onClick={() => choosePane({ tab: "log" })}>Log</button>
+        <button className={pane.tab === "ftx" ? "active" : ""} onClick={() => choosePane({ tab: "ftx" })}>FTx monitor</button>
+        <button className={pane.tab === "cluster" ? "active" : ""} onClick={() => choosePane({ tab: "cluster" })}>Cluster</button>
+        {pane.tab !== "log" && (
+          <label className="check beside" title="Show the log next to this pane">
+            <input type="checkbox" checked={pane.beside} onChange={(e) => choosePane({ beside: e.target.checked })} /> Beside the log
+          </label>
+        )}
       </nav>
-      <div className={`bottom pane-${pane}`}>
-      {pane !== "ftx" && <LogGrid
+      <div className={`bottom ${pane.tab !== "log" && pane.beside ? "pane-split" : ""}`}>
+      {(pane.tab === "log" || pane.beside) && <LogGrid
         logId={logId}
         refreshKey={refreshKey}
         filter={filter}
@@ -251,10 +267,14 @@ export default function App() {
         onColumns={setColumns}
         locations={locations}
       />}
-      {pane !== "log" && (
-        <FtxMonitor
-          mycall={stationCall}
-          onPick={(p) => setPrefill({ nonce: Date.now(), call: p.call, grid: p.grid, band: p.band, mode: p.mode, freq_hz: p.freq_hz })}
+      {pane.tab === "ftx" && <FtxMonitor mycall={stationCall} onPick={pick} />}
+      {pane.tab === "cluster" && (
+        <ClusterPane
+          onPick={pick}
+          onSettings={() => {
+            setSettingsTab("cluster");
+            setDialog("settings");
+          }}
         />
       )}
       </div>
@@ -313,9 +333,14 @@ export default function App() {
             reloadStation();
           }}
           onSwitchLog={setLogId}
-          onClose={() => setDialog(null)}
+          initialTab={settingsTab}
+          onClose={() => {
+            setDialog(null);
+            setSettingsTab(undefined);
+          }}
         />
       )}
+      {dialog === "qsl" && <QslDialog callsigns={callsigns} locations={locations} onClose={() => setDialog(null)} />}
       {dialog === "help" && <HelpView onClose={() => setDialog(null)} />}
       {editing && (
         <EditQsoDialog
