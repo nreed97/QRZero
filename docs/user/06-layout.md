@@ -1,6 +1,6 @@
 # Arranging the window
 
-Every part of the window is a pane: New QSO, Worked before, Station, Map, Log, FTx monitor, Cluster, Awards, Band map, Watch list, Propagation, Rotator and Notes. Some start as tabs behind others; click a tab to bring it to the front. Put them wherever suits your screen, and QRZero remembers the arrangement on this computer.
+Every part of the window is a pane: New QSO, Worked before, Station, Map, Log, FTx monitor, Cluster, Awards, Band map, Watch list, DXpeditions, Propagation, Rotator and Notes. Some start as tabs behind others; click a tab to bring it to the front. Put them wherever suits your screen, and QRZero remembers the arrangement on this computer.
 
 ## Resizing
 

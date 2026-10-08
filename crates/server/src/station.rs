@@ -390,6 +390,8 @@ pub struct Hub {
     inner: Mutex<Inner>,
     cty: RwLock<Option<Arc<CtyDb>>>,
     pub(crate) watch: crate::watch::Watch,
+    /// DXpeditions from the calendar feed and the user's own.
+    pub(crate) dxped: crate::dxped::Dxped,
     /// The user's own UDP connections and relays.
     pub(crate) udp: Arc<crate::udp_out::Outputs>,
     /// Where auto-logged QSOs go to be looked up: (log id, QSO id, call).
@@ -417,7 +419,8 @@ impl Hub {
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
         let udp = crate::udp_out::Outputs::new(conns);
-        let hub = Arc::new(Hub { store, data_dir, events, inner: Mutex::default(), cty: RwLock::default(), watch, udp, auto_lookup: Mutex::default() });
+        let dxped = crate::dxped::saved(|k| store.lock().unwrap_or_else(|p| p.into_inner()).get_setting(k).ok().flatten());
+        let hub = Arc::new(Hub { store, data_dir, events, inner: Mutex::default(), cty: RwLock::default(), watch, dxped, udp, auto_lookup: Mutex::default() });
         if let Err(e) = hub.load_cty_file() {
             tracing::info!("no country file yet: {e}");
         }
@@ -511,6 +514,11 @@ impl Hub {
     /// What's new about a station for the active log, or None before the log is indexed.
     pub fn needed(&self, call: &str, dxcc: Option<u32>, band: Option<&str>, mode: Option<&str>) -> Option<Needed> {
         self.lock().worked.as_ref().map(|(_, idx)| idx.needed(call, dxcc, band, mode))
+    }
+
+    /// What is worked for a DXCC entity in the active log, or None before the log is indexed.
+    pub fn dxcc_profile(&self, dxcc: u32) -> Option<qrzero_core::worked::DxccProfile> {
+        self.lock().worked.as_ref().map(|(_, idx)| idx.dxcc_profile(dxcc))
     }
 
     pub fn active(&self) -> Active {
@@ -1229,6 +1237,16 @@ impl Hub {
     pub(crate) fn watch_hit(&self, entry_id: u64, s: &crate::watch::Sighting) {
         if let Some(hit) = self.watch.record(entry_id, s, chrono::Utc::now().timestamp()) {
             self.emit(json!({"type": "watch_hit", "hit": hit}));
+        }
+    }
+
+    /// Notes a cluster spot of a listed DXpedition, and alerts when it would be new for the log.
+    pub(crate) fn dxped_spot(&self, s: &crate::watch::Sighting, dxcc: Option<u32>) {
+        let now = chrono::Utc::now().timestamp();
+        if let Some((label, note)) = self.dxped.on_spot(self, s, dxcc, now) {
+            if let Some(hit) = self.watch.record_other(label, note, s, now) {
+                self.emit(json!({"type": "watch_hit", "hit": hit}));
+            }
         }
     }
 

@@ -31,6 +31,7 @@ mod qsl;
 mod startup;
 mod station;
 mod udp_out;
+mod dxped;
 mod watch;
 
 pub use qsl::Endpoints as QslEndpoints;
@@ -61,6 +62,8 @@ pub struct Config {
     pub qsl_endpoints: QslEndpoints,
     /// N0NBH's solar data feed (tests point this at a stand-in).
     pub propagation_url: String,
+    /// NG3K's DXpedition calendar (tests point this at a stand-in).
+    pub dxped_url: String,
     /// Start the programs listed under Settings, Startup programs.
     pub launch_apps: bool,
 }
@@ -76,6 +79,7 @@ impl Config {
             update_cty: true,
             qsl_endpoints: QslEndpoints::default(),
             propagation_url: propagation::DEFAULT_URL.to_string(),
+            dxped_url: dxped::DEFAULT_URL.to_string(),
             launch_apps: true,
         }
     }
@@ -135,6 +139,19 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
     let store = Arc::new(Mutex::new(store));
     let hub = Hub::new(store.clone(), cfg.data_dir.clone());
     hub.start(cfg.update_cty);
+    hub.dxped.set_url(cfg.dxped_url);
+    if cfg.update_cty {
+        // Keeps the DXpedition calendar fresh in the background (weak, so it never holds the database open).
+        let weak = Arc::downgrade(&hub);
+        tokio::spawn(async move {
+            loop {
+                let Some(hub) = weak.upgrade() else { break };
+                let wait = dxped::refresh(&hub, false).await;
+                drop(hub);
+                tokio::time::sleep(wait).await;
+            }
+        });
+    }
     let cluster = Cluster::new(&hub);
     let qsl = Qsl::new(store.clone(), hub.clone(), cfg.secret_service.clone(), cfg.data_dir.clone(), cfg.qsl_endpoints);
     qsl.start();
@@ -249,6 +266,8 @@ fn router(state: Shared) -> Router {
         .route("/cty/entities", get(cty_entities))
         .route("/watch", get(watch_get).put(watch_put))
         .route("/watch/hits", get(watch_hits))
+        .route("/dxpeditions", get(dxped_get).put(dxped_put))
+        .route("/dxpeditions/refresh", post(dxped_refresh))
         .route("/cluster", get(cluster_get).put(cluster_put))
         .route("/cluster/connect", post(cluster_connect))
         .route("/cluster/send", post(cluster_send))
@@ -1285,6 +1304,25 @@ async fn watch_put(State(s): State<Shared>, Json(entries): Json<Vec<watch::Watch
     let text = serde_json::to_string(&saved).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     s.hub.set_setting(watch::SETTING_KEY, &text).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))?;
     Ok(Json(saved))
+}
+
+fn dxped_view(s: &Shared) -> serde_json::Value {
+    s.hub.dxped.view(&s.hub, chrono::Utc::now().date_naive())
+}
+
+async fn dxped_get(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
+    Ok(Json(dxped_view(&s)))
+}
+
+/// Replaces the hand-added list.
+async fn dxped_put(State(s): State<Shared>, Json(list): Json<Vec<dxped::Planned>>) -> ApiResult<serde_json::Value> {
+    dxped::save_manual(&s.hub, list).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(Json(dxped_view(&s)))
+}
+
+async fn dxped_refresh(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
+    dxped::refresh(&s.hub, true).await;
+    Ok(Json(dxped_view(&s)))
 }
 
 async fn watch_hits(State(s): State<Shared>) -> ApiResult<Vec<watch::WatchHit>> {

@@ -264,6 +264,27 @@ export interface WatchHit {
   detail: string;
   time: number;
 }
+export interface DxpedNeed { unknown: boolean; new_dxcc: boolean; bands: string[]; modes: string[] }
+export interface DxpedSpot { call: string; freq_hz: number; band: string | null; mode: string; comment: string; grid: string | null; time: number }
+export interface DxpedItem {
+  /** Only hand-added ones have an id. */
+  id: number;
+  manual: boolean;
+  call: string;
+  /** YYYY-MM-DD, empty for no date. */
+  start: string;
+  end: string;
+  note: string;
+  active: boolean;
+  entity: string | null;
+  prefix: string | null;
+  dxcc: number | null;
+  need: DxpedNeed;
+  needed: boolean;
+  spot: DxpedSpot | null;
+}
+export interface DxpedList { items: DxpedItem[]; fetched_at: number | null; error: string | null; url: string }
+export interface DxpedPlanned { id: number; call: string; start: string; end: string; note: string }
 export interface CtyEntityInfo { prefix: string; name: string; dxcc: number | null; cont: string }
 
 /** N0NBH solar data as /api/propagation returns it. */
