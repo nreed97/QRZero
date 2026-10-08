@@ -23,6 +23,13 @@ use qrzero_core::{secrets, Error, Store};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+mod cluster;
+mod qsl;
+mod station;
+use cluster::{Cluster, ClusterConfig};
+use qsl::{Qsl, QslConfig, SecretsUpdate};
+use station::{Active, Hub, Integrations};
+
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 const LOOKUP_CACHE_SECS: i64 = 30 * 24 * 3600;
 
@@ -39,6 +46,11 @@ pub struct Config {
     pub qrz_endpoint: String,
     /// Credential store namespace for saved passwords.
     pub secret_service: String,
+    /// Download the country file when it's missing or old.
+    pub update_cty: bool,
+    /// QRZ Logbook and Club Log endpoints (overridable for tests).
+    pub qrz_logbook_endpoint: String,
+    pub clublog_endpoint: String,
 }
 
 impl Config {
@@ -49,6 +61,9 @@ impl Config {
             token: None,
             qrz_endpoint: DEFAULT_ENDPOINT.to_string(),
             secret_service: "QRZero".to_string(),
+            update_cty: true,
+            qrz_logbook_endpoint: qrzero_core::qsl::QRZ_LOGBOOK_ENDPOINT.to_string(),
+            clublog_endpoint: qrzero_core::qsl::CLUBLOG_ENDPOINT.to_string(),
         }
     }
 }
@@ -73,6 +88,9 @@ struct AppState {
     secret_service: String,
     token: String,
     data_dir: PathBuf,
+    hub: Arc<Hub>,
+    cluster: Arc<Cluster>,
+    qsl: Arc<Qsl>,
 }
 
 type Shared = Arc<AppState>;
@@ -90,8 +108,17 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
         store.create_log("My log")?;
     }
     let token = cfg.token.unwrap_or_else(random_token);
+    let store = Arc::new(Mutex::new(store));
+    let hub = Hub::new(store.clone(), cfg.data_dir.clone());
+    hub.start(cfg.update_cty);
+    let cluster = Cluster::new(&hub);
+    let qsl = Qsl::new(store.clone(), hub.clone(), cfg.secret_service.clone(), cfg.data_dir.clone(), (cfg.qrz_logbook_endpoint, cfg.clublog_endpoint));
+    qsl.start();
     let state = Arc::new(AppState {
-        store: Arc::new(Mutex::new(store)),
+        store,
+        hub,
+        cluster,
+        qsl,
         qrz: tokio::sync::Mutex::new(None),
         qrz_endpoint: cfg.qrz_endpoint,
         secret_service: cfg.secret_service,
@@ -143,6 +170,21 @@ fn router(state: Shared) -> Router {
         .route("/prefs/{key}", get(get_pref).put(put_pref))
         .route("/settings", get(get_settings).put(put_settings))
         .route("/settings/qrz/test", post(test_qrz))
+        .route("/events", get(events))
+        .route("/station/active", post(set_active))
+        .route("/radios/tune", post(tune))
+        .route("/integrations", get(get_integrations).put(put_integrations))
+        .route("/ftx", get(ftx))
+        .route("/ftx/reply", post(ftx_reply))
+        .route("/rotator", post(rotate))
+        .route("/cty", get(cty_status).post(cty_install))
+        .route("/cty/update", post(cty_update))
+        .route("/cluster", get(cluster_get).put(cluster_put))
+        .route("/cluster/connect", post(cluster_connect))
+        .route("/cluster/send", post(cluster_send))
+        .route("/qsl", get(qsl_get).put(qsl_put))
+        .route("/qsl/qrz/test", post(qsl_test_qrz))
+        .route("/qsl/upload/{service}", post(qsl_upload))
         .layer(middleware::from_fn_with_state(state.clone(), require_token))
         .with_state(state);
     Router::new().nest("/api", api).fallback(static_file)
@@ -319,23 +361,28 @@ async fn list_equipment(State(s): State<Shared>, Path(id): Path<i64>) -> ApiResu
 }
 
 async fn create_equipment(State(s): State<Shared>, Path(loc): Path<i64>, Json(b): Json<EquipmentBody>) -> ApiResult<Equipment> {
-    db(&s, move |st| st.create_equipment(loc, &b.kind, &b.name, &b.fields)).await.map(Json)
+    let e = db(&s, move |st| st.create_equipment(loc, &b.kind, &b.name, &b.fields)).await?;
+    s.hub.reload_rigs();
+    Ok(Json(e))
 }
 
 async fn update_equipment(State(s): State<Shared>, Path(id): Path<i64>, Json(b): Json<EquipmentBody>) -> ApiResult<Equipment> {
-    db(&s, move |st| {
+    let e = db(&s, move |st| {
         let loc = match b.location_id {
             Some(l) => l,
             None => st.get_equipment(id)?.location_id,
         };
         st.update_equipment(id, loc, &b.kind, &b.name, &b.fields)
     })
-    .await
-    .map(Json)
+    .await?;
+    s.hub.reload_rigs();
+    Ok(Json(e))
 }
 
 async fn delete_equipment(State(s): State<Shared>, Path(id): Path<i64>) -> ApiResult<()> {
-    db(&s, move |st| st.delete_equipment(id)).await.map(Json)
+    db(&s, move |st| st.delete_equipment(id)).await?;
+    s.hub.reload_rigs();
+    Ok(Json(()))
 }
 
 #[derive(Deserialize)]
@@ -375,8 +422,11 @@ struct QsoBody {
     fields: Fields,
 }
 
-async fn insert_qso(State(s): State<Shared>, Path(id): Path<i64>, Json(b): Json<QsoBody>) -> ApiResult<Qso> {
-    db(&s, move |st| st.insert_qso(id, b.location_id, &b.fields)).await.map(Json)
+async fn insert_qso(State(s): State<Shared>, Path(id): Path<i64>, Json(mut b): Json<QsoBody>) -> ApiResult<Qso> {
+    s.hub.fill_from_cty(&mut b.fields);
+    let qso = db(&s, move |st| st.insert_qso(id, b.location_id, &b.fields)).await?;
+    s.hub.note_qso(id, &qso.fields);
+    Ok(Json(qso))
 }
 
 async fn get_qso(State(s): State<Shared>, Path(id): Path<i64>) -> ApiResult<Qso> {
@@ -384,7 +434,9 @@ async fn get_qso(State(s): State<Shared>, Path(id): Path<i64>) -> ApiResult<Qso>
 }
 
 async fn update_qso(State(s): State<Shared>, Path(id): Path<i64>, Json(b): Json<QsoBody>) -> ApiResult<Qso> {
-    db(&s, move |st| st.update_qso(id, b.location_id, &b.fields)).await.map(Json)
+    let qso = db(&s, move |st| st.update_qso(id, b.location_id, &b.fields)).await?;
+    s.hub.rebuild_worked();
+    Ok(Json(qso))
 }
 
 #[derive(Deserialize)]
@@ -393,7 +445,9 @@ struct IdsBody {
 }
 
 async fn delete_qsos(State(s): State<Shared>, Json(b): Json<IdsBody>) -> ApiResult<usize> {
-    db(&s, move |st| st.delete_qsos(&b.ids)).await.map(Json)
+    let n = db(&s, move |st| st.delete_qsos(&b.ids)).await?;
+    s.hub.rebuild_worked();
+    Ok(Json(n))
 }
 
 #[derive(Deserialize)]
@@ -427,6 +481,8 @@ async fn search_qsos(State(s): State<Shared>, Path(id): Path<i64>, Json(b): Json
 #[derive(Serialize)]
 struct LookupResult {
     worked: WorkedBefore,
+    /// The DXCC entity from the country file.
+    entity: Option<qrzero_core::cty::Entity>,
     /// Station details from the lookup service, as ADIF fields.
     station: Option<Fields>,
     source: Option<&'static str>,
@@ -435,7 +491,7 @@ struct LookupResult {
 
 async fn lookup(State(s): State<Shared>, Path((log_id, call)): Path<(i64, String)>) -> ApiResult<LookupResult> {
     let call = call.trim().to_ascii_uppercase();
-    let mut result = LookupResult { worked: WorkedBefore::default(), station: None, source: None, error: None };
+    let mut result = LookupResult { worked: WorkedBefore::default(), entity: s.hub.entity(&call), station: None, source: None, error: None };
     match qrz_lookup(&s, &call).await {
         Ok(Some((fields, source))) => {
             result.station = Some(fields);
@@ -444,7 +500,12 @@ async fn lookup(State(s): State<Shared>, Path((log_id, call)): Path<(i64, String
         Ok(None) => {}
         Err(e) => result.error = Some(e),
     }
-    let dxcc = result.station.as_ref().and_then(|f| f.get("DXCC")).and_then(|d| d.parse().ok());
+    let dxcc = result
+        .station
+        .as_ref()
+        .and_then(|f| f.get("DXCC"))
+        .and_then(|d| d.parse().ok())
+        .or_else(|| result.entity.as_ref().and_then(|e| e.dxcc).map(i64::from));
     result.worked = db(&s, move |st| st.worked_before(log_id, &call, dxcc)).await?;
     Ok(Json(result))
 }
@@ -514,7 +575,9 @@ async fn import(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Query<Im
         skip_duplicates: q.skip_duplicates,
         add_station_callsigns: q.add_station_callsigns,
     };
-    db(&s, move |st| st.import_adif(id, &body, &opts)).await.map(Json)
+    let report = db(&s, move |st| st.import_adif(id, &body, &opts)).await?;
+    s.hub.rebuild_worked();
+    Ok(Json(report))
 }
 
 #[derive(Deserialize)]
@@ -594,4 +657,175 @@ async fn test_qrz(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
     let mut client = QrzClient::new(&s.qrz_endpoint, &settings.qrz_username, &password);
     client.test_login().await.map_err(ApiError::from)?;
     Ok(Json(json!({ "ok": true })))
+}
+
+// ---- live station ------------------------------------------------------
+
+/// Server-sent events: radio state, FTx decodes, QSOs logged by other programs.
+async fn events(State(s): State<Shared>) -> axum::response::Sse<impl futures_util::Stream<Item = Result<axum::response::sse::Event, std::convert::Infallible>>> {
+    use axum::response::sse::{Event, KeepAlive, Sse};
+    use tokio::sync::broadcast::error::RecvError;
+    let (snapshot, rx) = s.hub.subscribe();
+    let first = futures_util::stream::iter(snapshot.into_iter().map(|e| Ok(Event::default().data(&*e))));
+    let live = futures_util::stream::unfold(rx, |mut rx| async move {
+        loop {
+            match rx.recv().await {
+                Ok(e) => return Some((Ok(Event::default().data(&*e)), rx)),
+                // A slow client skips what it missed rather than stalling everyone.
+                Err(RecvError::Lagged(_)) => continue,
+                Err(RecvError::Closed) => return None,
+            }
+        }
+    });
+    Sse::new(futures_util::StreamExt::chain(first, live)).keep_alive(KeepAlive::default())
+}
+
+async fn set_active(State(s): State<Shared>, Json(b): Json<Active>) -> ApiResult<()> {
+    s.hub.set_active(b);
+    Ok(Json(()))
+}
+
+#[derive(Deserialize)]
+struct TuneBody {
+    key: String,
+    freq_hz: Option<u64>,
+    mode: Option<String>,
+}
+
+async fn tune(State(s): State<Shared>, Json(b): Json<TuneBody>) -> ApiResult<()> {
+    s.hub.tune(&b.key, b.freq_hz, b.mode).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(()))
+}
+
+async fn get_integrations(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
+    let (cfg, status) = s.hub.integrations();
+    Ok(Json(json!({ "config": cfg, "status": status })))
+}
+
+async fn put_integrations(State(s): State<Shared>, Json(cfg): Json<Integrations>) -> ApiResult<serde_json::Value> {
+    s.hub.save_integrations(cfg)?;
+    // Give the listeners a moment to bind so the status says whether it worked.
+    tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+    get_integrations(State(s)).await
+}
+
+#[derive(Deserialize)]
+struct FtxQuery {
+    #[serde(default)]
+    since: u64,
+}
+
+async fn ftx(State(s): State<Shared>, Query(q): Query<FtxQuery>) -> ApiResult<serde_json::Value> {
+    Ok(Json(s.hub.ftx_snapshot(q.since)))
+}
+
+#[derive(Deserialize)]
+struct SeqBody {
+    seq: u64,
+}
+
+async fn ftx_reply(State(s): State<Shared>, Json(b): Json<SeqBody>) -> ApiResult<()> {
+    s.hub.ftx_reply(b.seq).await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(()))
+}
+
+#[derive(Deserialize)]
+struct RotateBody {
+    azimuth: f64,
+}
+
+async fn rotate(State(s): State<Shared>, Json(b): Json<RotateBody>) -> ApiResult<()> {
+    s.hub.rotate(b.azimuth).await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(()))
+}
+
+async fn cty_status(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
+    Ok(Json(s.hub.cty_status()))
+}
+
+/// Installs a country file the user picked (when the download isn't possible).
+async fn cty_install(State(s): State<Shared>, body: Bytes) -> ApiResult<serde_json::Value> {
+    let text = String::from_utf8_lossy(&body).into_owned();
+    s.hub.install_cty(&text).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
+    s.hub.rebuild_worked();
+    Ok(Json(s.hub.cty_status()))
+}
+
+async fn cty_update(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
+    s.hub
+        .update_cty()
+        .await
+        .map_err(|e| ApiError(StatusCode::BAD_GATEWAY, format!("couldn't download the country file: {e}")))?;
+    s.hub.rebuild_worked();
+    Ok(Json(s.hub.cty_status()))
+}
+
+// ---- cluster -------------------------------------------------------------
+
+async fn cluster_get(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
+    Ok(Json(s.cluster.snapshot()))
+}
+
+async fn cluster_put(State(s): State<Shared>, Json(cfg): Json<ClusterConfig>) -> ApiResult<serde_json::Value> {
+    s.cluster.save_config(cfg).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(Json(s.cluster.snapshot()))
+}
+
+#[derive(Deserialize)]
+struct ConnectBody {
+    connect: bool,
+}
+
+async fn cluster_connect(State(s): State<Shared>, Json(b): Json<ConnectBody>) -> ApiResult<()> {
+    if b.connect {
+        s.cluster.connect();
+    } else {
+        s.cluster.disconnect();
+    }
+    Ok(Json(()))
+}
+
+#[derive(Deserialize)]
+struct LineBody {
+    line: String,
+}
+
+async fn cluster_send(State(s): State<Shared>, Json(b): Json<LineBody>) -> ApiResult<()> {
+    s.cluster.send(&b.line).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(()))
+}
+
+// ---- QSL services ----------------------------------------------------------
+
+async fn qsl_get(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
+    let q = s.qsl.clone();
+    let v = tokio::task::spawn_blocking(move || q.overview())
+        .await
+        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(v))
+}
+
+#[derive(Deserialize)]
+struct QslBody {
+    config: QslConfig,
+    #[serde(default)]
+    secrets: SecretsUpdate,
+}
+
+async fn qsl_put(State(s): State<Shared>, Json(b): Json<QslBody>) -> ApiResult<serde_json::Value> {
+    s.qsl.save(b.config, b.secrets).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    qsl_get(State(s)).await
+}
+
+async fn qsl_test_qrz(State(s): State<Shared>, Json(b): Json<CallsignBody>) -> ApiResult<serde_json::Value> {
+    let call = s.qsl.test_qrz(&b.callsign).await.map_err(|e| ApiError(StatusCode::BAD_GATEWAY, e))?;
+    Ok(Json(json!({ "callsign": call })))
+}
+
+async fn qsl_upload(State(s): State<Shared>, Path(service): Path<String>) -> ApiResult<qsl::Run> {
+    let run = match service.as_str() {
+        "lotw" => s.qsl.upload_lotw().await,
+        other => s.qsl.upload(other).await,
+    };
+    Ok(Json(run))
 }

@@ -15,10 +15,23 @@ use crate::adif::{self, Fields};
 use crate::band;
 use crate::error::{Error, Result};
 use crate::model::*;
+use crate::worked::WorkedIndex;
 
 /// Migrations in order; migration N brings the schema to user_version N.
-const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2];
+const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2, SCHEMA_V3];
 const SCHEMA_VERSION: i32 = MIGRATIONS.len() as i32;
+
+/// Small partial indexes over QSOs not yet uploaded, so counting what's waiting
+/// stays fast once most of a large log is uploaded. The WHERE clauses must match
+/// `pending_sql` exactly for SQLite to use them.
+const SCHEMA_V3: &str = r#"
+CREATE INDEX qsos_pending_qrz ON qsos (log_id, station_callsign, time_on)
+    WHERE IFNULL(json_extract(fields, '$.QRZCOM_QSO_UPLOAD_STATUS'), '') NOT IN ('Y', 'I');
+CREATE INDEX qsos_pending_clublog ON qsos (log_id, station_callsign, time_on)
+    WHERE IFNULL(json_extract(fields, '$.CLUBLOG_QSO_UPLOAD_STATUS'), '') NOT IN ('Y', 'I');
+CREATE INDEX qsos_pending_lotw ON qsos (log_id, station_callsign, time_on)
+    WHERE IFNULL(json_extract(fields, '$.LOTW_QSL_SENT'), '') NOT IN ('Y', 'I');
+"#;
 
 const SCHEMA_V1: &str = r#"
 CREATE TABLE logs (
@@ -333,7 +346,20 @@ impl Store {
     }
 
     pub fn update_qso(&self, id: i64, location_id: Option<i64>, fields: &Fields) -> Result<Qso> {
-        let fields = normalize(fields);
+        let mut fields = normalize(fields);
+        // An edit to a QSO already uploaded to QRZ or Club Log marks it for re-upload.
+        if let Ok(old) = self.get_qso(id) {
+            let content = |f: &Fields| f.iter().filter(|(k, _)| !is_qsl_field(k)).map(|(k, v)| (k.clone(), v.clone())).collect::<Vec<_>>();
+            if content(&old.fields) != content(&fields) {
+                for key in MODIFIED_STATUS {
+                    if let Some(v) = fields.get_mut(key) {
+                        if v == "Y" {
+                            *v = "M".into();
+                        }
+                    }
+                }
+            }
+        }
         let c = Columns::from_fields(&fields)?;
         self.expect_changed(
             self.conn.execute(
@@ -348,6 +374,40 @@ impl Store {
             "QSO",
         )?;
         self.get_qso(id)
+    }
+
+    /// QSOs not yet sent to a QSL service: `status_key` (e.g. QRZCOM_QSO_UPLOAD_STATUS)
+    /// isn't Y or I, logged as one of `callsigns`, from `since` (Unix seconds) on, oldest first.
+    pub fn pending_uploads(&self, log_id: i64, status_key: &str, callsigns: &[String], location_id: Option<i64>, since: i64, limit: i64) -> Result<Vec<Qso>> {
+        let (sql, args) = pending_sql("id, log_id, location_id, fields", log_id, status_key, callsigns, location_id, since)?;
+        let mut stmt = self.conn.prepare(&format!("{sql} ORDER BY time_on LIMIT {}", limit.max(0)))?;
+        let rows = stmt.query_map(params_from_iter(args), row_to_qso)?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    pub fn count_pending(&self, log_id: i64, status_key: &str, callsigns: &[String], location_id: Option<i64>, since: i64) -> Result<i64> {
+        let (sql, args) = pending_sql("COUNT(*)", log_id, status_key, callsigns, location_id, since)?;
+        Ok(self.conn.query_row(&sql, params_from_iter(args), |r| r.get(0))?)
+    }
+
+    /// Sets fields (QSL statuses and dates) on several QSOs at once.
+    pub fn mark_qsos(&mut self, ids: &[i64], set: &Fields) -> Result<()> {
+        if set.keys().any(|k| !is_qsl_field(k)) {
+            return Err(Error::Invalid("only QSL fields can be set in bulk".into()));
+        }
+        let tx = self.conn.transaction()?;
+        {
+            let mut get = tx.prepare("SELECT fields FROM qsos WHERE id = ?1")?;
+            let mut put = tx.prepare("UPDATE qsos SET fields = ?1, updated_at = ?2 WHERE id = ?3")?;
+            for id in ids {
+                let Some(raw) = get.query_row([id], |r| r.get::<_, String>(0)).optional()? else { continue };
+                let mut fields: Fields = serde_json::from_str(&raw)?;
+                fields.extend(set.iter().map(|(k, v)| (k.clone(), v.clone())));
+                put.execute(params![serde_json::to_string(&fields)?, now(), id])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
     }
 
     pub fn delete_qsos(&mut self, ids: &[i64]) -> Result<usize> {
@@ -438,6 +498,55 @@ impl Store {
             wb.dxcc_modes = distinct("IFNULL(submode, mode)")?;
         }
         Ok(wb)
+    }
+
+    /// Builds the worked-before sets for flagging decodes and spots. `resolve`
+    /// supplies the DXCC entity for QSOs logged without one.
+    pub fn worked_index(&self, log_id: i64, resolve: impl Fn(&str) -> Option<u32>) -> Result<WorkedIndex> {
+        let mut idx = WorkedIndex::default();
+        let mut stmt = self
+            .conn
+            .prepare("SELECT call, dxcc, band, IFNULL(submode, mode) FROM qsos WHERE log_id = ?1")?;
+        let mut rows = stmt.query([log_id])?;
+        while let Some(r) = rows.next()? {
+            let call: String = r.get(0)?;
+            let dxcc: Option<i64> = r.get(1)?;
+            let band: Option<String> = r.get(2)?;
+            let mode: Option<String> = r.get(3)?;
+            let dxcc = dxcc.and_then(|d| u32::try_from(d).ok()).or_else(|| resolve(&call));
+            idx.add(&call, dxcc, band.as_deref(), mode.as_deref());
+        }
+        Ok(idx)
+    }
+
+    /// A QSO already in the log with the same call, band and mode within a minute of this one.
+    pub fn find_duplicate(&self, log_id: i64, fields: &Fields) -> Result<Option<i64>> {
+        let cols = Columns::from_fields(&normalize(fields))?;
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT id FROM qsos WHERE log_id = ?1 AND call = ?2
+                 AND time_on BETWEEN ?3 - 60 AND ?3 + 60
+                 AND IFNULL(band, '') = IFNULL(?4, '') AND IFNULL(mode, '') = IFNULL(?5, '') LIMIT 1",
+                params![log_id, cols.call, cols.time_on, cols.band, cols.mode],
+                |r| r.get(0),
+            )
+            .optional()?)
+    }
+
+    /// Finds a QSO by the value of one of its fields (e.g. another program's record id).
+    pub fn find_qso_by_field(&self, log_id: i64, key: &str, value: &str) -> Result<Option<i64>> {
+        if !key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            return Err(Error::Invalid(format!("bad field name {key}")));
+        }
+        Ok(self
+            .conn
+            .query_row(
+                &format!("SELECT id FROM qsos WHERE log_id = ?1 AND json_extract(fields, '$.{key}') = ?2 ORDER BY id DESC LIMIT 1"),
+                params![log_id, value],
+                |r| r.get(0),
+            )
+            .optional()?)
     }
 
     // ---- ADIF ----------------------------------------------------------
@@ -680,6 +789,32 @@ impl Store {
             Ok(())
         }
     }
+}
+
+/// Upload statuses ADIF says become "M" when an uploaded QSO is modified.
+const MODIFIED_STATUS: [&str; 2] = ["QRZCOM_QSO_UPLOAD_STATUS", "CLUBLOG_QSO_UPLOAD_STATUS"];
+
+/// QSL and upload bookkeeping, as opposed to what happened on the air.
+fn is_qsl_field(k: &str) -> bool {
+    k.contains("QSL") || k.contains("UPLOAD") || k.starts_with("EQSL_") || k.starts_with("LOTW_")
+}
+
+fn pending_sql(select: &str, log_id: i64, status_key: &str, callsigns: &[String], location_id: Option<i64>, since: i64) -> Result<(String, Vec<Value>)> {
+    if !status_key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return Err(Error::Invalid(format!("bad field name {status_key}")));
+    }
+    let mut args: Vec<Value> = vec![log_id.into(), since.into()];
+    let marks = vec!["?"; callsigns.len()].join(", ");
+    args.extend(callsigns.iter().map(|c| Value::from(c.to_ascii_uppercase())));
+    let mut sql = format!(
+        "SELECT {select} FROM qsos WHERE log_id = ? AND time_on >= ? AND station_callsign IN ({marks})
+         AND IFNULL(json_extract(fields, '$.{status_key}'), '') NOT IN ('Y', 'I')"
+    );
+    if let Some(loc) = location_id {
+        sql.push_str(" AND location_id = ?");
+        args.push(loc.into());
+    }
+    Ok((sql, args))
 }
 
 /// Indexed copies of a QSO's key fields.

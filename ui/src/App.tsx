@@ -5,7 +5,11 @@ import { utcClock } from "./util";
 import { DEFAULT_COLUMNS, DEFAULT_LAYOUT, type EntryLayout } from "./fields";
 import { gridToLatLon, positionOf } from "./geo";
 import { localGet, localSet, usePref } from "./prefs";
-import EntryPanel, { type EntryContext } from "./components/EntryPanel";
+import EntryPanel, { type EntryContext, type Prefill } from "./components/EntryPanel";
+import FtxMonitor, { type DecodePick } from "./components/FtxMonitor";
+import ClusterPane from "./components/ClusterPane";
+import QslDialog from "./components/QslDialog";
+import { onLive, useIntegrations, useRadios, useRotator } from "./live";
 import LookupPanel from "./components/LookupPanel";
 import MapPanel, { type MapView } from "./components/MapPanel";
 import LogGrid from "./components/LogGrid";
@@ -16,7 +20,8 @@ import EditQsoDialog from "./components/EditQsoDialog";
 import HelpView from "./components/HelpView";
 import SetupWizard from "./components/SetupWizard";
 
-type Dialog = "import" | "export" | "settings" | "help" | "wizard" | null;
+type Dialog = "import" | "export" | "settings" | "help" | "wizard" | "qsl" | null;
+interface Pane { tab: "log" | "ftx" | "cluster"; beside: boolean }
 
 export default function App() {
   const [logs, setLogs] = useState<Log[]>([]);
@@ -38,6 +43,18 @@ export default function App() {
   const [layout, setLayout, layoutLoaded] = usePref<EntryLayout>("entry_layout", DEFAULT_LAYOUT);
   const [columns, setColumns] = usePref<string[]>("grid_columns", DEFAULT_COLUMNS);
   const [general, setGeneral] = usePref<GeneralPrefs>("general", { units: "km" });
+  const radios = useRadios();
+  const rotatorAz = useRotator();
+  const integrations = useIntegrations();
+  const rotator = integrations?.rotator_enabled ? rotatorAz : undefined;
+  const [radioKey, setRadioKey] = useState(localGet("qrzero.radio", { key: "" }).key);
+  const [prefill, setPrefill] = useState<Prefill | null>(null);
+  const [pane, setPane] = useState<Pane>(() => {
+    const saved = localGet<Pane>("qrzero.pane2", { tab: "log", beside: false });
+    return saved.tab === "log" || saved.tab === "ftx" || saved.tab === "cluster" ? saved : { tab: "log", beside: false };
+  });
+  const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
+  const [notice, setNotice] = useState("");
   const [mapView, setMapView] = useState<MapView>(localGet("qrzero.map", { view: "flat" as MapView }).view);
 
   useEffect(() => {
@@ -85,6 +102,42 @@ export default function App() {
       .catch((e) => setError(String(e.message ?? e)));
   }, [logId, loadStation]);
 
+  // Tell the server where QSOs from WSJT-X and N1MM go, and which rigs to connect.
+  useEffect(() => {
+    if (logId !== null && callsigns !== null) api.setActive(logId, locationId, stationCall).catch(() => {});
+  }, [logId, locationId, stationCall, callsigns]);
+
+  useEffect(
+    () =>
+      onLive((e) => {
+        if (e.type === "qso_logged" && e.log_id === logId) {
+          setRefreshKey((k) => k + 1);
+          loadLogs().catch(() => {});
+          if (e.call) setNotice(e.added ? `Logged ${e.call} from ${e.source}` : `${e.call} from ${e.source} was already in the log`);
+        }
+        if (e.type === "error") setNotice(e.message);
+      }),
+    [logId, loadLogs],
+  );
+
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(""), 8000);
+    return () => clearTimeout(t);
+  }, [notice]);
+
+  const chooseRadio = (key: string) => {
+    setRadioKey(key);
+    localSet("qrzero.radio", { key });
+  };
+  const choosePane = (p: Partial<Pane>) => {
+    const next = { ...pane, ...p };
+    setPane(next);
+    localSet("qrzero.pane2", next);
+  };
+
+  const pick = (p: DecodePick) => setPrefill({ nonce: Date.now(), call: p.call, grid: p.grid, band: p.band, mode: p.mode, freq_hz: p.freq_hz });
+
   const refreshGrid = () => {
     setRefreshKey((k) => k + 1);
     loadLogs().catch(() => {});
@@ -94,7 +147,12 @@ export default function App() {
   const currentLog = logs.find((l) => l.id === logId);
   const home = location ? positionOf(location.fields, "MY_") : null;
   const dxStation = lookup?.station ?? null;
-  const dx = (dxStation && positionOf(dxStation)) || gridToLatLon(entry.fields.GRIDSQUARE ?? "") || null;
+  const dxEntity = lookup?.entity;
+  const dx =
+    (dxStation && positionOf(dxStation)) ||
+    gridToLatLon(entry.fields.GRIDSQUARE ?? "") ||
+    (dxEntity && entry.fields.CALL ? { lat: dxEntity.lat, lon: dxEntity.lon } : null) ||
+    null;
 
   if (error) return <div className="fatal">{error}</div>;
   if (logId === null || callsigns === null || !layoutLoaded) return <div className="fatal">Loading…</div>;
@@ -129,11 +187,13 @@ export default function App() {
           </select>
         </label>
         <span className="spacer" />
+        {notice && <span className="notice" role="status">{notice}</span>}
         <span className="muted">{currentLog?.qso_count.toLocaleString() ?? 0} QSOs</span>
         <span className="clock" title="UTC">{utcClock(now)}</span>
         <nav className="menu">
           <button onClick={() => setDialog("import")}>Import</button>
           <button onClick={() => setDialog("export")}>Export</button>
+          <button onClick={() => setDialog("qsl")} title="Upload to LoTW, QRZ and Club Log">QSL</button>
           <button onClick={() => setDialog("settings")}>Settings</button>
           <button onClick={() => setDialog("help")} title="User guide (F1)">Help</button>
         </nav>
@@ -160,6 +220,10 @@ export default function App() {
             onLookup={setLookup}
             onContext={setEntry}
             onHelp={() => setDialog("help")}
+            radios={radios}
+            radioKey={radioKey}
+            onRadio={chooseRadio}
+            prefill={prefill}
           />
         )}
         <LookupPanel result={lookup} entry={entry} />
@@ -169,6 +233,7 @@ export default function App() {
           dx={dx}
           dxLabel={entry.fields.CALL || dxStation?.CALL || ""}
           units={general.units}
+          rotator={rotator}
           view={mapView}
           onView={(v) => {
             setMapView(v);
@@ -177,7 +242,18 @@ export default function App() {
         />
       </div>
 
-      <LogGrid
+      <nav className="pane-tabs">
+        <button className={pane.tab === "log" ? "active" : ""} onClick={() => choosePane({ tab: "log" })}>Log</button>
+        <button className={pane.tab === "ftx" ? "active" : ""} onClick={() => choosePane({ tab: "ftx" })}>FTx monitor</button>
+        <button className={pane.tab === "cluster" ? "active" : ""} onClick={() => choosePane({ tab: "cluster" })}>Cluster</button>
+        {pane.tab !== "log" && (
+          <label className="check beside" title="Show the log next to this pane">
+            <input type="checkbox" checked={pane.beside} onChange={(e) => choosePane({ beside: e.target.checked })} /> Beside the log
+          </label>
+        )}
+      </nav>
+      <div className={`bottom ${pane.tab !== "log" && pane.beside ? "pane-split" : ""}`}>
+      {(pane.tab === "log" || pane.beside) && <LogGrid
         logId={logId}
         refreshKey={refreshKey}
         filter={filter}
@@ -190,7 +266,18 @@ export default function App() {
         columns={columns}
         onColumns={setColumns}
         locations={locations}
-      />
+      />}
+      {pane.tab === "ftx" && <FtxMonitor mycall={stationCall} onPick={pick} />}
+      {pane.tab === "cluster" && (
+        <ClusterPane
+          onPick={pick}
+          onSettings={() => {
+            setSettingsTab("cluster");
+            setDialog("settings");
+          }}
+        />
+      )}
+      </div>
 
       {dialog === "wizard" && (
         <SetupWizard
@@ -246,9 +333,14 @@ export default function App() {
             reloadStation();
           }}
           onSwitchLog={setLogId}
-          onClose={() => setDialog(null)}
+          initialTab={settingsTab}
+          onClose={() => {
+            setDialog(null);
+            setSettingsTab(undefined);
+          }}
         />
       )}
+      {dialog === "qsl" && <QslDialog callsigns={callsigns} locations={locations} onClose={() => setDialog(null)} />}
       {dialog === "help" && <HelpView onClose={() => setDialog(null)} />}
       {editing && (
         <EditQsoDialog

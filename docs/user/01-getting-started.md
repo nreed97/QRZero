@@ -26,6 +26,7 @@ Your log is stored in one file, `qrzero.db`, in `%APPDATA%\QRZero`. Back that fo
 | Station panel | Details about the station you are working and your history with it. |
 | Map | Your QTH, the other station, and the path between them with headings and distance. |
 | Log grid | Every QSO in the open log, newest first. |
+| FTx monitor | Decodes from every WSJT-X and JTDX you run, flagged by what you need. Switch with the tabs above the log. |
 
 ## Coming from Log4OM 2
 

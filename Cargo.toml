@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["crates/core", "crates/server", "src-tauri"]
-default-members = ["crates/core", "crates/server"]
+members = ["crates/core", "crates/radio", "crates/server", "src-tauri"]
+default-members = ["crates/core", "crates/radio", "crates/server"]
 
 [workspace.package]
 version = "0.1.0"

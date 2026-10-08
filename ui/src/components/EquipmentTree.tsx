@@ -19,6 +19,39 @@ const DETAILS: Record<EquipmentKind, [string, string, string?][]> = {
   other: [["MODEL", "Description"], ["NOTES", "Notes"]],
 };
 
+// How QRZero talks to a radio. Settings are kept in the rig's fields.
+const CONTROLS: { id: string; label: string; net?: boolean; port?: number }[] = [
+  { id: "", label: "None (log only)" },
+  { id: "hamlib", label: "Hamlib rigctld", net: true, port: 4532 },
+  { id: "tci", label: "TCI (ExpertSDR, Flex slices, SunSDR)", net: true, port: 40001 },
+  { id: "kenwood", label: "Kenwood / Elecraft / Flex CAT" },
+  { id: "yaesu", label: "Yaesu CAT (FT-991A, FTDX10/101, FT-710)" },
+  { id: "icom", label: "Icom CI-V" },
+];
+
+function RigControl({ fields, onChange }: { fields: Fields; onChange: (f: Fields) => void }) {
+  const control = CONTROLS.find((c) => c.id === (fields.CONTROL ?? "")) ?? CONTROLS[0];
+  const set = (k: string, v: string) => onChange({ ...fields, [k]: v });
+  const input = (k: string, label: string, cls: string, placeholder?: string) => (
+    <label className={`f ${cls}`}><span>{label}</span><input value={fields[k] ?? ""} placeholder={placeholder} onChange={(e) => set(k, e.target.value)} /></label>
+  );
+  return (
+    <div className="row">
+      <label className="f w-l">
+        <span>Rig control</span>
+        <select value={control.id} onChange={(e) => set("CONTROL", e.target.value)}>
+          {CONTROLS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+        </select>
+      </label>
+      {control.net && input("HOST", "Host", "w-m", "127.0.0.1")}
+      {control.net && input("PORT", "Port", "w-s", String(control.port))}
+      {control.id && !control.net && input("SERIAL_PORT", "Serial port", "w-s", "COM3")}
+      {control.id && !control.net && input("BAUD", "Baud", "w-s", "38400")}
+      {control.id === "icom" && input("CIV_ADDR", "CI-V address", "w-s", "94")}
+    </div>
+  );
+}
+
 interface Draft { id: number | null; location_id: number; kind: EquipmentKind; name: string; fields: Fields }
 
 export default function EquipmentTree({ locations, equipment, onChanged }: { locations: Location[]; equipment: Equipment[]; onChanged: () => void }) {
@@ -76,7 +109,7 @@ export default function EquipmentTree({ locations, equipment, onChanged }: { loc
                             {list.map((e, i) => (
                               <li key={e.id} className="item">
                                 <span className="item-name">{e.name}</span>
-                                <span className="muted">{[e.fields.MODEL, e.fields.POWER_W && `${e.fields.POWER_W} W`, e.fields.BANDS].filter(Boolean).join(" · ")}</span>
+                                <span className="muted">{[e.fields.MODEL, e.fields.POWER_W && `${e.fields.POWER_W} W`, e.fields.BANDS, e.fields.CONTROL && `control: ${CONTROLS.find((c) => c.id === e.fields.CONTROL)?.label.split(" (")[0] ?? e.fields.CONTROL}`].filter(Boolean).join(" · ")}</span>
                                 <span className="item-actions">
                                   <button className="tiny" disabled={i === 0} onClick={() => run(() => api.moveEquipment(e.id, -1))} title="Move up">↑</button>
                                   <button className="tiny" disabled={i === list.length - 1} onClick={() => run(() => api.moveEquipment(e.id, 1))} title="Move down">↓</button>
@@ -117,6 +150,7 @@ export default function EquipmentTree({ locations, equipment, onChanged }: { loc
               </label>
             ))}
           </div>
+          {draft.kind === "rig" && <RigControl fields={draft.fields} onChange={(fields) => setDraft({ ...draft, fields })} />}
           <div className="buttons">
             <button onClick={() => setDraft(null)}>Cancel</button>
             <button className="primary" disabled={!draft.name.trim()} onClick={save}>Save</button>
