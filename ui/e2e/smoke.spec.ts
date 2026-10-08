@@ -75,9 +75,9 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByTestId("search").fill("");
   await expect(page.locator(".grid > .grid-tools")).toContainText("3 QSOs");
 
-  // Edit a QSO.
-  await page.locator(".grid-row", { hasText: "K1ABC" }).dblclick();
-  const editor = page.locator(".qso-editor");
+  // Edit a QSO: the editor opens in its own window.
+  const [editWin] = await Promise.all([page.waitForEvent("popup"), page.locator(".grid-row", { hasText: "K1ABC" }).dblclick()]);
+  const editor = editWin.locator(".qso-editor");
   const name = editor.getByLabel("Name", { exact: true });
   await expect(name).toHaveValue("José");
   await name.fill("Jose Maria");
@@ -85,8 +85,10 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await editor.getByRole("button", { name: "Save" }).click();
   await expect(page.locator(".grid-row", { hasText: "K1ABC" })).toContainText("Jose Maria");
   await expect(editor.getByRole("button", { name: "Save" })).toBeDisabled();
-  await editor.getByRole("button", { name: "Close editor" }).click();
-  await expect(editor).toHaveCount(0);
+  // The QSO above it in the log, from the editor's arrows.
+  await editor.getByRole("button", { name: "Previous QSO" }).click();
+  await expect(editor.getByLabel("Call", { exact: true })).not.toHaveValue("K1ABC");
+  await Promise.all([editWin.waitForEvent("close"), editor.getByRole("button", { name: "Close editor" }).click()]);
 
   // Export 40m only, full fields.
   await page.getByRole("button", { name: "Export", exact: true }).click();
@@ -176,10 +178,9 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await call.press("Tab");
   const worked = page.locator(".worked-pane");
   await expect(worked.locator("tbody tr")).toHaveCount(1);
-  await worked.locator("tbody tr").first().dblclick();
-  await expect(page.locator(".qso-editor")).toBeVisible();
-  await page.getByRole("button", { name: "Close editor" }).click();
-  await expect(page.locator(".qso-editor")).toHaveCount(0);
+  const [editWin2] = await Promise.all([page.waitForEvent("popup"), worked.locator("tbody tr").first().dblclick()]);
+  await expect(editWin2.getByLabel("Call", { exact: true })).toHaveValue("K1XYZ");
+  await Promise.all([editWin2.waitForEvent("close"), editWin2.getByRole("button", { name: "Close editor" }).click()]);
 
   // Panes: drag the Cluster tab beside the Station pane, it gets its own group.
   const station = page.locator(".ws-group", { has: page.getByRole("tab", { name: "Station" }) }).locator(".ws-body");

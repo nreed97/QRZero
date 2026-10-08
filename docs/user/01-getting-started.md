@@ -29,10 +29,9 @@ The window is made of panes. Each pane has a tab at its top, and panes can share
 | Station | Details about the station you are working. |
 | Map | Your QTH, the other station, and the path between them with headings and distance. |
 | Log | Every QSO in the open log, newest first. |
-| Edit QSO | Opens beside the log when you double-click a QSO. |
 | FTx monitor, Cluster, Awards | Tabs next to the log to start with. |
 
-You can move, resize, hide and pop out any of them. See **Arranging the window**.
+You can move, resize, hide and pop out any of them. See **Arranging the window**. Double-click a QSO to edit it in its own window.
 
 ## Coming from Log4OM 2
 

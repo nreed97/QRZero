@@ -5,7 +5,7 @@ import { localGet, localSet } from "./prefs";
 import type { DecodePick } from "./components/FtxMonitor";
 import type { EntryContext } from "./components/EntryPanel";
 import type { LatLon } from "./geo";
-import type { Fields, LookupResult, Qso, QsoFilter, StationCallsign } from "./types";
+import type { Equipment, Fields, Location, LookupResult, Qso, QsoFilter, StationCallsign } from "./types";
 import type { PaneId } from "./workspace";
 
 /** What popped-out panes need to know from the main window. */
@@ -23,8 +23,19 @@ export interface PopContext {
   editingId: number | null;
 }
 
+/** A window QRZero opens: a popped-out pane, or the QSO editor. */
+export type WindowId = PaneId | "editor";
+
+/** The QSO to edit, with what the editor needs to offer choices. */
+export interface EditPayload {
+  qso: Qso;
+  locations: Location[];
+  equipment: Equipment[];
+  callsigns: StationCallsign[];
+}
+
 export type BusMsg =
-  | { t: "hello"; pane: PaneId }
+  | { t: "hello"; pane: WindowId }
   | { t: "bye"; pane: PaneId }
   | { t: "want-ctx" }
   | { t: "ctx"; ctx: PopContext }
@@ -33,7 +44,12 @@ export type BusMsg =
   | { t: "copy"; fields: Fields }
   | { t: "show-qsos"; filter: QsoFilter }
   | { t: "settings"; tab: string }
-  | { t: "close-all" };
+  | { t: "close-all" }
+  | { t: "edit-open"; edit: EditPayload }
+  | { t: "edit-step"; id: number; dir: -1 | 1 }
+  | { t: "edit-saved"; qso: Qso }
+  | { t: "edit-deleted"; id: number }
+  | { t: "edit-closed" };
 
 const channel: BroadcastChannel | null = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel("qrzero");
 
@@ -50,15 +66,16 @@ export function listen(f: (m: BusMsg) => void): () => void {
 
 export interface Geometry { w: number; h: number; x: number | null; y: number | null }
 
-const geoKey = (id: PaneId) => `qrzero.popout.${id}`;
-const DEFAULT_SIZE: Partial<Record<PaneId, Geometry>> = {
+const geoKey = (id: WindowId) => `qrzero.popout.${id}`;
+const DEFAULT_SIZE: Partial<Record<WindowId, Geometry>> = {
+  editor: { w: 640, h: 780, x: null, y: null },
   ftx: { w: 900, h: 560, x: null, y: null },
   map: { w: 700, h: 460, x: null, y: null },
   awards: { w: 900, h: 640, x: null, y: null },
 };
 
 /** Opens (or focuses) the window for a pane, where it was last time. */
-export function openPopout(id: PaneId): Window | null {
+export function openPopout(id: WindowId): Window | null {
   const g = localGet<Geometry>(geoKey(id), DEFAULT_SIZE[id] ?? { w: 640, h: 480, x: null, y: null });
   const url = new URL(window.location.href);
   url.search = "";
@@ -71,6 +88,6 @@ export function openPopout(id: PaneId): Window | null {
 }
 
 /** Called in the popped-out window to remember where it is. */
-export function saveGeometry(id: PaneId) {
+export function saveGeometry(id: WindowId) {
   localSet(geoKey(id), { w: window.innerWidth, h: window.innerHeight, x: window.screenX, y: window.screenY });
 }

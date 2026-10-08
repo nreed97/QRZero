@@ -13,12 +13,11 @@ import LogGrid from "./components/LogGrid";
 import ImportDialog from "./components/ImportDialog";
 import ExportDialog from "./components/ExportDialog";
 import SettingsDialog, { type GeneralPrefs } from "./components/SettingsDialog";
-import QsoEditor from "./components/QsoEditor";
 import HelpView from "./components/HelpView";
 import SharedPane, { type PaneActions } from "./components/SharedPanes";
 import Workspace from "./components/Workspace";
 import LayoutMenu from "./components/LayoutMenu";
-import { listen, openPopout, post, type BusMsg, type PopContext } from "./bus";
+import { listen, openPopout, post, type BusMsg, type PopContext, type WindowId } from "./bus";
 import { DEFAULT_WORKSPACE, canPopOut, findPane, removePane, sanitize, showPane, type PaneId, type Workspace as WS, type Zone } from "./workspace";
 import SetupWizard from "./components/SetupWizard";
 
@@ -41,8 +40,7 @@ function dockBack(root: WS["root"], id: PaneId): WS["root"] {
 
 function initialWorkspace(): WS {
   const saved = sanitize(localGet<{ ws: unknown }>("qrzero.workspace", { ws: null }).ws) ?? DEFAULT_WORKSPACE;
-  // No QSO is open in the editor at start.
-  return { ...saved, root: removePane(saved.root, "editor") };
+  return saved;
 }
 
 export default function App() {
@@ -55,7 +53,6 @@ export default function App() {
   const [locationId, setLocationId] = useState<number | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [editing, setEditing] = useState<Qso | null>(null);
-  const editorDirty = useRef(false);
   const stepper = useRef<((id: number, dir: -1 | 1) => Qso | null) | null>(null);
   const [copy, setCopy] = useState<{ nonce: number; fields: Fields } | null>(null);
   const [lookup, setLookup] = useState<LookupResult | null>(null);
@@ -71,10 +68,16 @@ export default function App() {
   const radios = useRadios();
   const [radioKey, setRadioKey] = useState(localGet("qrzero.radio", { key: "" }).key);
   const [prefill, setPrefill] = useState<Prefill | null>(null);
+  const locationsRef = useRef(locations);
+  locationsRef.current = locations;
+  const equipmentRef = useRef(equipment);
+  equipmentRef.current = equipment;
+  const callsignsRef = useRef<StationCallsign[]>([]);
+  callsignsRef.current = callsigns ?? [];
   const [ws, setWsState] = useState<WS>(initialWorkspace);
   const wsRef = useRef(ws);
   const windows = useRef(new Map<PaneId, Window>());
-  const greeted = useRef(new Set<PaneId>());
+  const greeted = useRef(new Set<WindowId>());
   const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState("");
 
@@ -180,31 +183,28 @@ export default function App() {
     }
   };
 
+  // The QSO editor opens in its own window; this one sends it the QSO once it says hello.
+  const editorWindow = useRef<Window | null>(null);
+  const pendingEdit = useRef<Qso | null>(null);
+  const sendEdit = (q: Qso) =>
+    post({ t: "edit-open", edit: { qso: q, locations: locationsRef.current, equipment: equipmentRef.current, callsigns: callsignsRef.current } });
+
   const openEditor = (q: Qso) => {
-    if (editing && editing.id !== q.id && editorDirty.current && !confirm(`Discard your changes to the QSO with ${editing.fields.CALL}?`)) return;
-    editorDirty.current = false;
     setEditing(q);
-    const cur = wsRef.current;
-    setWs({ ...cur, root: showPane(cur.root, "editor", "log", "right", 0.38) });
-  };
-
-  const closeEditor = () => {
-    editorDirty.current = false;
-    setEditing(null);
-    const cur = wsRef.current;
-    setWs({ ...cur, root: removePane(cur.root, "editor") });
-  };
-
-  const stepEditor = (dir: -1 | 1) => {
-    if (!editing) return;
-    if (editorDirty.current && !confirm(`Discard your changes to the QSO with ${editing.fields.CALL}?`)) return;
-    const q = stepper.current?.(editing.id, dir);
-    if (q) {
-      editorDirty.current = false;
-      setEditing(q);
+    const w = editorWindow.current;
+    if (w && !w.closed && greeted.current.has("editor")) {
+      sendEdit(q);
+      w.focus();
+      return;
+    }
+    pendingEdit.current = q;
+    greeted.current.delete("editor");
+    editorWindow.current = openPopout("editor");
+    if (!editorWindow.current) {
+      setEditing(null);
+      setNotice("The editor window didn't open. Allow pop-ups for this page, then try again.");
     }
   };
-
   const showQsos = (f: QsoFilter) => {
     setFilter({ ...f, bands: undefined, modes: undefined });
     const cur = wsRef.current;
@@ -261,13 +261,31 @@ export default function App() {
   const onBus = useRef<(m: BusMsg) => void>(() => {});
   onBus.current = (m) => {
     if (m.t === "hello") greeted.current.add(m.pane);
+    if (m.t === "hello" && m.pane === "editor" && pendingEdit.current) {
+      sendEdit(pendingEdit.current);
+      pendingEdit.current = null;
+    }
     if ((m.t === "hello" || m.t === "want-ctx") && popCtx) post({ t: "ctx", ctx: popCtx });
     if (m.t === "bye") dock(m.pane);
-    if (m.t === "pick") actions.onPick(m.pick);
-    if (m.t === "edit") {
-      openEditor(m.qso);
-      window.focus();
+    if (m.t === "edit-step") {
+      const q = stepper.current?.(m.id, m.dir);
+      if (q) {
+        setEditing(q);
+        sendEdit(q);
+      }
     }
+    if (m.t === "edit-saved") {
+      setEditing(m.qso);
+      refreshGrid();
+    }
+    if (m.t === "edit-deleted") refreshGrid();
+    if (m.t === "edit-closed") {
+      setEditing(null);
+      editorWindow.current = null;
+      greeted.current.delete("editor");
+    }
+    if (m.t === "pick") actions.onPick(m.pick);
+    if (m.t === "edit") openEditor(m.qso);
     if (m.t === "copy") actions.onCopy(m.fields);
     if (m.t === "show-qsos") showQsos(m.filter);
     if (m.t === "settings") actions.onSettings(m.tab);
@@ -367,7 +385,7 @@ export default function App() {
         ws={ws}
         onChange={setWs}
         onPopOut={popOut}
-        onClosePane={(id) => (id === "editor" ? closeEditor() : setWs({ ...wsRef.current, root: removePane(wsRef.current.root, id) }))}
+        onClosePane={(id) => setWs({ ...wsRef.current, root: removePane(wsRef.current.root, id) })}
         render={(id) => {
           if (id === "entry")
             return callsigns.length === 0 ? (
@@ -415,29 +433,6 @@ export default function App() {
                 stepper={stepper}
                 editingId={editing?.id ?? null}
               />
-            );
-          if (id === "editor")
-            return editing ? (
-              <QsoEditor
-                qso={editing}
-                locations={locations}
-                equipment={equipment}
-                callsigns={callsigns}
-                onClose={closeEditor}
-                onSaved={(q) => {
-                  editorDirty.current = false;
-                  setEditing(q);
-                  refreshGrid();
-                }}
-                onDeleted={() => {
-                  closeEditor();
-                  refreshGrid();
-                }}
-                onStep={stepEditor}
-                onDirty={(d) => (editorDirty.current = d)}
-              />
-            ) : (
-              <p className="muted" style={{ padding: 16 }}>Double-click a QSO in the log, or in Worked before, to edit it here.</p>
             );
           return popCtx && <SharedPane id={id} ctx={popCtx} act={actions} />;
         }}

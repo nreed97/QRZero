@@ -100,7 +100,7 @@ export default function LayoutMenu({ ws, onChange, onShow, onFocusWindow }: Prop
           </label>
           <hr />
           <div className="head">Panes</div>
-          {PANES.filter((p) => p.id !== "editor").map((p) => {
+          {PANES.map((p) => {
             const popped = ws.popped.includes(p.id);
             const on = shown.has(p.id) || popped;
             return (

@@ -1,6 +1,6 @@
 # Arranging the window
 
-Every part of the window is a pane: New QSO, Worked before, Station, Map, Log, FTx monitor, Cluster, Awards and Edit QSO. Put them wherever suits your screen, and QRZero remembers the arrangement on this computer.
+Every part of the window is a pane: New QSO, Worked before, Station, Map, Log, FTx monitor, Cluster and Awards. Put them wherever suits your screen, and QRZero remembers the arrangement on this computer.
 
 ## Resizing
 

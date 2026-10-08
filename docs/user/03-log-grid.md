@@ -21,7 +21,7 @@ When you click a row in the **Awards** tab, the log shows only those QSOs and a 
 
 ## Editing a QSO
 
-Double-click a row, or select it and press <kbd>Enter</kbd>, to open the QSO editor beside the log. The grid stays visible, so you can keep an eye on the neighbouring QSOs while you work.
+Double-click a row, or select it and press <kbd>Enter</kbd>, to open the QSO editor in its own window. Put the window wherever you like; QRZero remembers where it was. There is only ever one editor window: double-click another QSO, in the log or in Worked before, and the editor switches to it (asking first if you have unsaved changes).
 
 The editor groups the fields the way you think about a contact:
 
@@ -38,8 +38,8 @@ Labels of fields you have changed turn amber, and the title bar counts your unsa
 Keys while the editor is open:
 
 - <kbd>Ctrl</kbd>+<kbd>S</kbd> saves.
-- <kbd>Esc</kbd> closes the editor. If you have unsaved changes it asks before throwing them away.
-- <kbd>Alt</kbd>+<kbd>Up</kbd> and <kbd>Alt</kbd>+<kbd>Down</kbd> step to the previous or next QSO in the grid, as do the arrow buttons in the title bar.
+- <kbd>Esc</kbd> closes the editor window. If you have unsaved changes it asks before throwing them away.
+- <kbd>Alt</kbd>+<kbd>Up</kbd> and <kbd>Alt</kbd>+<kbd>Down</kbd> step to the QSO above or below in the log grid, as do the arrow buttons in the title bar.
 
 **Revert** puts back what was saved, and **Delete QSO** removes the contact after asking. Editing a QSO that was already uploaded to QRZ or Club Log marks it for upload again.
 
