@@ -69,6 +69,9 @@ export interface Radio {
   rig_mode: string;
   data: boolean;
   tx: boolean;
+  /** In split: receiving on freq_hz, transmitting on tx_freq_hz. */
+  split: boolean;
+  tx_freq_hz: number;
   error: string | null;
 }
 
@@ -178,6 +181,8 @@ export interface Spot {
   band: string | null;
   mode: string;
   comment: string;
+  /** Where the DX listens when the comment says ("UP 5", "QSX 14.205"). */
+  tx_freq_hz?: number | null;
   entity: Entity | null;
   /** Where the spotter is. */
   spotter_entity?: Entity | null;

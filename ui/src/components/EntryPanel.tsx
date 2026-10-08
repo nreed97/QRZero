@@ -42,6 +42,8 @@ export interface Prefill {
   band?: string | null;
   mode?: string;
   freq_hz?: number;
+  /** Split: transmit here, receive on freq_hz. */
+  tx_freq_hz?: number;
 }
 
 /** MHz as typed in the entry panel: 14.025 or 14.07412. */
@@ -69,6 +71,8 @@ interface Gear { rig?: number; antenna?: number; amplifier?: number }
 export default function EntryPanel({ logId, stationCall, location, layout, equipment, onLogged, onLookup, onContext, onHelp, radios, radioKey, onRadio, prefill, copy }: Props) {
   const prefs = useRef(localGet("qrzero.entry", { freq: "", band: "20m", mode: "CW", last: {} as Fields })).current;
   const [freq, setFreq] = useState(prefs.freq);
+  // The receive frequency while the radio is in split; empty otherwise. `freq` is then the transmit frequency.
+  const [freqRx, setFreqRx] = useState("");
   const [band, setBand] = useState(prefs.band);
   const [mode, setMode] = useState(prefs.mode);
   const [rstSent, setRstSent] = useState(choiceFor(prefs.mode).rst);
@@ -150,17 +154,25 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
   // Follow the selected radio.
   useEffect(() => {
     if (!radio?.connected || !radio.freq_hz) return;
-    setFreq(mhz(radio.freq_hz));
-    const b = bandForFreq(radio.freq_hz / 1e6);
+    const split = radio.split && radio.tx_freq_hz > 0;
+    const txHz = split ? radio.tx_freq_hz : radio.freq_hz;
+    setFreq(mhz(txHz));
+    setFreqRx(split ? mhz(radio.freq_hz) : "");
+    const b = bandForFreq(txHz / 1e6);
     if (b) setBand(b);
     const m = radioMode(radio);
     if (m && m !== modeRef.current) changeMode(m);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [radio?.key, radio?.connected, radio?.freq_hz, radio?.mode, radio?.rig_mode]);
+  }, [radio?.key, radio?.connected, radio?.freq_hz, radio?.split, radio?.tx_freq_hz, radio?.mode, radio?.rig_mode]);
 
   const tuneTo = (freqText: string) => {
     const hz = Math.round(Number(freqText) * 1e6);
-    if (radio?.can_tune && hz > 0 && Math.abs(hz - radio.freq_hz) >= 1) {
+    if (radio?.can_tune && radio.split && radio.tx_freq_hz > 0) {
+      // In split the box holds the transmit frequency.
+      if (hz > 0 && Math.abs(hz - radio.tx_freq_hz) >= 1) {
+        api.tune(radio.key, undefined, undefined, { tx_freq_hz: hz }).catch((e) => setStatus({ text: `Couldn't set the transmit frequency: ${(e as Error).message}`, kind: "err" }));
+      }
+    } else if (radio?.can_tune && hz > 0 && Math.abs(hz - radio.freq_hz) >= 1) {
       api.tune(radio.key, hz).catch((e) => setStatus({ text: `Couldn't tune: ${(e as Error).message}`, kind: "err" }));
     }
   };
@@ -231,7 +243,9 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
     if (prefill.grid) setForm((f) => ({ ...f, GRIDSQUARE: prefill.grid! }));
     const m = prefill.mode && MODES.some((x) => x.label === prefill.mode) ? prefill.mode : null;
     if (radio?.can_tune && prefill.freq_hz) {
-      api.tune(radio.key, prefill.freq_hz, m ?? undefined).catch(() => {});
+      // A spot that says where it listens sets split; any other spot turns a split left over from the last one off.
+      const split = prefill.tx_freq_hz ? { tx_freq_hz: prefill.tx_freq_hz } : radio.split ? { split: false } : undefined;
+      api.tune(radio.key, prefill.freq_hz, m ?? undefined, split).catch((e) => setStatus({ text: `Couldn't tune: ${(e as Error).message}`, kind: "err" }));
     } else if (radio?.source !== "wsjtx") {
       if (prefill.freq_hz) setFreq(mhz(prefill.freq_hz));
       if (prefill.band) setBand(prefill.band);
@@ -290,6 +304,8 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
     }
     if (choice.submode) fields.SUBMODE = choice.submode;
     if (freq.trim()) fields.FREQ = freq.trim();
+    // In split FREQ is where we transmitted and FREQ_RX where we listened.
+    if (freqRx.trim()) fields.FREQ_RX = freqRx.trim();
     const rig = pick("rig"), ant = pick("antenna"), amp = pick("amplifier");
     if (rig) fields.MY_RIG = rig.name;
     if (ant) fields.MY_ANTENNA = ant.name;
@@ -399,7 +415,8 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
           </label>
           <label className="f w-s"><span>Sent</span><input id="rst-sent" value={rstSent} onChange={(e) => setRstSent(e.target.value)} /></label>
           <label className="f w-s"><span>Rcvd</span><input value={rstRcvd} onChange={(e) => setRstRcvd(e.target.value)} /></label>
-          <label className="f w-m"><span>Freq MHz</span><input value={freq} onChange={(e) => changeFreq(e.target.value)} onBlur={(e) => tuneTo(e.target.value)} inputMode="decimal" /></label>
+          <label className="f w-m"><span>{freqRx ? "TX MHz" : "Freq MHz"}</span><input value={freq} onChange={(e) => changeFreq(e.target.value)} onBlur={(e) => tuneTo(e.target.value)} inputMode="decimal" title={freqRx ? "Transmit frequency (the radio is in split)" : undefined} /></label>
+          {freqRx && <label className="f w-m"><span>RX MHz</span><input value={freqRx} onChange={(e) => setFreqRx(e.target.value)} inputMode="decimal" title="Receive frequency (the radio is in split)" /></label>}
           <label className="f w-s">
             <span>Band</span>
             <select value={band} onChange={(e) => setBand(e.target.value)}>

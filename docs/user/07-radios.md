@@ -24,6 +24,22 @@ When radios are connected, the **Radio** box appears in the QSO panel's title ba
 
 Choose **manual** to type frequency and mode yourself.
 
+## Split
+
+When a TCI radio (Flex through AetherSDR, or an Expert Electronics SDR) is in split, the VFO readout in the header shows both frequencies, **RX** for the one you listen on and **TX** for the one you transmit on. The QSO panel shows the transmit frequency in the first box (labelled **TX MHz**) and the receive frequency in a second box (**RX MHz**), and both are logged: the QSO's frequency is where you transmitted and its RX frequency is where you listened. Typing a frequency in the **TX MHz** box and leaving it sets the radio's transmit frequency. Out of split, the panel goes back to a single **Freq MHz** box.
+
+Split is read from and set on TCI radios only. Other rig control methods show and log the single frequency they report.
+
+### Split from spots
+
+When you click a cluster or band map spot whose comment says where the DX is listening, QRZero tunes the radio to the spot and sets split with the transmit frequency to match:
+
+- `UP 5`, `UP5`, `UP 5K`: 5 kHz above the spot. A bare `UP` means 1 kHz. `UP 5-10` uses the lower figure, 5.
+- `DN 2` or `DOWN 2`: 2 kHz below.
+- `QSX 14.205` (MHz), `QSX 14205` (kHz) or `QSX 205` (the last three digits of the spot's kHz). `LISTENING` and `LSN` work the same way.
+
+Anything more than 100 kHz from the spot is ignored. Spots that set split show it in the row's tooltip. Clicking a spot that doesn't say turns split off, so the radio never keeps the last station's transmit frequency.
+
 WSJT-X and N1MM radios are listed too (when those programs are connected), so the panel can follow them, but they can't be tuned from QRZero.
 
 ## VFO readout

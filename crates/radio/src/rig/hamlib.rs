@@ -87,6 +87,7 @@ impl Conn {
                 let Some(req) = ModeReq::from_adif(m, freq_hz) else { return Ok(()) };
                 format!("M {} 0", encode_mode(req))
             }
+            RigCommand::SetSplit(_) => bail!("split control needs a TCI connection"),
         };
         match self.query(&line, 1).await? {
             Err(0) => Ok(()),

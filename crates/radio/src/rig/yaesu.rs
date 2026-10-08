@@ -34,6 +34,7 @@ impl Protocol for Yaesu {
                 Some(req) => io.set(&format!("MD0{};", encode_mode(req))),
                 None => Ok(()),
             },
+            RigCommand::SetSplit(_) => anyhow::bail!("split control needs a TCI connection"),
         }
     }
 }

@@ -37,6 +37,8 @@ pub struct SpotInfo {
     pub band: Option<String>,
     pub mode: String,
     pub comment: String,
+    /// Where the DX listens, when the comment says ("UP 5", "QSX 14.205").
+    pub tx_freq_hz: Option<u64>,
     pub entity: Option<Entity>,
     /// Where the spotter is, from the country file.
     pub spotter_entity: Option<Entity>,
@@ -190,6 +192,7 @@ impl Cluster {
             ClusterEvent::Spot(s) => {
                 let freq_hz = (s.freq_khz * 1000.0).round() as u64;
                 let band = band_for_freq(s.freq_khz / 1000.0).map(str::to_string);
+                let tx_freq_hz = cluster::split_target(freq_hz, &s.comment);
                 let mode = cluster::guess_mode(s.freq_khz, &s.comment).to_string();
                 let entity = hub.entity(&s.call);
                 // Spotters often log in as CALL-# or CALL/P; the country file wants the bare call.
@@ -221,6 +224,7 @@ impl Cluster {
                         band,
                         mode,
                         comment: s.comment,
+                        tx_freq_hz,
                         entity,
                         spotter_entity,
                         needed,
