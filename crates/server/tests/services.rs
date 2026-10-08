@@ -31,8 +31,8 @@ impl Api {
         let mut cfg = Config::local(dir.path().to_path_buf());
         cfg.secret_service = format!("QRZero-test-{}", std::process::id());
         cfg.update_cty = false;
-        cfg.qrz_logbook_endpoint = qrz;
-        cfg.clublog_endpoint = clublog;
+        cfg.qsl_endpoints.qrz = qrz;
+        cfg.qsl_endpoints.clublog = clublog;
         let running = start(cfg).await.unwrap();
         Api { base: format!("http://{}/api", running.addr), token: running.token, http: reqwest::Client::new(), dir }
     }

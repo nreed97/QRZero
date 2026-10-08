@@ -1,4 +1,4 @@
-import type { ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Qso, QsoFilter, Settings, StationCallsign } from "./types";
+import type { QslService, QslDownload, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Qso, QsoFilter, Settings, StationCallsign } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
 function sessionToken(): string {
@@ -63,6 +63,12 @@ export const api = {
   updateQso: (id: number, locationId: number | null, fields: Fields) =>
     json<Qso>("PUT", `/qsos/${id}`, { location_id: locationId, fields }),
   deleteQsos: (ids: number[]) => json<number>("POST", "/qsos/delete", { ids }),
+  markQsos: (ids: number[], fields: Fields) => json<number>("POST", "/qsos/mark", { ids, fields }),
+  award: (logId: number, award: AwardKind, o: { calls: string[]; lotw: boolean; paper: boolean; eqsl: boolean; unworked: boolean }) => {
+    const q = new URLSearchParams({ calls: o.calls.join(","), lotw: String(o.lotw), paper: String(o.paper), eqsl: String(o.eqsl), unworked: String(o.unworked) });
+    return json<AwardTable>("GET", `/logs/${logId}/awards/${award}?${q}`);
+  },
+  paperQueue: (logId: number) => json<Qso[]>("GET", `/logs/${logId}/paper-queue`),
   search: (logId: number, filter: QsoFilter, offset: number, limit: number, sort = "newest") =>
     json<{ total: number; rows: Qso[] }>("POST", `/logs/${logId}/qsos/search`, { filter, offset, limit, sort }),
   lookup: (logId: number, call: string) => json<LookupResult>("GET", `/logs/${logId}/lookup/${encodeURIComponent(call)}`),
@@ -110,5 +116,6 @@ export const api = {
   qsl: () => json<QslOverview>("GET", "/qsl"),
   saveQsl: (config: QslConfig, secrets: QslSecrets) => json<QslOverview>("PUT", "/qsl", { config, secrets }),
   testQrzLogbook: (callsign: string) => json<{ callsign: string }>("POST", "/qsl/qrz/test", { callsign }),
-  qslUpload: (service: "qrz" | "clublog" | "lotw") => json<QslRun>("POST", `/qsl/upload/${service}`),
+  qslUpload: (service: QslService) => json<QslRun>("POST", `/qsl/upload/${service}`),
+  qslDownload: (service: "lotw" | "eqsl") => json<QslDownload>("POST", `/qsl/download/${service}`),
 };

@@ -54,7 +54,7 @@ pub fn upload_record(qso: &Fields) -> String {
     out
 }
 
-fn http_client() -> reqwest::Client {
+pub(crate) fn http_client() -> reqwest::Client {
     reqwest::Client::builder()
         .timeout(Duration::from_secs(20))
         .user_agent(USER_AGENT)
@@ -63,7 +63,7 @@ fn http_client() -> reqwest::Client {
 }
 
 /// Encodes `pairs` as application/x-www-form-urlencoded.
-fn form_encode(pairs: &[(&str, &str)]) -> String {
+pub(crate) fn form_encode(pairs: &[(&str, &str)]) -> String {
     fn enc(out: &mut String, s: &str) {
         for b in s.bytes() {
             match b {

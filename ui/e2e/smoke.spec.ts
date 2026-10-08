@@ -124,6 +124,21 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByLabel("QRZ API key for N0OLD")).toHaveAttribute("placeholder", "API key saved");
   await page.getByRole("button", { name: "Close" }).click();
 
+  // Paper cards: queue one from the log, then find it in QSL, Paper cards.
+  await page.locator(".grid-row", { hasText: "K1ABC" }).click();
+  await page.getByLabel("Paper QSL").selectOption("queue");
+  await page.getByRole("button", { name: "QSL", exact: true }).click();
+  await page.getByRole("button", { name: "Paper cards" }).click();
+  await expect(page.locator(".paper-queue")).toContainText("K1ABC");
+  await expect(page.getByRole("button", { name: "Print 1 label" })).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+
+  // Awards: everything worked so far, nothing confirmed.
+  await page.getByRole("button", { name: "Awards" }).click();
+  await page.getByRole("button", { name: "WAZ" }).click();
+  await expect(page.locator(".award-table")).toContainText("Zone 40");
+  await page.getByRole("button", { name: "Log", exact: true }).click();
+
   // The user guide opens from the top bar.
   await page.getByRole("button", { name: "Help" }).click();
   await expect(page.getByRole("heading", { name: "Getting started" })).toBeVisible();

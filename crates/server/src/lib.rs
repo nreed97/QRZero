@@ -16,6 +16,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use qrzero_core::adif::Fields;
+use qrzero_core::awards::{Award, AwardTable, Counts, Tally};
 use qrzero_core::model::*;
 use qrzero_core::qrz::{QrzClient, DEFAULT_ENDPOINT};
 use qrzero_core::store::Sort;
@@ -26,6 +27,8 @@ use serde_json::json;
 mod cluster;
 mod qsl;
 mod station;
+
+pub use qsl::Endpoints as QslEndpoints;
 use cluster::{Cluster, ClusterConfig};
 use qsl::{Qsl, QslConfig, SecretsUpdate};
 use station::{Active, Hub, Integrations};
@@ -49,8 +52,8 @@ pub struct Config {
     /// Download the country file when it's missing or old.
     pub update_cty: bool,
     /// QRZ Logbook and Club Log endpoints (overridable for tests).
-    pub qrz_logbook_endpoint: String,
-    pub clublog_endpoint: String,
+    /// QSL service URLs (tests point these at local stand-ins).
+    pub qsl_endpoints: QslEndpoints,
 }
 
 impl Config {
@@ -62,8 +65,7 @@ impl Config {
             qrz_endpoint: DEFAULT_ENDPOINT.to_string(),
             secret_service: "QRZero".to_string(),
             update_cty: true,
-            qrz_logbook_endpoint: qrzero_core::qsl::QRZ_LOGBOOK_ENDPOINT.to_string(),
-            clublog_endpoint: qrzero_core::qsl::CLUBLOG_ENDPOINT.to_string(),
+            qsl_endpoints: QslEndpoints::default(),
         }
     }
 }
@@ -91,7 +93,11 @@ struct AppState {
     hub: Arc<Hub>,
     cluster: Arc<Cluster>,
     qsl: Arc<Qsl>,
+    /// Award tables by request, with the QSO version they were counted at.
+    award_cache: AwardCache,
 }
+
+type AwardCache = Arc<Mutex<std::collections::HashMap<String, (i64, Arc<AwardTable>)>>>;
 
 type Shared = Arc<AppState>;
 
@@ -112,7 +118,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
     let hub = Hub::new(store.clone(), cfg.data_dir.clone());
     hub.start(cfg.update_cty);
     let cluster = Cluster::new(&hub);
-    let qsl = Qsl::new(store.clone(), hub.clone(), cfg.secret_service.clone(), cfg.data_dir.clone(), (cfg.qrz_logbook_endpoint, cfg.clublog_endpoint));
+    let qsl = Qsl::new(store.clone(), hub.clone(), cfg.secret_service.clone(), cfg.data_dir.clone(), cfg.qsl_endpoints);
     qsl.start();
     let state = Arc::new(AppState {
         store,
@@ -124,6 +130,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
         secret_service: cfg.secret_service,
         token: token.clone(),
         data_dir: cfg.data_dir,
+        award_cache: AwardCache::default(),
     });
     let listener = tokio::net::TcpListener::bind(cfg.addr).await?;
     let addr = listener.local_addr()?;
@@ -157,6 +164,9 @@ fn router(state: Shared) -> Router {
         .route("/logs/{id}/qsos/search", post(search_qsos))
         .route("/qsos/{id}", get(get_qso).put(update_qso))
         .route("/qsos/delete", post(delete_qsos))
+        .route("/qsos/mark", post(mark_qsos))
+        .route("/logs/{id}/paper-queue", get(paper_queue))
+        .route("/logs/{id}/awards/{award}", get(award))
         .route("/logs/{id}/lookup/{call}", get(lookup))
         .route(
             "/logs/{id}/import",
@@ -185,6 +195,7 @@ fn router(state: Shared) -> Router {
         .route("/qsl", get(qsl_get).put(qsl_put))
         .route("/qsl/qrz/test", post(qsl_test_qrz))
         .route("/qsl/upload/{service}", post(qsl_upload))
+        .route("/qsl/download/{service}", post(qsl_download))
         .layer(middleware::from_fn_with_state(state.clone(), require_token))
         .with_state(state);
     Router::new().nest("/api", api).fallback(static_file)
@@ -442,6 +453,72 @@ async fn update_qso(State(s): State<Shared>, Path(id): Path<i64>, Json(b): Json<
 #[derive(Deserialize)]
 struct IdsBody {
     ids: Vec<i64>,
+}
+
+#[derive(Deserialize)]
+struct MarkBody {
+    ids: Vec<i64>,
+    fields: Fields,
+}
+
+/// Sets QSL fields on several QSOs at once (paper QSL queue, sent, received).
+async fn mark_qsos(State(s): State<Shared>, Json(b): Json<MarkBody>) -> ApiResult<usize> {
+    let n = b.ids.len();
+    db(&s, move |st| st.mark_qsos(&b.ids, &b.fields)).await?;
+    s.hub.emit(json!({"type": "qso_logged", "log_id": null, "call": "", "source": "mark", "added": false}));
+    Ok(Json(n))
+}
+
+#[derive(Deserialize)]
+struct AwardQuery {
+    /// Comma-separated station callsigns; empty means all.
+    #[serde(default)]
+    calls: String,
+    #[serde(default)]
+    lotw: bool,
+    #[serde(default)]
+    paper: bool,
+    #[serde(default)]
+    eqsl: bool,
+    #[serde(default)]
+    unworked: bool,
+}
+
+async fn award(State(s): State<Shared>, Path((id, award)): Path<(i64, Award)>, Query(q): Query<AwardQuery>) -> ApiResult<AwardTable> {
+    let cty = s.hub.cty();
+    let mut names = std::collections::BTreeMap::new();
+    if let (Award::Dxcc, Some(cty)) = (award, &cty) {
+        for e in cty.entities() {
+            if let Some(d) = e.dxcc {
+                names.entry(d.to_string()).or_insert_with(|| e.name.clone());
+            }
+        }
+    }
+    let calls: Vec<String> = q.calls.split(',').map(|c| c.trim().to_ascii_uppercase()).filter(|c| !c.is_empty()).collect();
+    let counts = Counts { lotw: q.lotw, paper: q.paper, eqsl: q.eqsl };
+    // Counting a big log takes a moment, so keep the last few tables until a QSO changes.
+    let key = format!("{id}|{award:?}|{}|{}{}{}|{}|{}", calls.join(","), q.lotw, q.paper, q.eqsl, q.unworked, cty.as_ref().map_or(0, |c| c.len()));
+    let cache = s.award_cache.clone();
+    let table = db(&s, move |st| {
+        let version = st.qso_version()?;
+        if let Some(t) = cache.lock().unwrap_or_else(|p| p.into_inner()).get(&key).filter(|(v, _)| *v == version) {
+            return Ok(t.1.clone());
+        }
+        let mut tally = Tally::new(award, counts, names);
+        let resolve = |c: &str| cty.as_ref().and_then(|db| db.lookup(c)).and_then(|e| e.dxcc);
+        st.for_each_award_qso(id, &calls, resolve, |qso| tally.add(qso))?;
+        let table = Arc::new(tally.finish(q.unworked));
+        let mut c = cache.lock().unwrap_or_else(|p| p.into_inner());
+        c.retain(|_, (v, _)| *v == version);
+        c.insert(key, (version, table.clone()));
+        Ok(table)
+    })
+    .await?;
+    Ok(Json(table.as_ref().clone()))
+}
+
+async fn paper_queue(State(s): State<Shared>, Path(id): Path<i64>) -> ApiResult<Vec<Qso>> {
+    Ok(Json(db(&s, move |st| st.paper_queue(id)).await?))
 }
 
 async fn delete_qsos(State(s): State<Shared>, Json(b): Json<IdsBody>) -> ApiResult<usize> {
@@ -820,6 +897,10 @@ async fn qsl_put(State(s): State<Shared>, Json(b): Json<QslBody>) -> ApiResult<s
 async fn qsl_test_qrz(State(s): State<Shared>, Json(b): Json<CallsignBody>) -> ApiResult<serde_json::Value> {
     let call = s.qsl.test_qrz(&b.callsign).await.map_err(|e| ApiError(StatusCode::BAD_GATEWAY, e))?;
     Ok(Json(json!({ "callsign": call })))
+}
+
+async fn qsl_download(State(s): State<Shared>, Path(service): Path<String>) -> ApiResult<qsl::Download> {
+    Ok(Json(s.qsl.download(&service).await))
 }
 
 async fn qsl_upload(State(s): State<Shared>, Path(service): Path<String>) -> ApiResult<qsl::Run> {

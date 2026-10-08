@@ -140,12 +140,30 @@ export interface QslConfig {
   tqsl_path: string;
   lotw_since: string;
   lotw: LotwMapping[];
+  lotw_username: string;
+  lotw_rcvd_since: string;
+  eqsl_enabled: boolean;
+  eqsl_since: string;
+  eqsl_username: string;
+  eqsl_nickname: string;
+  eqsl_calls: string[];
+  eqsl_rcvd_since: string;
+  confirm_daily: boolean;
 }
+export type QslService = "qrz" | "clublog" | "lotw" | "eqsl";
+export interface QslDownload { at: number; running: boolean; received: number; confirmed: number; unmatched: string[]; unmatched_count: number; error: string | null }
 export interface QslOverview {
   config: QslConfig;
-  secrets: { qrz_calls: string[]; clublog_password: boolean; clublog_app_key: boolean };
-  pending: { qrz: number; clublog: number; lotw: { mapping: LotwMapping; pending: number }[] };
-  runs: Partial<Record<"qrz" | "clublog" | "lotw", QslRun>>;
+  secrets: { qrz_calls: string[]; clublog_password: boolean; clublog_app_key: boolean; lotw_password: boolean; eqsl_password: boolean };
+  pending: { qrz: number; clublog: number; eqsl: number; lotw: { mapping: LotwMapping; pending: number }[] };
+  runs: Partial<Record<QslService, QslRun>>;
+  downloads: Partial<Record<"lotw" | "eqsl", QslDownload>>;
   tqsl: { path: string | null; found: boolean; locations: string[] };
 }
-export interface QslSecrets { qrz_keys?: Record<string, string>; clublog_password?: string; clublog_app_key?: string }
+export interface QslSecrets { qrz_keys?: Record<string, string>; clublog_password?: string; clublog_app_key?: string; lotw_password?: string; eqsl_password?: string }
+
+export type AwardKind = "dxcc" | "was" | "waz" | "wpx";
+export type AwardStatus = "worked" | "confirmed";
+export interface AwardRow { key: string; name: string; cells: Record<string, AwardStatus> }
+export interface AwardColumn { key: string; worked: number; confirmed: number }
+export interface AwardTable { award: AwardKind; columns: AwardColumn[]; rows: AwardRow[]; total: number }

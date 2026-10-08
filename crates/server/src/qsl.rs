@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use chrono::{NaiveDate, Utc};
 use qrzero_core::adif::{self, Fields};
+use qrzero_core::confirm::{self, Service as ConfirmService};
 use qrzero_core::qsl::{self, ClubLog, QrzLogbook, QslError, TqslJob, Upload};
 use qrzero_core::{secrets, Store};
 use serde::{Deserialize, Serialize};
@@ -43,6 +44,20 @@ pub struct QslConfig {
     pub tqsl_path: String,
     pub lotw_since: String,
     pub lotw: Vec<LotwMapping>,
+    /// LoTW website login, for downloading confirmations.
+    pub lotw_username: String,
+    /// Confirmations already downloaded up to this date (YYYY-MM-DD; empty: all).
+    pub lotw_rcvd_since: String,
+    pub eqsl_enabled: bool,
+    pub eqsl_since: String,
+    pub eqsl_username: String,
+    /// eQSL "QTH nickname", for accounts with more than one.
+    pub eqsl_nickname: String,
+    /// Station callsigns uploaded to the eQSL account.
+    pub eqsl_calls: Vec<String>,
+    pub eqsl_rcvd_since: String,
+    /// Download new LoTW and eQSL confirmations once a day.
+    pub confirm_daily: bool,
 }
 
 impl Default for QslConfig {
@@ -59,6 +74,15 @@ impl Default for QslConfig {
             tqsl_path: String::new(),
             lotw_since: String::new(),
             lotw: Vec::new(),
+            lotw_username: String::new(),
+            lotw_rcvd_since: String::new(),
+            eqsl_enabled: false,
+            eqsl_since: String::new(),
+            eqsl_username: String::new(),
+            eqsl_nickname: String::new(),
+            eqsl_calls: Vec::new(),
+            eqsl_rcvd_since: String::new(),
+            confirm_daily: false,
         }
     }
 }
@@ -74,10 +98,28 @@ pub struct Run {
     pub error: Option<String>,
 }
 
+/// The outcome of the last confirmation download from LoTW or eQSL.
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct Download {
+    pub at: i64,
+    pub running: bool,
+    /// Confirmations downloaded.
+    pub received: usize,
+    /// QSOs newly marked confirmed.
+    pub confirmed: usize,
+    /// Downloaded confirmations with no matching QSO (first 50).
+    pub unmatched: Vec<String>,
+    pub unmatched_count: usize,
+    pub error: Option<String>,
+}
+
 #[derive(Default)]
 struct Inner {
     config: QslConfig,
     runs: BTreeMap<&'static str, Run>,
+    downloads: BTreeMap<&'static str, Download>,
+    /// When confirmations were last downloaded automatically (Unix seconds).
+    last_auto_download: i64,
     /// QSOs a service refused this session, so they aren't retried every few minutes.
     refused: HashSet<(&'static str, i64)>,
 }
@@ -87,11 +129,32 @@ pub struct Qsl {
     hub: Arc<Hub>,
     secret_service: String,
     data_dir: PathBuf,
-    qrz_endpoint: String,
-    clublog_endpoint: String,
+    endpoints: Endpoints,
     inner: Mutex<Inner>,
     /// One upload at a time per service.
     busy: tokio::sync::Mutex<()>,
+}
+
+/// Service URLs, overridable for tests.
+#[derive(Clone, Debug)]
+pub struct Endpoints {
+    pub qrz: String,
+    pub clublog: String,
+    pub eqsl_upload: String,
+    pub eqsl_inbox: String,
+    pub lotw_report: String,
+}
+
+impl Default for Endpoints {
+    fn default() -> Self {
+        Endpoints {
+            qrz: qsl::QRZ_LOGBOOK_ENDPOINT.into(),
+            clublog: qsl::CLUBLOG_ENDPOINT.into(),
+            eqsl_upload: confirm::EQSL_UPLOAD_ENDPOINT.into(),
+            eqsl_inbox: confirm::EQSL_INBOX_ENDPOINT.into(),
+            lotw_report: confirm::LOTW_REPORT_ENDPOINT.into(),
+        }
+    }
 }
 
 struct Service {
@@ -102,6 +165,7 @@ struct Service {
 
 const QRZ: Service = Service { name: "qrz", status_key: "QRZCOM_QSO_UPLOAD_STATUS", date_key: "QRZCOM_QSO_UPLOAD_DATE" };
 const CLUBLOG: Service = Service { name: "clublog", status_key: "CLUBLOG_QSO_UPLOAD_STATUS", date_key: "CLUBLOG_QSO_UPLOAD_DATE" };
+const EQSL: Service = Service { name: "eqsl", status_key: "EQSL_QSL_SENT", date_key: "EQSL_QSLSDATE" };
 const LOTW: Service = Service { name: "lotw", status_key: "LOTW_QSL_SENT", date_key: "LOTW_QSLSDATE" };
 
 fn qrz_secret(call: &str) -> String {
@@ -121,15 +185,14 @@ fn since(date: &str) -> i64 {
 }
 
 impl Qsl {
-    pub fn new(store: Arc<Mutex<Store>>, hub: Arc<Hub>, secret_service: String, data_dir: PathBuf, endpoints: (String, String)) -> Arc<Self> {
+    pub fn new(store: Arc<Mutex<Store>>, hub: Arc<Hub>, secret_service: String, data_dir: PathBuf, endpoints: Endpoints) -> Arc<Self> {
         let config = hub.setting("qsl").and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
         Arc::new(Qsl {
             store,
             hub,
             secret_service,
             data_dir,
-            qrz_endpoint: endpoints.0,
-            clublog_endpoint: endpoints.1,
+            endpoints,
             inner: Mutex::new(Inner { config, ..Inner::default() }),
             busy: tokio::sync::Mutex::new(()),
         })
@@ -151,6 +214,19 @@ impl Qsl {
                 }
                 if cfg.clublog_enabled {
                     q.upload("clublog").await;
+                }
+                if cfg.eqsl_enabled {
+                    q.upload("eqsl").await;
+                }
+                let now = Utc::now().timestamp();
+                if cfg.confirm_daily && now - q.lock().last_auto_download > 24 * 3600 {
+                    q.lock().last_auto_download = now;
+                    if !cfg.lotw_username.is_empty() {
+                        q.download("lotw").await;
+                    }
+                    if !cfg.eqsl_username.is_empty() {
+                        q.download("eqsl").await;
+                    }
                 }
             }
         });
@@ -207,13 +283,17 @@ impl Qsl {
                 "qrz_calls": qrz_keys,
                 "clublog_password": self.secret("clublog-password").is_some(),
                 "clublog_app_key": self.secret("clublog-app-key").is_some(),
+                "lotw_password": self.secret("lotw-password").is_some(),
+                "eqsl_password": self.secret("eqsl-password").is_some(),
             },
             "pending": {
                 "qrz": pending(&QRZ, &cfg.qrz_calls, &cfg.qrz_since),
                 "clublog": pending(&CLUBLOG, &cfg.clublog_calls, &cfg.clublog_since),
+                "eqsl": pending(&EQSL, &cfg.eqsl_calls, &cfg.eqsl_since),
                 "lotw": lotw,
             },
             "runs": self.lock().runs,
+            "downloads": self.lock().downloads,
             "tqsl": {
                 "path": tqsl.as_ref().map(|p| p.display().to_string()),
                 "found": tqsl.as_ref().is_some_and(|p| p.exists()),
@@ -225,7 +305,7 @@ impl Qsl {
     pub fn save(&self, mut cfg: QslConfig, update: SecretsUpdate) -> Result<(), String> {
         let today = Utc::now().format("%Y-%m-%d").to_string();
         // Turning a service on starts from today, so an imported log isn't sent again.
-        for (on, date) in [(cfg.qrz_enabled, &mut cfg.qrz_since), (cfg.clublog_enabled, &mut cfg.clublog_since)] {
+        for (on, date) in [(cfg.qrz_enabled, &mut cfg.qrz_since), (cfg.clublog_enabled, &mut cfg.clublog_since), (cfg.eqsl_enabled, &mut cfg.eqsl_since)] {
             if on && date.trim().is_empty() {
                 *date = today.clone();
             }
@@ -239,7 +319,7 @@ impl Qsl {
                 cfg.qrz_calls.push(call.clone());
             }
         }
-        for c in cfg.qrz_calls.iter_mut().chain(cfg.clublog_calls.iter_mut()) {
+        for c in cfg.qrz_calls.iter_mut().chain(cfg.clublog_calls.iter_mut()).chain(cfg.eqsl_calls.iter_mut()) {
             *c = c.trim().to_ascii_uppercase();
         }
         let svc = self.secret_service.clone();
@@ -253,6 +333,12 @@ impl Qsl {
             if let Some(k) = &update.clublog_app_key {
                 secrets::set(st, &svc, "clublog-app-key", Some(k.trim()).filter(|k| !k.is_empty()))?;
             }
+            if let Some(p) = &update.lotw_password {
+                secrets::set(st, &svc, "lotw-password", Some(p.as_str()).filter(|p| !p.is_empty()))?;
+            }
+            if let Some(p) = &update.eqsl_password {
+                secrets::set(st, &svc, "eqsl-password", Some(p.as_str()).filter(|p| !p.is_empty()))?;
+            }
             st.set_setting("qsl", &serde_json::to_string(&cfg)?)
         })
         .map_err(|e| e.to_string())?;
@@ -262,7 +348,7 @@ impl Qsl {
 
     pub async fn test_qrz(&self, call: &str) -> Result<String, String> {
         let key = self.secret(&qrz_secret(call)).ok_or("no API key saved for that callsign")?;
-        QrzLogbook::new(&self.qrz_endpoint, &key).status().await.map_err(|e| e.to_string())
+        QrzLogbook::new(&self.endpoints.qrz, &key).status().await.map_err(|e| e.to_string())
     }
 
     fn set_run(&self, name: &'static str, run: Run) {
@@ -275,6 +361,7 @@ impl Qsl {
         let svc = match name {
             "qrz" => &QRZ,
             "clublog" => &CLUBLOG,
+            "eqsl" => &EQSL,
             _ => return Run { error: Some(format!("unknown service {name}")), ..Run::default() },
         };
         let _busy = self.busy.lock().await;
@@ -287,21 +374,35 @@ impl Qsl {
     async fn upload_service(&self, svc: &Service) -> Run {
         let mut run = Run { at: Utc::now().timestamp(), ..Run::default() };
         let cfg = self.config();
-        let (calls, date) = if svc.name == "qrz" { (&cfg.qrz_calls, &cfg.qrz_since) } else { (&cfg.clublog_calls, &cfg.clublog_since) };
+        let (calls, date) = match svc.name {
+            "qrz" => (&cfg.qrz_calls, &cfg.qrz_since),
+            "eqsl" => (&cfg.eqsl_calls, &cfg.eqsl_since),
+            _ => (&cfg.clublog_calls, &cfg.clublog_since),
+        };
+        let eqsl_password = self.secret("eqsl-password");
         let (password, app_key) = (self.secret("clublog-password"), self.secret("clublog-app-key"));
         for call in calls {
             enum Client {
                 Qrz(QrzLogbook),
                 ClubLog(ClubLog),
+                Eqsl(String),
             }
-            let client = if svc.name == "qrz" {
+            let client = if svc.name == "eqsl" {
+                match &eqsl_password {
+                    Some(p) if !cfg.eqsl_username.is_empty() => Client::Eqsl(p.clone()),
+                    _ => {
+                        run.error = Some("eQSL needs your username and password".into());
+                        return run;
+                    }
+                }
+            } else if svc.name == "qrz" {
                 match self.secret(&qrz_secret(call)) {
-                    Some(key) => Client::Qrz(QrzLogbook::new(&self.qrz_endpoint, &key)),
+                    Some(key) => Client::Qrz(QrzLogbook::new(&self.endpoints.qrz, &key)),
                     None => continue,
                 }
             } else {
                 match (&password, &app_key) {
-                    (Some(p), Some(k)) if !cfg.clublog_email.is_empty() => Client::ClubLog(ClubLog::new(&self.clublog_endpoint, &cfg.clublog_email, p, call, k)),
+                    (Some(p), Some(k)) if !cfg.clublog_email.is_empty() => Client::ClubLog(ClubLog::new(&self.endpoints.clublog, &cfg.clublog_email, p, call, k)),
                     _ => {
                         run.error = Some("Club Log needs your email, password and an API key".into());
                         return run;
@@ -325,6 +426,10 @@ impl Qsl {
                 let result = match &client {
                     Client::Qrz(c) => c.upload(&qso.fields, qso.fields.get(svc.status_key).is_some_and(|s| s == "M")).await,
                     Client::ClubLog(c) => c.upload(&qso.fields).await,
+                    Client::Eqsl(password) => {
+                        let nick = Some(cfg.eqsl_nickname.as_str()).filter(|n| !n.is_empty());
+                        confirm::eqsl_upload(&self.endpoints.eqsl_upload, &cfg.eqsl_username, password, nick, &qso.fields).await
+                    }
                 };
                 match result {
                     Ok(Upload::Added) | Ok(Upload::Duplicate) => {
@@ -362,6 +467,98 @@ impl Qsl {
             }
         }
         run
+    }
+
+    fn set_download(&self, name: &'static str, d: Download) {
+        self.lock().downloads.insert(name, d.clone());
+        self.hub.emit(json!({"type": "qsl_download", "service": name, "run": d}));
+    }
+
+    /// Downloads new confirmations from LoTW or eQSL and marks the matching QSOs.
+    pub async fn download(&self, name: &str) -> Download {
+        let name: &'static str = match name {
+            "lotw" => "lotw",
+            "eqsl" => "eqsl",
+            _ => return Download { error: Some(format!("unknown service {name}")), ..Download::default() },
+        };
+        let _busy = self.busy.lock().await;
+        self.set_download(name, Download { running: true, at: Utc::now().timestamp(), ..Download::default() });
+        let d = self.download_service(name).await;
+        self.set_download(name, d.clone());
+        d
+    }
+
+    async fn download_service(&self, name: &'static str) -> Download {
+        let mut d = Download { at: Utc::now().timestamp(), ..Download::default() };
+        let cfg = self.config();
+        let (service, records, next_since) = if name == "lotw" {
+            let Some(password) = self.secret("lotw-password").filter(|_| !cfg.lotw_username.is_empty()) else {
+                d.error = Some("enter your LoTW website username and password first".into());
+                return d;
+            };
+            match confirm::lotw_confirmations(&self.endpoints.lotw_report, &cfg.lotw_username, &password, None, &cfg.lotw_rcvd_since).await {
+                Ok(r) => {
+                    let next = r.last_qsl.as_deref().and_then(|t| t.get(..10)).map(str::to_string);
+                    (ConfirmService::Lotw, r.records, next)
+                }
+                Err(e) => {
+                    d.error = Some(e.to_string());
+                    return d;
+                }
+            }
+        } else {
+            let Some(password) = self.secret("eqsl-password").filter(|_| !cfg.eqsl_username.is_empty()) else {
+                d.error = Some("enter your eQSL username and password first".into());
+                return d;
+            };
+            let nick = Some(cfg.eqsl_nickname.as_str()).filter(|n| !n.is_empty());
+            match confirm::eqsl_confirmations(&self.endpoints.eqsl_inbox, &cfg.eqsl_username, &password, nick, &cfg.eqsl_rcvd_since).await {
+                Ok(r) => (ConfirmService::Eqsl, r, Some(Utc::now().format("%Y-%m-%d").to_string())),
+                Err(e) => {
+                    d.error = Some(e.to_string());
+                    return d;
+                }
+            }
+        };
+        let updates: Vec<_> = records
+            .iter()
+            .map(|r| {
+                let u = confirm::confirmation_updates(service, r);
+                (r, u.set, u.fill)
+            })
+            .collect();
+        let stats = self.db(|st| {
+            let logs: Vec<i64> = st.list_logs()?.iter().map(|l| l.id).collect();
+            st.apply_confirmations(&logs, updates, confirm::same_qso)
+        });
+        match stats {
+            Ok(s) => {
+                d.received = s.received;
+                d.confirmed = s.new;
+                d.unmatched_count = s.unmatched.len();
+                d.unmatched = s.unmatched.into_iter().take(50).collect();
+            }
+            Err(e) => {
+                d.error = Some(e.to_string());
+                return d;
+            }
+        }
+        if let Some(next) = next_since {
+            let mut c = self.config();
+            if name == "lotw" {
+                c.lotw_rcvd_since = next;
+            } else {
+                c.eqsl_rcvd_since = next;
+            }
+            if let Ok(text) = serde_json::to_string(&c) {
+                let _ = self.db(|st| st.set_setting("qsl", &text));
+            }
+            self.lock().config = c;
+        }
+        if d.confirmed > 0 {
+            self.hub.emit(json!({"type": "qso_logged", "log_id": null, "call": "", "source": name, "added": false}));
+        }
+        d
     }
 
     /// Signs and uploads pending QSOs to LoTW with TQSL, one station location at a time.
@@ -457,6 +654,8 @@ pub struct SecretsUpdate {
     pub qrz_keys: BTreeMap<String, String>,
     pub clublog_password: Option<String>,
     pub clublog_app_key: Option<String>,
+    pub lotw_password: Option<String>,
+    pub eqsl_password: Option<String>,
 }
 
 #[cfg(test)]

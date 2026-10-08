@@ -15,6 +15,10 @@ The grid shows every QSO in the open log, newest first. It stays fast with hundr
 
 With rows selected you can **Export selected** or **Delete** them. Deleting asks first and can't be undone.
 
+**Paper QSL…** sets the card fields on the selected QSOs: queue a card to send, card sent (bureau or direct), card received (bureau or direct), or not sending. Sent and received also record today's date. See [QSL](10-qsl.md) for printing labels.
+
+When you click a row in the **Awards** tab, the log shows only those QSOs and a button such as **DXCC 291 ×** appears above the grid. Click it to show all QSOs again.
+
 ## Editing a QSO
 
 Double-click a row to edit it. The editor shows every ADIF field the QSO has, including ones the entry panel doesn't show. Change a value, clear it to remove the field, or **Add field** for a new one. Dates are `YYYYMMDD` and times `HHMM` or `HHMMSS`, in UTC.

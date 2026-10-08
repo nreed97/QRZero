@@ -15,10 +15,11 @@ use crate::adif::{self, Fields};
 use crate::band;
 use crate::error::{Error, Result};
 use crate::model::*;
+use crate::awards::AwardQso;
 use crate::worked::WorkedIndex;
 
 /// Migrations in order; migration N brings the schema to user_version N.
-const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2, SCHEMA_V3];
+const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4];
 const SCHEMA_VERSION: i32 = MIGRATIONS.len() as i32;
 
 /// Small partial indexes over QSOs not yet uploaded, so counting what's waiting
@@ -31,6 +32,18 @@ CREATE INDEX qsos_pending_clublog ON qsos (log_id, station_callsign, time_on)
     WHERE IFNULL(json_extract(fields, '$.CLUBLOG_QSO_UPLOAD_STATUS'), '') NOT IN ('Y', 'I');
 CREATE INDEX qsos_pending_lotw ON qsos (log_id, station_callsign, time_on)
     WHERE IFNULL(json_extract(fields, '$.LOTW_QSL_SENT'), '') NOT IN ('Y', 'I');
+"#;
+
+/// eQSL uploads, like [`SCHEMA_V3`].
+const SCHEMA_V4: &str = r#"
+CREATE INDEX qsos_pending_eqsl ON qsos (log_id, station_callsign, time_on)
+    WHERE IFNULL(json_extract(fields, '$.EQSL_QSL_SENT'), '') NOT IN ('Y', 'I');
+-- Bumped on every QSO change, so results computed from the whole log can be cached.
+CREATE TABLE qso_version (id INTEGER PRIMARY KEY CHECK (id = 1), version INTEGER NOT NULL);
+INSERT INTO qso_version VALUES (1, 0);
+CREATE TRIGGER qsos_version_ins AFTER INSERT ON qsos BEGIN UPDATE qso_version SET version = version + 1; END;
+CREATE TRIGGER qsos_version_upd AFTER UPDATE ON qsos BEGIN UPDATE qso_version SET version = version + 1; END;
+CREATE TRIGGER qsos_version_del AFTER DELETE ON qsos BEGIN UPDATE qso_version SET version = version + 1; END;
 "#;
 
 const SCHEMA_V1: &str = r#"
@@ -383,6 +396,133 @@ impl Store {
         let mut stmt = self.conn.prepare(&format!("{sql} ORDER BY time_on LIMIT {}", limit.max(0)))?;
         let rows = stmt.query_map(params_from_iter(args), row_to_qso)?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    /// Matches confirmations downloaded from LoTW or eQSL to QSOs in `log_ids` and applies
+    /// them: each item is (downloaded record, fields to set, fields to fill where blank).
+    /// Candidates share the call and are within 30 minutes; `same` makes the final call.
+    pub fn apply_confirmations<'a>(
+        &mut self,
+        log_ids: &[i64],
+        items: impl IntoIterator<Item = (&'a Fields, Fields, Fields)>,
+        same: impl Fn(&Fields, &Fields) -> bool,
+    ) -> Result<ConfirmStats> {
+        let mut stats = ConfirmStats::default();
+        if log_ids.is_empty() {
+            return Ok(stats);
+        }
+        let logs = log_ids.iter().map(i64::to_string).collect::<Vec<_>>().join(", ");
+        let tx = self.conn.transaction()?;
+        {
+            let mut find = tx.prepare(&format!(
+                "SELECT id, fields FROM qsos WHERE log_id IN ({logs}) AND call = ?1 AND time_on BETWEEN ?2 - 1800 AND ?2 + 1800"
+            ))?;
+            let mut put = tx.prepare("UPDATE qsos SET fields = ?1, dxcc = ?2, updated_at = ?3 WHERE id = ?4")?;
+            for (rec, set, fill) in items {
+                stats.received += 1;
+                let Ok(key) = Columns::from_fields(&normalize(rec)) else { continue };
+                let mut hit = false;
+                let candidates: Vec<(i64, String)> =
+                    find.query_map(params![key.call, key.time_on], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<rusqlite::Result<_>>()?;
+                for (id, raw) in candidates {
+                    let mut fields: Fields = serde_json::from_str(&raw)?;
+                    if !same(&fields, rec) {
+                        continue;
+                    }
+                    hit = true;
+                    let before = fields.clone();
+                    fields.extend(set.iter().map(|(k, v)| (k.clone(), v.clone())));
+                    for (k, v) in &fill {
+                        if fields.get(k).is_none_or(|x| x.trim().is_empty()) && !v.trim().is_empty() {
+                            fields.insert(k.clone(), v.clone());
+                        }
+                    }
+                    if fields == before {
+                        stats.already += 1;
+                        continue;
+                    }
+                    let c = Columns::from_fields(&fields)?;
+                    put.execute(params![serde_json::to_string(&fields)?, c.dxcc, now(), id])?;
+                    stats.new += 1;
+                }
+                if !hit {
+                    let g = |k: &str| rec.get(k).map(String::as_str).unwrap_or("");
+                    stats.unmatched.push(format!("{} {} {} {} {}", g("CALL"), g("QSO_DATE"), g("TIME_ON"), g("BAND"), g("MODE")).trim().to_string());
+                }
+            }
+        }
+        tx.commit()?;
+        Ok(stats)
+    }
+
+    /// A number that changes whenever any QSO is added, edited or deleted.
+    pub fn qso_version(&self) -> Result<i64> {
+        Ok(self.conn.query_row("SELECT version FROM qso_version", [], |r| r.get(0))?)
+    }
+
+    /// Calls `f` with the award facts of every QSO in the log, optionally only for
+    /// some station callsigns. `resolve` supplies a DXCC entity for QSOs without one.
+    pub fn for_each_award_qso(
+        &self,
+        log_id: i64,
+        callsigns: &[String],
+        resolve: impl Fn(&str) -> Option<u32>,
+        mut f: impl FnMut(&AwardQso),
+    ) -> Result<()> {
+        let marks = vec!["?"; callsigns.len()].join(", ");
+        let calls = if callsigns.is_empty() { String::new() } else { format!(" AND station_callsign IN ({marks})") };
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT id, call, band, IFNULL(submode, mode), dxcc, fields FROM qsos WHERE log_id = ?{calls}"
+        ))?;
+        let mut args: Vec<Value> = vec![log_id.into()];
+        args.extend(callsigns.iter().map(|c| Value::from(c.to_ascii_uppercase())));
+        let mut rows = stmt.query(params_from_iter(args))?;
+        // Parsing the JSON once in Rust, keeping only these keys, is several times
+        // faster than one json_extract per key.
+        #[derive(serde::Deserialize)]
+        #[allow(non_snake_case)]
+        struct Facts<'a> {
+            #[serde(borrow)]
+            STATE: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            CQZ: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            LOTW_QSL_RCVD: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            QSL_RCVD: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            EQSL_QSL_RCVD: Option<std::borrow::Cow<'a, str>>,
+        }
+        let yes = |v: &Option<std::borrow::Cow<str>>| matches!(v.as_deref(), Some("Y") | Some("V"));
+        let mut q = AwardQso::default();
+        while let Some(r) = rows.next()? {
+            q.id = r.get(0)?;
+            q.call = r.get(1)?;
+            q.band = r.get(2)?;
+            q.mode = r.get(3)?;
+            let dxcc: Option<i64> = r.get(4)?;
+            q.dxcc = dxcc.and_then(|d| u32::try_from(d).ok()).or_else(|| resolve(&q.call));
+            let raw = r.get_ref(5)?.as_str().map_err(rusqlite::Error::from)?;
+            let facts: Facts = serde_json::from_str(raw)?;
+            q.state = facts.STATE.map(|s| s.trim().to_ascii_uppercase()).filter(|s| !s.is_empty());
+            q.cq_zone = facts.CQZ.and_then(|z| z.trim().parse().ok());
+            q.lotw = yes(&facts.LOTW_QSL_RCVD);
+            q.paper = yes(&facts.QSL_RCVD);
+            q.eqsl = yes(&facts.EQSL_QSL_RCVD);
+            f(&q);
+        }
+        Ok(())
+    }
+
+    /// QSOs waiting for a paper QSL card (QSL_SENT is R "requested" or Q "queued"),
+    /// grouped by call for printing labels.
+    pub fn paper_queue(&self, log_id: i64) -> Result<Vec<Qso>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, log_id, location_id, fields FROM qsos WHERE log_id = ?1
+             AND json_extract(fields, '$.QSL_SENT') IN ('R', 'Q') ORDER BY call, time_on",
+        )?;
+        let rows = stmt.query_map([log_id], row_to_qso)?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
     pub fn count_pending(&self, log_id: i64, status_key: &str, callsigns: &[String], location_id: Option<i64>, since: i64) -> Result<i64> {
@@ -815,6 +955,19 @@ fn pending_sql(select: &str, log_id: i64, status_key: &str, callsigns: &[String]
         args.push(loc.into());
     }
     Ok((sql, args))
+}
+
+/// What applying downloaded confirmations did.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
+pub struct ConfirmStats {
+    /// Confirmations downloaded.
+    pub received: usize,
+    /// QSOs newly marked confirmed (or given new details).
+    pub new: usize,
+    /// QSOs that already showed the confirmation.
+    pub already: usize,
+    /// Downloaded confirmations with no matching QSO in the log.
+    pub unmatched: Vec<String>,
 }
 
 /// Indexed copies of a QSO's key fields.

@@ -2,21 +2,22 @@
 // by other programs. Read with fetch so the session token can go in a header.
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import type { FtxDecode, FtxInstance, Integrations, QslRun, Radio, Spot } from "./types";
+import type { FtxDecode, FtxInstance, Integrations, QslDownload, QslRun, QslService, Radio, Spot } from "./types";
 
 export type LiveEvent =
   | { type: "radios"; radios: Radio[] }
   | { type: "ftx_instances"; instances: FtxInstance[] }
   | { type: "decode"; decode: FtxDecode }
   | { type: "ftx_clear"; instance: string }
-  | { type: "qso_logged"; log_id: number; call: string; source: string; added: boolean }
+  | { type: "qso_logged"; log_id: number | null; call: string; source: string; added: boolean }
   | { type: "rotator"; azimuth: number | null }
   | { type: "cty"; entities: number }
   | { type: "integrations"; config: Integrations }
   | { type: "spot"; spot: Spot }
   | { type: "cluster_line"; text: string }
   | { type: "cluster_state"; state: string; connected: boolean }
-  | { type: "qsl"; service: "qrz" | "clublog" | "lotw"; run: QslRun }
+  | { type: "qsl"; service: QslService; run: QslRun }
+  | { type: "qsl_download"; service: "lotw" | "eqsl"; run: QslDownload }
   | { type: "error"; message: string };
 
 type Listener = (e: LiveEvent) => void;

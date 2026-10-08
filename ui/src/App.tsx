@@ -18,10 +18,11 @@ import ExportDialog from "./components/ExportDialog";
 import SettingsDialog, { type GeneralPrefs } from "./components/SettingsDialog";
 import EditQsoDialog from "./components/EditQsoDialog";
 import HelpView from "./components/HelpView";
+import AwardsPane from "./components/AwardsPane";
 import SetupWizard from "./components/SetupWizard";
 
 type Dialog = "import" | "export" | "settings" | "help" | "wizard" | "qsl" | null;
-interface Pane { tab: "log" | "ftx" | "cluster"; beside: boolean }
+interface Pane { tab: "log" | "ftx" | "cluster" | "awards"; beside: boolean }
 
 export default function App() {
   const [logs, setLogs] = useState<Log[]>([]);
@@ -51,7 +52,7 @@ export default function App() {
   const [prefill, setPrefill] = useState<Prefill | null>(null);
   const [pane, setPane] = useState<Pane>(() => {
     const saved = localGet<Pane>("qrzero.pane2", { tab: "log", beside: false });
-    return saved.tab === "log" || saved.tab === "ftx" || saved.tab === "cluster" ? saved : { tab: "log", beside: false };
+    return ["log", "ftx", "cluster", "awards"].includes(saved.tab) ? saved : { tab: "log", beside: false };
   });
   const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState("");
@@ -110,7 +111,7 @@ export default function App() {
   useEffect(
     () =>
       onLive((e) => {
-        if (e.type === "qso_logged" && e.log_id === logId) {
+        if (e.type === "qso_logged" && (e.log_id === logId || e.log_id === null)) {
           setRefreshKey((k) => k + 1);
           loadLogs().catch(() => {});
           if (e.call) setNotice(e.added ? `Logged ${e.call} from ${e.source}` : `${e.call} from ${e.source} was already in the log`);
@@ -246,6 +247,7 @@ export default function App() {
         <button className={pane.tab === "log" ? "active" : ""} onClick={() => choosePane({ tab: "log" })}>Log</button>
         <button className={pane.tab === "ftx" ? "active" : ""} onClick={() => choosePane({ tab: "ftx" })}>FTx monitor</button>
         <button className={pane.tab === "cluster" ? "active" : ""} onClick={() => choosePane({ tab: "cluster" })}>Cluster</button>
+        <button className={pane.tab === "awards" ? "active" : ""} onClick={() => choosePane({ tab: "awards" })}>Awards</button>
         {pane.tab !== "log" && (
           <label className="check beside" title="Show the log next to this pane">
             <input type="checkbox" checked={pane.beside} onChange={(e) => choosePane({ beside: e.target.checked })} /> Beside the log
@@ -267,6 +269,16 @@ export default function App() {
         onColumns={setColumns}
         locations={locations}
       />}
+      {pane.tab === "awards" && logId !== null && (
+        <AwardsPane
+          logId={logId}
+          callsigns={callsigns ?? []}
+          onShowQsos={(f) => {
+            setFilter({ ...f, bands: undefined, modes: undefined });
+            if (!pane.beside) choosePane({ tab: "log" });
+          }}
+        />
+      )}
       {pane.tab === "ftx" && <FtxMonitor mycall={stationCall} onPick={pick} />}
       {pane.tab === "cluster" && (
         <ClusterPane
@@ -340,7 +352,7 @@ export default function App() {
           }}
         />
       )}
-      {dialog === "qsl" && <QslDialog callsigns={callsigns} locations={locations} onClose={() => setDialog(null)} />}
+      {dialog === "qsl" && logId !== null && <QslDialog logId={logId} callsigns={callsigns} locations={locations} onClose={() => setDialog(null)} />}
       {dialog === "help" && <HelpView onClose={() => setDialog(null)} />}
       {editing && (
         <EditQsoDialog
