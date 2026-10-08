@@ -23,6 +23,11 @@ impl Protocol for Yaesu {
             decode_mode(code).apply(&mut st);
         }
         st.tx = io.ask("TX;", "TX")?.value().is_some_and(|v| v != "TX0;");
+        // ST is 0 off, 1 on (some models add 2 for on with a 5 kHz shift). The transmit VFO is B.
+        if io.ask("ST;", "ST")?.value().is_some_and(|v| v != "ST0;") {
+            st.tx_freq_hz = io.ask("FB;", "FB")?.value().and_then(|v| parse_fb(&v)).unwrap_or(0);
+            st.split = st.tx_freq_hz > 0;
+        }
         self.last = st.clone();
         Ok(st)
     }
@@ -34,7 +39,8 @@ impl Protocol for Yaesu {
                 Some(req) => io.set(&format!("MD0{};", encode_mode(req))),
                 None => Ok(()),
             },
-            RigCommand::SetSplit(_) => anyhow::bail!("split control needs a TCI connection"),
+            RigCommand::SetSplit(Some(hz)) => io.set(&format!("FB{:09};ST1;", (*hz).min(999_999_999))),
+            RigCommand::SetSplit(None) => io.set("ST0;"),
         }
     }
 }
@@ -42,6 +48,11 @@ impl Protocol for Yaesu {
 /// Parses `FA014025000;` (9 digits on most models, any width accepted).
 fn parse_fa(s: &str) -> Option<u64> {
     parse_digits(s.strip_prefix("FA")?.strip_suffix(';')?)
+}
+
+/// Parses `FB014205000;`, VFO B's frequency.
+fn parse_fb(s: &str) -> Option<u64> {
+    parse_digits(s.strip_prefix("FB")?.strip_suffix(';')?)
 }
 
 /// Parses `MD0C;` into its mode code character.
@@ -122,6 +133,8 @@ mod tests {
             "FA;" => Some("FA014074000;".into()),
             "MD0;" => Some("MD0C;".into()),
             "TX;" => Some("TX1;".into()),
+            "ST;" => Some("ST1;".into()),
+            "FB;" => Some("FB014205000;".into()),
             "MD0Z;" => Some("?;".into()),
             _ => None,
         });
@@ -130,10 +143,13 @@ mod tests {
         let mut yaesu = Yaesu::default();
         let st = yaesu.poll(&mut io).unwrap();
         assert_eq!((st.freq_hz, st.rig_mode.as_str(), st.data, st.tx), (14_074_000, "DATA-U", true, true));
+        assert_eq!((st.split, st.tx_freq_hz), (true, 14_205_000));
         yaesu.command(&mut io, &RigCommand::SetMode("SSB".into()), 7_100_000).unwrap();
         yaesu.command(&mut io, &RigCommand::SetFreq(7_100_000), 0).unwrap();
+        yaesu.command(&mut io, &RigCommand::SetSplit(Some(14_205_000)), 0).unwrap();
+        yaesu.command(&mut io, &RigCommand::SetSplit(None), 0).unwrap();
         assert!(io.set("MD0Z;").is_err());
         let log = String::from_utf8(written.lock().unwrap().clone()).unwrap();
-        assert!(log.ends_with("MD01;FA007100000;MD0Z;"), "{log}");
+        assert!(log.ends_with("MD01;FA007100000;FB014205000;ST1;ST0;MD0Z;"), "{log}");
     }
 }

@@ -60,6 +60,12 @@ impl Protocol for Kenwood {
         let da = self.has_da && io.ask("DA;", "DA")?.value().and_then(|v| parse_field(&v, "DA")).is_some_and(|d| d != 0);
         let mut st = RigState { freq_hz: status.freq_hz, tx: status.tx, ..Default::default() };
         decode_mode(self.dialect, status.mode, dt, da).apply(&mut st);
+        if status.split {
+            // The transmit frequency is on the VFO we aren't receiving on.
+            let ask = if status.rx_vfo_b { ("FA;", "FA") } else { ("FB;", "FB") };
+            st.tx_freq_hz = io.ask(ask.0, ask.1)?.value().and_then(|v| parse_field(&v, ask.1)).unwrap_or(0);
+            st.split = st.tx_freq_hz > 0;
+        }
         self.last = st.clone();
         Ok(st)
     }
@@ -71,7 +77,9 @@ impl Protocol for Kenwood {
                 Some(req) => io.set(&encode_mode(self.dialect, self.has_da, req)),
                 None => Ok(()),
             },
-            RigCommand::SetSplit(_) => anyhow::bail!("split control needs a TCI connection"),
+            // Receive on VFO A, transmit on VFO B (FR before FT, as the radios want).
+            RigCommand::SetSplit(Some(hz)) => io.set(&format!("FB{:011};FR0;FT1;", (*hz).min(99_999_999_999))),
+            RigCommand::SetSplit(None) => io.set("FR0;FT0;"),
         }
     }
 }
@@ -83,6 +91,9 @@ struct IfStatus {
     tx: bool,
     /// The MD digit, as an ASCII byte.
     mode: u8,
+    /// The receive VFO is B (otherwise A or memory).
+    rx_vfo_b: bool,
+    split: bool,
 }
 
 /// Parses `IF<11-digit freq><5><5 RIT><1><1><1><2 mem><tx><mode>...;`.
@@ -91,7 +102,15 @@ fn parse_if(s: &str) -> Option<IfStatus> {
     if b.len() < 28 || !b.is_ascii() {
         return None;
     }
-    Some(IfStatus { freq_hz: parse_digits(&b[..11])?, tx: b.as_bytes()[26] == b'1', mode: b.as_bytes()[27] })
+    let at = |i: usize| b.as_bytes().get(i).copied();
+    Some(IfStatus {
+        freq_hz: parse_digits(&b[..11])?,
+        tx: b.as_bytes()[26] == b'1',
+        mode: b.as_bytes()[27],
+        rx_vfo_b: at(28) == Some(b'1'),
+        // Right after the mode: receive VFO, scan, split.
+        split: at(30) == Some(b'1'),
+    })
 }
 
 /// Parses a numeric reply such as `ID019;` or `DT0;`.
@@ -173,10 +192,14 @@ mod tests {
     #[test]
     fn parse_replies() {
         let st = parse_if(&if_reply(14_025_000, false, '3')).unwrap();
-        assert_eq!(st, IfStatus { freq_hz: 14_025_000, tx: false, mode: b'3' });
+        assert_eq!(st, IfStatus { freq_hz: 14_025_000, tx: false, mode: b'3', rx_vfo_b: false, split: false });
         // K3 style (blank fields, negative RIT) while transmitting USB.
         let st = parse_if("IF00007074000     -001000 0012000001 ;").unwrap();
-        assert_eq!(st, IfStatus { freq_hz: 7_074_000, tx: true, mode: b'2' });
+        assert_eq!(st, IfStatus { freq_hz: 7_074_000, tx: true, mode: b'2', rx_vfo_b: false, split: false });
+        // Split on (VFO A receiving), then VFO B receiving.
+        let st = parse_if(&format!("{}001;", &if_reply(14_025_000, false, '3')[..30])).unwrap();
+        assert!(!st.tx && st.mode == b'3' && !st.rx_vfo_b && st.split);
+        assert!(parse_if(&format!("{}100;", &if_reply(14_025_000, false, '3')[..30])).unwrap().rx_vfo_b);
         assert_eq!(parse_if("IF000;"), None);
         assert_eq!(parse_if("FA00014025000;"), None);
         assert_eq!(parse_field("ID019;", "ID"), Some(19));
@@ -213,7 +236,8 @@ mod tests {
     /// Runs the full poll loop against a fake K3.
     #[tokio::test]
     async fn serve_fake_k3() {
-        let radio = Arc::new(Mutex::new((14_074_000u64, '6', '0')));
+        // freq, mode, DT, VFO B freq, split
+        let radio = Arc::new(Mutex::new((14_074_000u64, '6', '0', 0u64, false)));
         let r = radio.clone();
         let link = fake::ascii(move |cmd| {
             let mut r = r.lock().unwrap();
@@ -221,10 +245,27 @@ mod tests {
                 r.0 = f.parse().unwrap();
                 return None;
             }
+            if let Some(f) = cmd.strip_prefix("FB").and_then(|f| f.strip_suffix(';')).filter(|f| !f.is_empty()) {
+                r.3 = f.parse().unwrap();
+                return None;
+            }
             match cmd {
+                "FT1;" => {
+                    r.4 = true;
+                    None
+                }
+                "FT0;" => {
+                    r.4 = false;
+                    None
+                }
+                "FB;" => Some(format!("FB{:011};", r.3)),
                 "ID;" => Some("ID017;".into()),
                 "DT;" => Some(format!("DT{};", r.2)),
-                "IF;" => Some(if_reply(r.0, false, r.1)),
+                "IF;" => {
+                    let mut reply = if_reply(r.0, false, r.1);
+                    reply.replace_range(32..33, if r.4 { "1" } else { "0" });
+                    Some(reply)
+                }
                 "MD3;" => {
                     r.1 = '3';
                     None
@@ -253,6 +294,13 @@ mod tests {
         assert_eq!(st.freq_hz, 7_030_000);
         let log = String::from_utf8(written.lock().unwrap().clone()).unwrap();
         assert!(log.contains("FA00007030000;") && log.contains("MD3;"), "{log}");
+        cmd_tx.send((0, RigCommand::SetSplit(Some(7_035_000)))).unwrap();
+        let st = wait(|s| s.split).await;
+        assert_eq!((st.freq_hz, st.tx_freq_hz), (7_030_000, 7_035_000));
+        cmd_tx.send((0, RigCommand::SetSplit(None))).unwrap();
+        wait(|s| !s.split).await;
+        let log = String::from_utf8(written.lock().unwrap().clone()).unwrap();
+        assert!(log.contains("FB00007035000;FR0;FT1;") && log.contains("FR0;FT0;"), "{log}");
         drop(cmd_tx);
         thread.join().unwrap().unwrap();
     }

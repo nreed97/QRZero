@@ -60,7 +60,7 @@ pub enum RigCommand {
     SetFreq(u64),
     /// ADIF mode, e.g. "CW", "SSB", "AM", "FM", "RTTY", "FT8", "FT4", "PSK31". SSB picks LSB below 10 MHz except 60 m (5.3-5.4 MHz) which is USB. Digital modes pick the rig's USB data mode (DIGU, PKTUSB, USB-D / data on, etc.).
     SetMode(String),
-    /// Transmit on this frequency and turn split on, or turn split off (`None`). Only TCI supports it so far.
+    /// Transmit on this frequency and turn split on, or turn split off (`None`). 
     SetSplit(Option<u64>),
 }
 
