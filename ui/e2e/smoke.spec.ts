@@ -66,6 +66,18 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "Done" }).click();
   await expect(page.locator(".grid-row", { hasText: "W1AW" })).toContainText("K3");
 
+  // Drag the Rig heading (added last) in front of Call.
+  const heads = page.locator(".grid > .grid-head .col-head");
+  const rig = await heads.filter({ hasText: /^Rig$/ }).boundingBox();
+  const callHead = await heads.filter({ hasText: /^Call$/ }).boundingBox();
+  await page.mouse.move(rig!.x + 10, rig!.y + rig!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(callHead!.x + 20, callHead!.y + 5, { steps: 8 });
+  await page.mouse.move(callHead!.x + 4, callHead!.y + 5, { steps: 4 });
+  await page.mouse.up();
+  const order = await heads.allInnerTexts();
+  expect(order.indexOf("Rig")).toBe(order.indexOf("Call") - 1);
+
   // Search by call prefix and by wildcard.
   await page.getByTestId("search").fill("K1");
   await expect(page.locator(".grid > .grid-tools")).toContainText("2 QSOs");
