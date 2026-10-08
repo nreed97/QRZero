@@ -113,6 +113,26 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "Settings" }).click();
   await page.getByRole("button", { name: "Radios and programs" }).click();
   await expect(page.getByLabel("Listen to WSJT-X / JTDX")).toBeChecked();
+
+  // A UDP connection from a preset is saved and can send a test message.
+  await page.getByRole("button", { name: "UDP connections" }).click();
+  await page.getByRole("button", { name: "Rotator program" }).click();
+  await expect(page.locator("select[aria-label='Sends when']")).toHaveValue("rotator");
+  await expect(page.locator("select[aria-label=Format]")).toHaveValue("pst");
+  await page.getByRole("button", { name: "Send test" }).click();
+  await expect(page.locator("pre.udp-sent")).toHaveText("<PST><AZIMUTH>45</AZIMUTH></PST>");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Saved.")).toBeVisible();
+  await page.getByRole("button", { name: "Startup programs" }).click();
+  await page.getByRole("button", { name: "UDP connections" }).click();
+  await expect(page.locator("input[aria-label=Name]")).toHaveValue("Rotator");
+
+  // Startup programs: a missing program says why it didn't start.
+  await page.getByRole("button", { name: "Startup programs" }).click();
+  await page.getByRole("button", { name: "Add a program" }).click();
+  await page.getByLabel("Program", { exact: true }).fill("/no/such/program");
+  await page.getByRole("button", { name: "Launch now" }).click();
+  await expect(page.locator("table.startup-apps")).toContainText("couldn't start");
   await page.getByRole("button", { name: "Close" }).click();
 
   // With no cluster set up, the Cluster pane sends you to Settings to add one.

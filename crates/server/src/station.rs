@@ -20,6 +20,8 @@ use tokio::net::UdpSocket;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 
+use crate::udp_out::{Ctx as UdpCtx, Event as UdpEvent};
+
 const MAX_DECODES: usize = 1000;
 /// Where the country file comes from. cty.csv carries ADIF DXCC numbers; cty.dat is the fallback.
 pub const CTY_URLS: [&str; 2] = ["https://www.country-files.com/cty/cty.csv", "https://www.country-files.com/cty/cty.dat"];
@@ -330,6 +332,8 @@ pub struct Hub {
     inner: Mutex<Inner>,
     cty: RwLock<Option<Arc<CtyDb>>>,
     pub(crate) watch: crate::watch::Watch,
+    /// The user's own UDP connections and relays.
+    pub(crate) udp: Arc<crate::udp_out::Outputs>,
 }
 
 impl Hub {
@@ -344,7 +348,16 @@ impl Hub {
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
         let watch = crate::watch::Watch::new(watch_list);
-        let hub = Arc::new(Hub { store, data_dir, events, inner: Mutex::default(), cty: RwLock::default(), watch });
+        let conns = store
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .get_setting(crate::udp_out::SETTING_KEY)
+            .ok()
+            .flatten()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default();
+        let udp = crate::udp_out::Outputs::new(conns);
+        let hub = Arc::new(Hub { store, data_dir, events, inner: Mutex::default(), cty: RwLock::default(), watch, udp });
         if let Err(e) = hub.load_cty_file() {
             tracing::info!("no country file yet: {e}");
         }
@@ -471,6 +484,36 @@ impl Hub {
         }
     }
 
+    /// Tells the UDP connections about a newly logged QSO.
+    pub fn send_qso(&self, f: &Fields, qso_id: i64) {
+        if self.udp.wants(UdpEvent::QsoLogged) {
+            self.udp.fire(UdpCtx::qso(f, Some(qso_id)));
+        }
+    }
+
+    /// Tells the UDP connections a call was entered, with the heading to it from the active location.
+    pub fn send_lookup(&self, call: &str, station: Option<&Fields>, entity: Option<&Entity>) {
+        if !self.udp.wants(UdpEvent::Lookup) {
+            return;
+        }
+        let grid = station.and_then(|f| f.get("GRIDSQUARE")).map(|g| g.trim().to_string()).unwrap_or_default();
+        let loc_id = self.active().location_id;
+        let my_grid = loc_id
+            .and_then(|id| self.with_store(|st| st.get_location(id)).ok())
+            .and_then(|l| l.fields.get("MY_GRIDSQUARE").cloned())
+            .unwrap_or_default();
+        let to = crate::udp_out::grid_latlon(&grid).or_else(|| entity.map(|e| (e.lat, e.lon)));
+        let az = crate::udp_out::grid_latlon(&my_grid).zip(to).map(|(a, b)| crate::udp_out::bearing(a, b));
+        self.udp.fire(UdpCtx {
+            event: UdpEvent::Lookup,
+            call: call.to_string(),
+            grid,
+            az,
+            fields: station.cloned().unwrap_or_default(),
+            ..UdpCtx::default()
+        });
+    }
+
     // ---- rigs -------------------------------------------------------------
 
     /// (Re)connects the rigs set up for control at the active location.
@@ -507,6 +550,9 @@ impl Hub {
     }
 
     fn set_radio(&self, radio: Radio) {
+        if radio.state.connected && radio.state.freq_hz > 0 && self.udp.wants(UdpEvent::Radio) {
+            self.udp.fire(radio_ctx(&radio));
+        }
         let mut inner = self.lock();
         inner.radios.insert(radio.key.clone(), radio);
         let radios: Vec<_> = inner.radios.values().cloned().collect();
@@ -810,21 +856,25 @@ impl Hub {
                     if let Some(existing) = st.find_qso_by_field(log_id, "APP_QRZERO_N1MM_ID", id)? {
                         let old = st.get_qso(existing)?;
                         st.update_qso(existing, old.location_id, &fields)?;
-                        return Ok(false);
+                        return Ok(None);
                     }
                 }
             }
             if st.find_duplicate(log_id, &fields)?.is_some() {
-                return Ok(false);
+                return Ok(None);
             }
-            st.insert_qso(log_id, active.location_id, &fields)?;
-            Ok(true)
+            Ok(Some(st.insert_qso(log_id, active.location_id, &fields)?))
         });
         match result {
             Ok(added) => {
-                if added {
-                    self.note_qso(log_id, &fields);
-                }
+                let added = match added {
+                    Some(qso) => {
+                        self.note_qso(log_id, &qso.fields);
+                        self.send_qso(&qso.fields, qso.id);
+                        true
+                    }
+                    None => false,
+                };
                 let call = fields.get("CALL").cloned().unwrap_or_default();
                 self.emit(json!({"type": "qso_logged", "log_id": log_id, "call": call, "source": source, "added": added}));
             }
@@ -881,7 +931,14 @@ impl Hub {
             let inner = self.lock();
             (inner.integrations.rotator_enabled, inner.integrations.rotator_addr.clone())
         };
+        let others = self.udp.wants(UdpEvent::Rotator);
+        if others {
+            self.udp.fire(UdpCtx { event: UdpEvent::Rotator, az: Some(azimuth), ..UdpCtx::default() });
+        }
         if !enabled {
+            if others {
+                return Ok(());
+            }
             return Err("turn on the rotator in Settings, Radios first".into());
         }
         let sock = UdpSocket::bind("0.0.0.0:0").await.map_err(|e| e.to_string())?;
@@ -1061,10 +1118,30 @@ async fn wsjtx_listener(hub: std::sync::Weak<Hub>, cfg: Integrations, listen: St
             let _ = socket.send_to(&buf[..n], to).await;
         }
         let Some(h) = hub.upgrade() else { return };
+        relay(&h, &socket, UdpEvent::RelayWsjtx, &buf[..n]).await;
         h.lock().wsjtx_sockets.insert(from, socket.clone());
         match wsjtx::parse(&buf[..n]) {
             Ok(msg) => h.on_wsjtx(msg, from),
             Err(e) => tracing::debug!("WSJT-X packet from {from}: {e}"),
+        }
+    }
+}
+
+/// Passes a received packet on, unchanged, to the user's relay connections for that stream.
+/// Sent from the listening socket, so programs that answer (WSJT-X's Reply) reach QRZero.
+async fn relay(h: &Hub, socket: &UdpSocket, stream: UdpEvent, packet: &[u8]) {
+    let targets = h.udp.relay_targets(stream);
+    if targets.is_empty() {
+        return;
+    }
+    let me = socket.local_addr().ok();
+    for to in targets {
+        // Never back to ourselves, or the packet goes round forever.
+        if Some(to) == me || me.is_some_and(|m| m.port() == to.port() && m.ip().is_unspecified() && to.ip().is_loopback()) {
+            continue;
+        }
+        if socket.send_to(packet, to).await.is_ok() {
+            h.udp.relayed(stream, to);
         }
     }
 }
@@ -1089,6 +1166,7 @@ async fn n1mm_listener(hub: std::sync::Weak<Hub>, listen: String) {
             continue;
         };
         let Some(h) = hub.upgrade() else { return };
+        relay(&h, &socket, UdpEvent::RelayN1mm, &buf[..n]).await;
         match n1mm::parse(&buf[..n]) {
             Ok(msg) => h.on_n1mm(msg),
             Err(e) => tracing::debug!("N1MM packet: {e}"),
@@ -1140,6 +1218,30 @@ async fn rotator_poller(hub: std::sync::Weak<Hub>, addr: String) {
 }
 
 // ---- helpers --------------------------------------------------------------
+
+/// A radio's state as a UDP connection event. Rig channels are numbered from 1 (RadioNr in N1MM terms).
+fn radio_ctx(r: &Radio) -> UdpCtx {
+    let mut parts = r.key.split(':');
+    let radio_nr = match (parts.next(), parts.next(), parts.next()) {
+        (Some("rig"), Some(_), Some(ch)) => ch.parse::<u32>().map_or(1, |c| c + 1),
+        (Some("n1mm"), Some(_), Some(nr)) => nr.parse().unwrap_or(1),
+        _ => 1,
+    };
+    let s = &r.state;
+    UdpCtx {
+        event: UdpEvent::Radio,
+        freq_hz: s.freq_hz,
+        tx_freq_hz: s.freq_hz,
+        band: band_for_freq(s.freq_hz as f64 / 1e6).unwrap_or_default().to_string(),
+        mode: if s.mode.is_empty() { s.rig_mode.clone() } else { s.mode.clone() },
+        rig_mode: s.rig_mode.clone(),
+        tx: s.tx,
+        radio: r.name.clone(),
+        radio_key: r.key.clone(),
+        radio_nr,
+        ..UdpCtx::default()
+    }
+}
 
 /// Rig control settings live in the rig's equipment fields.
 pub fn rig_config(f: &Fields) -> Option<RigConfig> {

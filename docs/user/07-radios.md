@@ -41,6 +41,8 @@ The rig recorded with each QSO (`MY_RIG`) is the radio being followed.
 
 With PstRotatorAz set up (**Settings → Radios and programs**), the map shows the rotator's heading and **Turn SP** / **LP** buttons that turn the antenna to the short or long path of the station you're working.
 
+For another rotator program, or to send the heading somewhere else as well, add a UDP connection that sends on **Rotator turn request** (see *UDP connections and startup programs*). The Rotator pane works with that alone too, though it only shows the current heading when PstRotatorAz is on.
+
 ## Rotator pane
 
 The **Rotator** pane gives the rotator a proper control of its own. Open it from **Layout**, **Rotator**. It shares a tab with the map to start with; drag it anywhere you like, or pop it out to its own window.
