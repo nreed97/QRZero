@@ -16,7 +16,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use qrzero_core::adif::Fields;
-use qrzero_core::awards::{Award, AwardHint, AwardQso, AwardTable, Counts, Tally};
+use qrzero_core::awards::{Award, AwardHint, AwardQso, AwardTable, Counts, CtyFacts, Tally};
 use qrzero_core::model::*;
 use qrzero_core::qrz::{QrzClient, DEFAULT_ENDPOINT};
 use qrzero_core::store::Sort;
@@ -36,7 +36,7 @@ mod watch;
 pub use qsl::Endpoints as QslEndpoints;
 use cluster::{Cluster, ClusterConfig};
 use qsl::{Qsl, QslConfig, SecretsUpdate};
-use station::{Active, Hub, Integrations};
+use station::{cty_facts, Active, Hub, Integrations};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 const LOOKUP_CACHE_SECS: i64 = 30 * 24 * 3600;
@@ -569,7 +569,7 @@ async fn award(State(s): State<Shared>, Path((id, award)): Path<(i64, Award)>, Q
             return Ok(t.1.clone());
         }
         let mut tally = Tally::new(award, counts, names);
-        let resolve = |c: &str| cty.as_ref().and_then(|db| db.lookup(c)).and_then(|e| e.dxcc);
+        let resolve = |c: &str| cty_facts(cty.as_deref(), c);
         st.for_each_award_qso(id, &calls, resolve, |qso| tally.add(qso))?;
         let table = Arc::new(tally.finish(q.unworked));
         let mut c = cache.lock().unwrap_or_else(|p| p.into_inner());
@@ -593,6 +593,10 @@ struct HintQuery {
     /// CQ zone and DXCC entity; taken from the country file when missing.
     cqz: Option<String>,
     dxcc: Option<String>,
+    /// Grid square, IOTA reference and county ("ST,Name") of the station, when known.
+    grid: Option<String>,
+    iota: Option<String>,
+    cnty: Option<String>,
     #[serde(default)]
     lotw: bool,
     #[serde(default)]
@@ -607,14 +611,14 @@ async fn award_hints(State(s): State<Shared>, Path(log_id): Path<i64>, Query(q):
     for (k, v) in [("CALL", &q.call), ("BAND", &q.band), ("MODE", &q.mode), ("STATE", &q.state)] {
         fields.insert(k.into(), v.clone());
     }
-    for (k, v) in [("CQZ", &q.cqz), ("DXCC", &q.dxcc)] {
+    for (k, v) in [("CQZ", &q.cqz), ("DXCC", &q.dxcc), ("GRIDSQUARE", &q.grid), ("IOTA", &q.iota), ("CNTY", &q.cnty)] {
         if let Some(v) = v.as_ref().filter(|v| !v.trim().is_empty()) {
             fields.insert(k.into(), v.clone());
         }
     }
     // The same country-file facts a logged QSO would get.
     s.hub.fill_from_cty(&mut fields);
-    let qso = AwardQso::from_fields(&fields, |_| None);
+    let qso = AwardQso::from_fields(&fields, |_| CtyFacts::default());
     let counts = Counts { lotw: q.lotw, paper: q.paper, eqsl: q.eqsl };
     let hub = s.hub.clone();
     let mut hints = tokio::task::spawn_blocking(move || hub.award_hints(log_id, &qso, counts))

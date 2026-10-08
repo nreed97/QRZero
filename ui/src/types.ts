@@ -224,7 +224,7 @@ export interface QslOverview {
 }
 export interface QslSecrets { qrz_keys?: Record<string, string>; clublog_password?: string; clublog_app_key?: string; lotw_password?: string; eqsl_password?: string }
 
-export type AwardKind = "dxcc" | "was" | "waz" | "wpx";
+export type AwardKind = "dxcc" | "was" | "waz" | "wpx" | "wac" | "itu" | "vucc" | "iota" | "counties";
 export type AwardStatus = "worked" | "confirmed";
 export interface AwardRow { key: string; name: string; cells: Record<string, AwardStatus> }
 export interface AwardColumn { key: string; worked: number; confirmed: number }
