@@ -60,6 +60,9 @@ function LabelSheet({ items, sheet, skip }: { items: Label[]; sheet: Sheet; skip
                   {l.via && <span> via {l.via}</span>}
                 </div>
                 <table>
+                  <thead>
+                    <tr><th>Date</th><th>UTC</th><th>MHz</th><th>Mode</th><th>RST</th></tr>
+                  </thead>
                   <tbody>
                     {l.qsos.map((q) => (
                       <tr key={q.id}>

@@ -338,14 +338,16 @@ table.list th { text-align: left; font-size: 12px; font-weight: 600; padding: 2p
   body > *:not(.label-print) { display: none !important; }
   body { background: #fff; }
   .label-print { display: block; color: #000; font: 9pt Arial, Helvetica, sans-serif; }
-  .label-page { display: grid; break-after: page; padding-top: 0.5in; }
+  .label-page { display: grid; padding-top: 0.5in; }
+  .label-page:not(:last-child) { break-after: page; }
   .sheet-5160 .label-page { grid-template-columns: repeat(3, 2.625in); grid-auto-rows: 1in; column-gap: 0.125in; padding-left: 0.1875in; }
   .sheet-5163 .label-page { grid-template-columns: repeat(2, 4in); grid-auto-rows: 2in; column-gap: 0.1875in; padding-left: 0.156in; }
   .label { overflow: hidden; padding: 0.08in 0.12in; box-sizing: border-box; }
   .label-to { font-size: 11pt; }
   .sheet-5163 .label-to { font-size: 14pt; margin-bottom: 2pt; }
   .label table { border-collapse: collapse; width: 100%; }
-  .label td { padding: 0 3pt 0 0; font-size: 8pt; white-space: nowrap; }
+  .label td, .label th { padding: 0 3pt 0 0; font-size: 8pt; white-space: nowrap; text-align: left; }
+  .label th { font-size: 6pt; font-weight: normal; text-transform: uppercase; }
   .sheet-5163 .label td { font-size: 10pt; }
   .label-foot { font-size: 7.5pt; margin-top: 1pt; }
   .sheet-5163 .label-foot { font-size: 9pt; margin-top: 3pt; }

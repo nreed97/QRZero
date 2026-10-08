@@ -4,11 +4,11 @@ import { onLive } from "../live";
 import { localGet, localSet } from "../prefs";
 import type { AwardKind, AwardTable, QsoFilter, StationCallsign } from "../types";
 
-const AWARDS: { key: AwardKind; name: string; what: string }[] = [
-  { key: "dxcc", name: "DXCC", what: "entities" },
-  { key: "was", name: "WAS", what: "states" },
-  { key: "waz", name: "WAZ", what: "CQ zones" },
-  { key: "wpx", name: "WPX", what: "prefixes" },
+const AWARDS: { key: AwardKind; name: string; what: string; row: string }[] = [
+  { key: "dxcc", name: "DXCC", what: "entities", row: "Entity" },
+  { key: "was", name: "WAS", what: "states", row: "State" },
+  { key: "waz", name: "WAZ", what: "CQ zones", row: "Zone" },
+  { key: "wpx", name: "WPX", what: "prefixes", row: "Prefix" },
 ];
 
 const COL_NAMES: Record<string, string> = { mixed: "Mixed", cw: "CW", phone: "Phone", digital: "Digital" };
@@ -93,7 +93,7 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
           <table className="award-table">
             <thead>
               <tr>
-                <th className="name">{award.name === "WPX" ? "Prefix" : award.what[0].toUpperCase() + award.what.slice(1, -1)}</th>
+                <th className="name">{award.row}</th>
                 {table.columns.map((c) => <th key={c.key} className={c.key === "digital" || c.key === "mixed" ? "sep" : ""}>{COL_NAMES[c.key] ?? c.key}</th>)}
               </tr>
               <tr className="totals">
