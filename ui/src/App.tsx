@@ -31,6 +31,11 @@ const HOME: Partial<Record<PaneId, [PaneId, Zone]>> = {
   ftx: ["log", "center"],
   cluster: ["log", "center"],
   awards: ["log", "center"],
+  bandmap: ["log", "center"],
+  watch: ["lookup", "center"],
+  propagation: ["map", "center"],
+  rotator: ["map", "center"],
+  notes: ["worked", "center"],
 };
 
 function dockBack(root: WS["root"], id: PaneId): WS["root"] {
@@ -255,6 +260,7 @@ export default function App() {
           units: general.units,
           refreshKey,
           editingId: editing?.id ?? null,
+          radioKey,
         };
 
   // Messages from popped-out panes; a ref so the listener always sees current state.

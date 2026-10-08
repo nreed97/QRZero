@@ -1,6 +1,6 @@
 // The docked pane layout: a tree of splits whose leaves are tab groups.
 
-export type PaneId = "entry" | "lookup" | "worked" | "map" | "log" | "ftx" | "cluster" | "awards";
+export type PaneId = "entry" | "lookup" | "worked" | "map" | "log" | "ftx" | "cluster" | "awards" | "bandmap" | "watch" | "propagation" | "rotator" | "notes";
 
 export const PANES: { id: PaneId; title: string; popout: boolean }[] = [
   { id: "entry", title: "New QSO", popout: false },
@@ -11,6 +11,11 @@ export const PANES: { id: PaneId; title: string; popout: boolean }[] = [
   { id: "ftx", title: "FTx monitor", popout: true },
   { id: "cluster", title: "Cluster", popout: true },
   { id: "awards", title: "Awards", popout: true },
+  { id: "bandmap", title: "Band map", popout: true },
+  { id: "watch", title: "Watch list", popout: true },
+  { id: "propagation", title: "Propagation", popout: true },
+  { id: "rotator", title: "Rotator", popout: true },
+  { id: "notes", title: "Notes", popout: true },
 ];
 
 export const paneTitle = (id: PaneId) => PANES.find((p) => p.id === id)?.title ?? id;
@@ -43,12 +48,12 @@ export const DEFAULT_WORKSPACE: Workspace = {
         dir: "row",
         sizes: [0.56, 0.2, 0.24],
         children: [
-          { kind: "split", dir: "col", sizes: [0.58, 0.42], children: [tabs("entry"), tabs("worked")] },
-          tabs("lookup"),
-          tabs("map"),
+          { kind: "split", dir: "col", sizes: [0.58, 0.42], children: [tabs("entry"), tabs("worked", "notes")] },
+          tabs("lookup", "watch"),
+          tabs("map", "rotator", "propagation"),
         ],
       },
-      tabs("log", "ftx", "cluster", "awards"),
+      tabs("log", "ftx", "cluster", "bandmap", "awards"),
     ],
   },
   popped: [],

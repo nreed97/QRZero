@@ -10,6 +10,11 @@ import FtxMonitor, { type DecodePick } from "./FtxMonitor";
 import LookupPanel from "./LookupPanel";
 import MapPanel, { type MapView } from "./MapPanel";
 import WorkedPane from "./WorkedPane";
+import BandMapPane from "./BandMapPane";
+import WatchPane from "./WatchPane";
+import PropagationPane from "./PropagationPane";
+import RotatorPane from "./RotatorPane";
+import NotesPane from "./NotesPane";
 
 export interface PaneActions {
   onPick: (p: DecodePick) => void;
@@ -64,6 +69,16 @@ export default function SharedPane({ id, ctx, act }: { id: PaneId; ctx: PopConte
       return <ClusterPane onPick={act.onPick} onSettings={() => act.onSettings("cluster")} />;
     case "awards":
       return <AwardsPane logId={ctx.logId} callsigns={ctx.callsigns} onShowQsos={act.onShowQsos} />;
+    case "bandmap":
+      return <BandMapPane ctx={ctx} act={act} />;
+    case "watch":
+      return <WatchPane ctx={ctx} act={act} />;
+    case "propagation":
+      return <PropagationPane ctx={ctx} act={act} />;
+    case "rotator":
+      return <RotatorPane ctx={ctx} act={act} />;
+    case "notes":
+      return <NotesPane ctx={ctx} act={act} />;
     default:
       return null;
   }

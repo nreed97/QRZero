@@ -21,6 +21,8 @@ export interface PopContext {
   units: "km" | "mi";
   refreshKey: number;
   editingId: number | null;
+  /** The radio the entry panel follows ("" for none). */
+  radioKey: string;
 }
 
 /** A window QRZero opens: a popped-out pane, or the QSO editor. */
