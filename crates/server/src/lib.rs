@@ -27,7 +27,9 @@ use serde_json::json;
 mod cluster;
 mod propagation;
 mod qsl;
+mod startup;
 mod station;
+mod udp_out;
 mod watch;
 
 pub use qsl::Endpoints as QslEndpoints;
@@ -58,6 +60,8 @@ pub struct Config {
     pub qsl_endpoints: QslEndpoints,
     /// N0NBH's solar data feed (tests point this at a stand-in).
     pub propagation_url: String,
+    /// Start the programs listed under Settings, Startup programs.
+    pub launch_apps: bool,
 }
 
 impl Config {
@@ -71,6 +75,7 @@ impl Config {
             update_cty: true,
             qsl_endpoints: QslEndpoints::default(),
             propagation_url: propagation::DEFAULT_URL.to_string(),
+            launch_apps: true,
         }
     }
 }
@@ -99,6 +104,7 @@ struct AppState {
     cluster: Arc<Cluster>,
     qsl: Arc<Qsl>,
     propagation: Arc<propagation::Propagation>,
+    startup: Arc<startup::Startup>,
     /// Award tables by request, with the QSO version they were counted at.
     award_cache: AwardCache,
 }
@@ -126,9 +132,14 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
     let cluster = Cluster::new(&hub);
     let qsl = Qsl::new(store.clone(), hub.clone(), cfg.secret_service.clone(), cfg.data_dir.clone(), cfg.qsl_endpoints);
     qsl.start();
+    let startup = startup::Startup::new();
+    if cfg.launch_apps {
+        startup.launch_all(saved_startup_apps(&hub));
+    }
     let state = Arc::new(AppState {
         store,
         hub,
+        startup,
         cluster,
         qsl,
         propagation: propagation::Propagation::new(cfg.propagation_url),
@@ -193,6 +204,10 @@ fn router(state: Shared) -> Router {
         .route("/station/active", post(set_active))
         .route("/radios/tune", post(tune))
         .route("/integrations", get(get_integrations).put(put_integrations))
+        .route("/udp-connections", get(udp_get).put(udp_put))
+        .route("/udp-connections/test", post(udp_test))
+        .route("/startup-apps", get(startup_get).put(startup_put))
+        .route("/startup-apps/launch", post(startup_launch))
         .route("/ftx", get(ftx))
         .route("/ftx/reply", post(ftx_reply))
         .route("/rotator", post(rotate))
@@ -450,6 +465,7 @@ async fn insert_qso(State(s): State<Shared>, Path(id): Path<i64>, Json(mut b): J
     s.hub.fill_from_cty(&mut b.fields);
     let qso = db(&s, move |st| st.insert_qso(id, b.location_id, &b.fields)).await?;
     s.hub.note_qso(id, &qso.fields);
+    s.hub.send_qso(&qso.fields, qso.id);
     Ok(Json(qso))
 }
 
@@ -583,6 +599,7 @@ struct LookupResult {
 
 async fn lookup(State(s): State<Shared>, Path((log_id, call)): Path<(i64, String)>) -> ApiResult<LookupResult> {
     let call = call.trim().to_ascii_uppercase();
+    let call_for_udp = call.clone();
     let mut result = LookupResult { worked: WorkedBefore::default(), entity: s.hub.entity(&call), station: None, source: None, error: None, note: None };
     match qrz_lookup(&s, &call).await {
         Ok(Some((fields, source))) => {
@@ -605,6 +622,10 @@ async fn lookup(State(s): State<Shared>, Path((log_id, call)): Path<(i64, String
     .await?;
     result.worked = worked;
     result.note = note;
+    if s.hub.udp.wants(udp_out::Event::Lookup) {
+        let (hub, station, entity, call) = (s.hub.clone(), result.station.clone(), result.entity.clone(), call_for_udp);
+        tokio::task::spawn_blocking(move || hub.send_lookup(&call, station.as_ref(), entity.as_ref()));
+    }
     Ok(Json(result))
 }
 
@@ -845,6 +866,52 @@ async fn put_integrations(State(s): State<Shared>, Json(cfg): Json<Integrations>
     // Give the listeners a moment to bind so the status says whether it worked.
     tokio::time::sleep(std::time::Duration::from_millis(150)).await;
     get_integrations(State(s)).await
+}
+
+// ---- UDP connections and startup programs ------------------------------------
+
+async fn udp_get(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
+    Ok(Json(json!({ "connections": s.hub.udp.connections(), "status": s.hub.udp.status() })))
+}
+
+async fn udp_put(State(s): State<Shared>, Json(conns): Json<Vec<udp_out::UdpConnection>>) -> ApiResult<serde_json::Value> {
+    let saved = s.hub.udp.set(conns);
+    let text = serde_json::to_string(&saved).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    s.hub.set_setting(udp_out::SETTING_KEY, &text).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    // Relay addresses are looked up in the background; give that a moment for the status.
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    udp_get(State(s)).await
+}
+
+/// Sends an example message on a connection (saved or not) and answers with what was sent.
+async fn udp_test(State(s): State<Shared>, Json(conn): Json<udp_out::UdpConnection>) -> ApiResult<serde_json::Value> {
+    let sent = s.hub.udp.test(&conn).await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(json!({ "sent": sent })))
+}
+
+fn saved_startup_apps(hub: &Hub) -> Vec<startup::StartupApp> {
+    hub.setting(startup::SETTING_KEY).and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
+}
+
+async fn startup_get(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
+    Ok(Json(json!({ "apps": saved_startup_apps(&s.hub), "status": s.startup.status() })))
+}
+
+async fn startup_put(State(s): State<Shared>, Json(apps): Json<Vec<startup::StartupApp>>) -> ApiResult<serde_json::Value> {
+    let apps = startup::normalize(apps);
+    let text = serde_json::to_string(&apps).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    s.hub.set_setting(startup::SETTING_KEY, &text).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    s.startup.forget_others(&apps);
+    startup_get(State(s)).await
+}
+
+/// Starts one program now ("Launch now" in Settings).
+async fn startup_launch(State(s): State<Shared>, Json(app): Json<startup::StartupApp>) -> ApiResult<startup::AppStatus> {
+    let st = s.startup.clone();
+    let status = tokio::task::spawn_blocking(move || st.launch_one(&app))
+        .await
+        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(status))
 }
 
 #[derive(Deserialize)]

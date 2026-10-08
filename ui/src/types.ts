@@ -235,3 +235,20 @@ export interface SolarData {
   vhf: { name: string; location: string; condition: string }[];
 }
 export interface PropagationReport { data: SolarData | null; fetched_at: string | null; error: string | null }
+
+export type UdpEvent = "qso_logged" | "radio" | "rotator" | "lookup" | "relay_wsjtx" | "relay_n1mm";
+export type UdpFormat = "n1mm_radio" | "n1mm_contact" | "adif" | "json" | "pst" | "template";
+export interface UdpConnection {
+  id: number;
+  name: string;
+  enabled: boolean;
+  host: string;
+  port: number;
+  event: UdpEvent;
+  format: UdpFormat;
+  template: string;
+  /** Radio events: only this radio (by name); empty for all. */
+  radio: string;
+}
+export interface RunStatus { ok: boolean; text: string }
+export interface StartupApp { id: number; enabled: boolean; path: string; args: string; skip_if_running: boolean }

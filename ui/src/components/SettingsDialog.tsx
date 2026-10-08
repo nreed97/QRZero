@@ -5,6 +5,7 @@ import type { EntryLayout } from "../fields";
 import Modal from "./Modal";
 import EquipmentTree from "./EquipmentTree";
 import EntryFieldsEditor from "./EntryFieldsEditor";
+import { StartupAppsTab, UdpConnectionsTab } from "./ConnectionsSettings";
 
 export interface GeneralPrefs { units: "km" | "mi" }
 
@@ -25,7 +26,7 @@ interface Props {
   initialTab?: string;
 }
 
-type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "cluster" | "logs" | "lookup" | "general";
+type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "udp" | "startup" | "cluster" | "logs" | "lookup" | "general";
 
 const TAB_NAMES: Record<Tab, string> = {
   station: "Callsigns",
@@ -33,6 +34,8 @@ const TAB_NAMES: Record<Tab, string> = {
   equipment: "Equipment",
   fields: "Entry fields",
   radios: "Radios and programs",
+  udp: "UDP connections",
+  startup: "Startup programs",
   cluster: "DX cluster",
   logs: "Logs",
   lookup: "Callsign lookup",
@@ -72,6 +75,8 @@ export default function SettingsDialog(props: Props) {
       {tab === "fields" && <EntryFieldsEditor layout={props.layout} onChange={props.onLayout} />}
       {tab === "lookup" && <LookupTab />}
       {tab === "radios" && <RadiosTab />}
+      {tab === "udp" && <UdpConnectionsTab />}
+      {tab === "startup" && <StartupAppsTab />}
       {tab === "cluster" && <ClusterTab />}
       {tab === "general" && (
         <div>

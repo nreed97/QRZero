@@ -398,3 +398,10 @@ table.list th { text-align: left; font-size: 12px; font-weight: 600; padding: 2p
 .award-table td.worked { color: var(--new); }
 .awards { display: flex; flex-direction: column; min-height: 0; }
 button.chip { white-space: nowrap; }
+
+/* Settings: UDP connections and startup programs */
+table.list.udp-conns select { width: 100%; box-sizing: border-box; }
+table.list.udp-conns tr.sub td { border-top: none; padding-top: 0; }
+table.list.udp-conns td:nth-child(7), table.list.startup-apps td:nth-child(5) { max-width: 220px; }
+table.list.startup-apps td:nth-child(2) { width: 45%; }
+pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px; padding: 4px 6px; max-height: 160px; overflow: auto; white-space: pre-wrap; word-break: break-all; margin: 4px 0; }
