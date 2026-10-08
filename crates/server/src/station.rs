@@ -186,11 +186,12 @@ pub struct FtxInstance {
 /// Start of the T/R period holding `ms` (ms since midnight UTC). FT4's 7.5 s period is sent
 /// as 7, so the mode wins over `tr_period`; with neither, FT8's 15 s.
 pub fn tx_period_start(ms: u32, mode: &str, tr_period: u32) -> u32 {
+    // WSJT-X can send no period (0) or "not set" (all bits on); only a sane one is believed.
     let period = match (mode, tr_period) {
         ("FT4", _) => 7_500,
-        (_, 0) if mode.starts_with("JT") || mode.starts_with("Q65") => 60_000,
-        (_, 0) => 15_000,
-        (_, s) => s * 1000,
+        (_, s @ 1..=300) => s * 1000,
+        _ if mode.starts_with("JT") || mode.starts_with("Q65") => 60_000,
+        _ => 15_000,
     };
     // A transmission starts just after the boundary; a status sent a moment early still counts.
     let ms = (ms + 500) % 86_400_000;
@@ -917,6 +918,7 @@ impl Hub {
                 tx_message,
                 ..
             } => {
+                let tr_period = if tr_period <= 300 { tr_period } else { 0 };
                 let (changed, instances, tx) = {
                     let mut inner = self.lock();
                     let src = ftx_source(&id, &configuration_name, dial_freq, inner.radios.values());
@@ -1641,5 +1643,7 @@ mod tests {
         assert_eq!(tx_period_start(at(12, 0, 8.0), "FT8", 0), at(12, 0, 0.0));
         assert_eq!(tx_period_start(at(12, 0, 59.0), "JT65", 0), at(12, 0, 0.0));
         assert_eq!(tx_period_start(at(23, 59, 59.8), "FT8", 15), 0);
+        // "Not set" from WSJT-X must not overflow into a period that puts every line at 00:00:00.
+        assert_eq!(tx_period_start(at(18, 50, 31.0), "FT8", u32::MAX), at(18, 50, 30.0));
     }
 }

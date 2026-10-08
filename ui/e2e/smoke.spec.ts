@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import dgram from "node:dgram";
 
@@ -53,7 +53,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await call.press("Escape");
 
   // Import an ADIF file into the default location.
-  await page.getByRole("button", { name: "Import" }).click();
+  await fromMenu(page, "Import ADIF…");
   await page.getByTestId("import-file").setInputFiles({ name: "test.adi", mimeType: "text/plain", buffer: Buffer.from(ADIF) });
   await page.getByRole("dialog").getByRole("button", { name: "Import" }).click();
   await expect(page.getByText("QSOs imported")).toContainText("2");
@@ -115,7 +115,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.locator(".grid > .grid-tools")).toContainText("No UDP connection is set up");
 
   // Export 40m only, full fields.
-  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await fromMenu(page, "Export ADIF…");
   await page.getByLabel("Choose filters").check();
   await page.locator("label.chip", { hasText: /^40m$/ }).locator("input").check();
   await page.getByLabel(/Full: every stored field/).check();
@@ -182,8 +182,12 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
     await expect(strip.getByTestId("ftx-state")).toHaveText("TX");
     await expect(strip.getByTestId("ftx-txmsg")).toHaveText("Tx: EA8AB N0CALL R-14");
     await expect(strip.getByTestId("ftx-stage")).toHaveText("Sending R+report");
+    // The rest of WSJT-X's state is under More controls.
+    await expect(strip).not.toContainText("Rx 1500 Tx 1210");
+    await strip.getByRole("button", { name: "More controls" }).click();
     await expect(strip).toContainText("DX EA8AB IL18");
     await expect(strip).toContainText("Rx 1500 Tx 1210");
+    await strip.getByRole("button", { name: "Fewer controls" }).click();
     // Our transmission is a line of its own in the list, and a TX line in the call boxes.
     const txRow = ftx.locator(".ftx-row.tx");
     await expect(txRow).toHaveCount(1);
@@ -216,7 +220,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
     radio.close();
   }
   await page.getByRole("tab", { name: "Log", exact: true }).click();
-  await page.getByRole("button", { name: "Settings" }).click();
+  await fromMenu(page, "Settings…");
   await page.getByRole("button", { name: "Radios and programs" }).click();
   await expect(page.getByLabel("Listen to WSJT-X / JTDX")).toBeChecked();
 
@@ -250,7 +254,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("tab", { name: "Log", exact: true }).click();
 
   // QSL uploads: keys are saved, never shown back.
-  await page.getByRole("button", { name: "QSL", exact: true }).click();
+  await fromMenu(page, /^QSL/);
   await page.getByLabel("QRZ API key for N0OLD").fill("ABCD-1234");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Saved.")).toBeVisible();
@@ -260,7 +264,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // Paper cards: queue one from the log, then find it in QSL, Paper cards.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click();
   await page.getByLabel("Paper QSL").selectOption("queue");
-  await page.getByRole("button", { name: "QSL", exact: true }).click();
+  await fromMenu(page, /^QSL/);
   await page.getByRole("button", { name: "Paper cards" }).click();
   await expect(page.locator(".paper-queue")).toContainText("K1ABC");
   await expect(page.getByRole("button", { name: "Print 1 label" })).toBeVisible();
@@ -273,7 +277,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("tab", { name: "Log", exact: true }).click();
 
   // Antennas with bands: the QSO panel picks the one for the band.
-  await page.getByRole("button", { name: "Settings" }).click();
+  await fromMenu(page, "Settings…");
   await page.getByRole("button", { name: "Equipment" }).click();
   for (const [antName, bands] of [["Hex beam", ["20m", "15m"]], ["Dipole", ["40m"]]] as const) {
     await page.getByRole("button", { name: "add antenna" }).click();
@@ -352,7 +356,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "FTx monitor" })).toBeVisible();
 
   // Backups: back up now, download it, then stage a restore and cancel it.
-  await page.getByRole("button", { name: "Settings" }).click();
+  await fromMenu(page, "Settings…");
   await page.getByRole("button", { name: "Backups", exact: true }).click();
   await page.getByRole("button", { name: "Back up now" }).click();
   await expect(page.getByText(/^Saved qrzero-.*-manual\.db\.$/)).toBeVisible();
@@ -372,7 +376,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "Close" }).click();
 
   // The user guide opens from the top bar.
-  await page.getByRole("button", { name: "Help" }).click();
+  await fromMenu(page, /^Help/);
   await expect(page.getByRole("heading", { name: "Getting started" })).toBeVisible();
   await page.screenshot({ path: "e2e-results/help.png" });
 });
@@ -425,4 +429,10 @@ async function closeWindow(button: Locator) {
   await button.click({ noWaitAfter: true }).catch((e: Error) => {
     if (!/closed/.test(e.message)) throw e;
   });
+}
+
+/** Picks an item from the ☰ menu in the top bar. */
+async function fromMenu(page: Page, item: string | RegExp) {
+  await page.locator(".topbar").getByRole("button", { name: "Menu" }).click();
+  await page.locator(".topbar").getByRole("menuitem", { name: item }).click();
 }

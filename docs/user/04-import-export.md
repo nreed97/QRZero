@@ -4,7 +4,7 @@ QRZero reads and writes ADIF `.adi` files, the format every logger and QSL servi
 
 ## Importing
 
-Choose **Import** in the top bar.
+Choose **Import ADIF…** from the **☰** menu at the right of the top bar.
 
 | Option | What it does |
 | --- | --- |
@@ -19,7 +19,7 @@ Files written by older Windows programs in Windows-1252 rather than UTF-8 are re
 
 ## Exporting
 
-Choose **Export** in the top bar, or select rows in the grid and choose **Export selected**.
+Choose **Export ADIF…** from the **☰** menu, or select rows in the grid and choose **Export selected**.
 
 **What to export**
 

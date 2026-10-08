@@ -1,6 +1,6 @@
 # QSL: LoTW, QRZ, Club Log, eQSL and paper cards
 
-Click **QSL** in the top bar. The first tab has the online services; **Paper cards** has your card queue and label printing.
+Choose **QSL** from the **☰** menu at the right of the top bar. The first tab has the online services; **Paper cards** has your card queue and label printing.
 
 Each QSO keeps its upload status in the standard ADIF fields (`LOTW_QSL_SENT`, `QRZCOM_QSO_UPLOAD_STATUS`, `CLUBLOG_QSO_UPLOAD_STATUS`, `EQSL_QSL_SENT` and their dates), so exports and other loggers see what's been sent. Add the **LoTW S**, **QRZ** and **Club Log** columns to the log grid to see them.
 

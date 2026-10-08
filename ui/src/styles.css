@@ -128,8 +128,8 @@ kbd { font: 11px var(--mono); opacity: 0.75; margin-left: 4px; }
 .clock { font: 600 14px var(--mono); }
 .menu { display: flex; gap: 4px; }
 
-/* VFO readouts in the top bar */
-.vfo-bar { display: flex; gap: 4px; flex-wrap: wrap; }
+/* VFO readout in the top bar */
+.vfo-bar { display: flex; align-items: stretch; gap: 2px; }
 .vfo {
   display: flex;
   align-items: baseline;
@@ -141,13 +141,19 @@ kbd { font: 11px var(--mono); opacity: 0.75; margin-left: 4px; }
   font: 12px var(--mono);
   color: var(--muted);
 }
-.vfo.followed { border-color: var(--accent); color: var(--text); }
 .vfo .vfo-name { font-family: var(--ui); }
 .vfo .vfo-freq { font-size: 16px; font-weight: 600; color: var(--text); letter-spacing: 0.5px; }
 .vfo.offline .vfo-freq { color: var(--muted); }
 .vfo .vfo-state { min-width: 2.2em; text-align: center; }
 .vfo.tx { border-color: var(--err); }
 .vfo.tx .vfo-state { background: var(--err); color: var(--bg); font-weight: 700; }
+.vfo-more { padding: 0 6px; font-size: 12px; }
+.vfo-more.tx { border-color: var(--err); color: var(--err); }
+.vfo-pop { left: 0; right: auto; }
+.vfo-pop .item.vfo { border: 0; border-radius: 0; background: none; padding: 3px 12px; }
+.vfo-pop .item.vfo .vfo-freq { font-size: 14px; }
+.vfo-pop .item.vfo.tx { box-shadow: inset 3px 0 0 var(--err); }
+.burger { font-size: 15px; line-height: 1; padding: 2px 9px; }
 
 /* Panels */
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; display: flex; flex-direction: column; min-width: 0; }
@@ -352,6 +358,7 @@ table.list.fields input:not([type=checkbox]), table.list.fields select { width: 
 .ftx-inst-line button.halt { color: var(--err); font-weight: 600; }
 .ftx-inst-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 14px; padding: 2px 6px 4px 22px; font-size: 12px; }
 .ftx-inst-ctl form { display: flex; align-items: center; gap: 4px; }
+.ftx-inst-info { display: flex; flex-wrap: wrap; gap: 2px 10px; flex-basis: 100%; color: var(--muted); }
 .ftx-inst-ctl input { width: 170px; padding: 1px 4px; }
 .ftx-inst-ctl input.narrow { width: 70px; }
 .ftx-inst-ctl select { padding: 0 2px; }

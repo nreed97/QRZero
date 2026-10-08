@@ -89,16 +89,9 @@ function InstanceLine({ i, mycall, label, tag, title, onMsg }: {
       <div className="ftx-inst-line">
         <span className="src-tag mono" title={title}>{tag}</span>
         <strong className="who" title={title}>{name}</strong>
-        <span className="mono">{i.band ?? ""} {i.mode} {(i.dial_freq / 1e6).toFixed(3)}</span>
         <span className={`state ${i.transmitting ? "tx" : i.tx_enabled ? "armed" : ""}`} title={i.transmitting ? "On the air" : i.tx_enabled ? "Enable Tx is ticked" : "Enable Tx is off"} data-testid="ftx-state">{state}</span>
-        {i.decoding && <span className="muted">Decoding</span>}
         <span className="mono txmsg" title="The message being sent, or to be sent next" data-testid="ftx-txmsg">Tx: {i.tx_message || "-"}</span>
-        <span className={`stage stage-${stage.kind}`} title="Where the QSO is, from the message being sent" data-testid="ftx-stage">{stage.text}</span>
-        {(i.dx_call || i.dx_grid) && <span className="mono" title="DX call and grid">DX {i.dx_call} {i.dx_grid}</span>}
-        {i.report && <span className="mono" title="Report to send">Rpt {i.report}</span>}
-        <span className="mono" title="Rx and Tx audio offsets, Hz">Rx {i.rx_df} Tx {i.tx_df}</span>
-        {i.tr_period > 0 && <span className="mono" title="T/R period">{i.mode === "FT4" ? "7.5" : i.tr_period} s</span>}
-        {i.special_op_mode > 0 && <span title="Special operating activity">{SPECIAL[i.special_op_mode] ?? `Special ${i.special_op_mode}`}</span>}
+        {stage.kind !== "idle" && <span className={`stage stage-${stage.kind}`} title="Where the QSO is, from the message being sent" data-testid="ftx-stage">{stage.text}</span>}
         {i.tx_watchdog && <span className="warn" title="WSJT-X's Tx watchdog stopped transmitting. Tick Enable Tx in WSJT-X, or answer a station, to carry on.">Tx watchdog</span>}
         <span className="spacer" />
         <button className="halt" onClick={() => void halt(false)} title="Stop transmitting now (Halt Tx)">Halt TX</button>
@@ -108,6 +101,15 @@ function InstanceLine({ i, mycall, label, tag, title, onMsg }: {
       </div>
       {open && (
         <div className="ftx-inst-ctl">
+          <div className="ftx-inst-info">
+            <span className="mono">{i.band ?? ""} {i.mode} {(i.dial_freq / 1e6).toFixed(3)}</span>
+            {i.decoding && <span className="muted">Decoding</span>}
+            {(i.dx_call || i.dx_grid) && <span className="mono" title="DX call and grid">DX {i.dx_call} {i.dx_grid}</span>}
+            {i.report && <span className="mono" title="Report to send">Rpt {i.report}</span>}
+            <span className="mono" title="Rx and Tx audio offsets, Hz">Rx {i.rx_df} Tx {i.tx_df}</span>
+            {i.tr_period > 0 && <span className="mono" title="T/R period">{i.mode === "FT4" ? "7.5" : i.tr_period} s</span>}
+            {i.special_op_mode > 0 && <span title="Special operating activity">{SPECIAL[i.special_op_mode] ?? `Special ${i.special_op_mode}`}</span>}
+          </div>
           <form onSubmit={sendText(true)}>
             <label>Message <input className="mono" value={text} onChange={(e) => setText(e.target.value)} maxLength={37} placeholder="free text" aria-label="Free text message" title="Free text is up to 13 characters; a standard message such as K1ABC N0CALL RR73 can be longer" /></label>
             <button type="submit" title="Put it in Tx5 and send it next, while Enable Tx is on">Send</button>
