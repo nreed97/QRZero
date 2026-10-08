@@ -28,7 +28,9 @@ WSJT-X and N1MM radios are listed too (when those programs are connected), so th
 
 ## VFO readout
 
-The top bar shows a readout for each radio: its name, frequency (for example `14.074.000`), band, mode and **RX** or **TX**. The readout turns red while the radio transmits, and shows `off` when the radio isn't connected (hover over it to see why). The radio the QSO panel follows has a blue outline; click another readout to follow that radio instead.
+The top bar shows the radio the QSO panel follows: its name, frequency (for example `14.074.000`), band, mode and **RX** or **TX**. The readout turns red while the radio transmits, and shows `off` when the radio isn't connected (hover over it to see why).
+
+With more than one radio (two Flex slices, a second WSJT-X), a small **+1** (or **+2** …) button sits next to it. It turns red when one of those radios transmits. Click it for a list of every radio with its frequency and state, and pick one to follow it.
 
 ## Several radios (SO2R)
 

@@ -38,14 +38,16 @@ Rows calling you are highlighted, and needed stations are shaded. Stations on yo
 
 ### Running WSJT-X from the monitor
 
-Above the decodes there is one line for each WSJT-X or JTDX, in its colour. It shows what that program is doing right now:
+Above the decodes there is one short line for each WSJT-X or JTDX, in its colour:
 
-- Its source, band, mode and dial frequency.
-- **TX** in red while it is on the air (the whole line turns red too), **Tx on** when Enable Tx is ticked and it is waiting for its period, **Tx off** otherwise. **Decoding** shows while it decodes.
+- Its source tag and name.
+- **TX** in red while it is on the air (the whole line turns red too), **Tx on** when Enable Tx is ticked and it is waiting for its period, **Tx off** otherwise.
 - **Tx:** the message it is sending, or will send next.
-- Where the QSO has got to (see below).
-- **DX** call and grid, **Rpt** the report it will send, **Rx** and **Tx** audio offsets in Hz, and the T/R period.
+- Where the QSO has got to (see below), while it is in a QSO or calling CQ.
 - **Tx watchdog** in red when WSJT-X's watchdog has stopped transmitting. Tick Enable Tx in WSJT-X, or answer a station, to carry on.
+- The buttons described under *Controls*.
+
+**More controls** also shows the rest: band, mode and dial frequency, **Decoding** while it decodes, **DX** call and grid, **Rpt** the report it will send, **Rx** and **Tx** audio offsets in Hz, and the T/R period.
 
 With the source box set to one program, only its line shows.
 
@@ -62,9 +64,8 @@ QRZero works this out from the message being sent, compared with your call:
 | **Sending RRR** / **Sending RR73** | K1ABC N0CALL RR73 |
 | **Sending 73** | K1ABC N0CALL 73 |
 | **Sending free text** | anything else |
-| **Idle** | Enable Tx is off and nothing is being sent |
 
-WSJT-X doesn't report its QSO state, only the message, so a free-text QSO or a message from someone else's call shows as free text.
+Nothing is shown when Enable Tx is off and nothing is being sent. WSJT-X doesn't report its QSO state, only the message, so a free-text QSO or a message from someone else's call shows as free text.
 
 #### Controls
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import MainMenu from "./components/MainMenu";
 import VfoBar from "./components/VfoBar";
 import type { Equipment, Fields, Location, Log, LookupResult, Qso, QsoFilter, StationCallsign } from "./types";
 import { utcClock } from "./util";
@@ -381,13 +382,7 @@ export default function App() {
         <span className="muted">{currentLog?.qso_count.toLocaleString() ?? 0} QSOs</span>
         <span className="clock" title="UTC">{utcClock(now)}</span>
         <LayoutMenu ws={ws} onChange={setWs} onShow={(id) => setWs({ ...wsRef.current, root: dockBack(wsRef.current.root, id) })} onFocusWindow={focusWindow} />
-        <nav className="menu">
-          <button onClick={() => setDialog("import")}>Import</button>
-          <button onClick={() => setDialog("export")}>Export</button>
-          <button onClick={() => setDialog("qsl")} title="Upload to LoTW, QRZ and Club Log">QSL</button>
-          <button onClick={() => setDialog("settings")}>Settings</button>
-          <button onClick={() => setDialog("help")} title="User guide (F1)">Help</button>
-        </nav>
+        <MainMenu onPick={setDialog} />
       </header>
 
       <Workspace

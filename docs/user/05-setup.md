@@ -1,6 +1,6 @@
 # Callsigns, locations and logs
 
-Open **Settings** from the top bar.
+Open **Settings…** from the **☰** menu at the right of the top bar.
 
 ## Station callsigns
 
