@@ -274,6 +274,12 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.reload();
   await expect(page.getByRole("button", { name: "Layout: Test layout" })).toBeVisible();
   await expect(page.locator(".ws-group", { has: page.getByRole("tab", { name: "Cluster" }) }).getByRole("tab")).toHaveCount(1);
+  // ...and even with the browser's storage wiped, as happens when the desktop app restarts on a new address.
+  await page.waitForTimeout(600); // the copy to the database is saved shortly after a change
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Layout: Test layout" })).toBeVisible();
+  await expect(page.locator(".ws-group", { has: page.getByRole("tab", { name: "Cluster" }) }).getByRole("tab")).toHaveCount(1);
 
   // A pane pops out into its own window and docks back when that window closes.
   await page.getByRole("tab", { name: "FTx monitor" }).click();

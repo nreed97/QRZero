@@ -101,7 +101,11 @@ export const api = {
   deleteEquipment: (id: number) => json<null>("DELETE", `/equipment/${id}`),
 
   getPref: <T>(key: string) => json<T | null>("GET", `/prefs/${key}`),
-  setPref: (key: string, value: unknown) => json<null>("PUT", `/prefs/${key}`, value),
+  /** keepalive lets the save finish while the window is closing. */
+  setPref: (key: string, value: unknown, keepalive = false) =>
+    keepalive
+      ? fetch(`/api/prefs/${key}`, { method: "PUT", keepalive, headers: { "x-qrzero-token": token, "content-type": "application/json" }, body: JSON.stringify(value) }).then(() => null)
+      : json<null>("PUT", `/prefs/${key}`, value),
 
   settings: () => json<Settings>("GET", "/settings"),
   saveSettings: (s: { qrz_enabled?: boolean; qrz_username?: string; qrz_password?: string }) => json<Settings>("PUT", "/settings", s),
