@@ -330,3 +330,46 @@ table.list th { text-align: left; font-size: 12px; font-weight: 600; padding: 2p
 .qsl fieldset { margin-bottom: 10px; }
 .qsl legend { font-weight: 600; }
 .qsl .row { align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+
+/* Paper QSL labels: only the label sheet prints. */
+.label-print { display: none; }
+@media print {
+  @page { size: letter; margin: 0; }
+  body > *:not(.label-print) { display: none !important; }
+  body { background: #fff; }
+  .label-print { display: block; color: #000; font: 9pt Arial, Helvetica, sans-serif; }
+  .label-page { display: grid; break-after: page; padding-top: 0.5in; }
+  .sheet-5160 .label-page { grid-template-columns: repeat(3, 2.625in); grid-auto-rows: 1in; column-gap: 0.125in; padding-left: 0.1875in; }
+  .sheet-5163 .label-page { grid-template-columns: repeat(2, 4in); grid-auto-rows: 2in; column-gap: 0.1875in; padding-left: 0.156in; }
+  .label { overflow: hidden; padding: 0.08in 0.12in; box-sizing: border-box; }
+  .label-to { font-size: 11pt; }
+  .sheet-5163 .label-to { font-size: 14pt; margin-bottom: 2pt; }
+  .label table { border-collapse: collapse; width: 100%; }
+  .label td { padding: 0 3pt 0 0; font-size: 8pt; white-space: nowrap; }
+  .sheet-5163 .label td { font-size: 10pt; }
+  .label-foot { font-size: 7.5pt; margin-top: 1pt; }
+  .sheet-5163 .label-foot { font-size: 9pt; margin-top: 3pt; }
+}
+.paper-queue th { text-align: left; font-weight: 600; padding: 3px 5px; border-bottom: 1px solid var(--line); }
+
+/* Awards */
+.seg { display: inline-flex; }
+.seg button { border-radius: 0; margin-left: -1px; }
+.seg button:first-child { border-radius: 2px 0 0 2px; margin-left: 0; }
+.seg button:last-child { border-radius: 0 2px 2px 0; }
+.seg button.on { border-color: var(--accent); color: var(--accent); position: relative; font-weight: 600; }
+.award-score { white-space: nowrap; }
+.award-scroll { flex: 1; overflow: auto; min-height: 0; }
+.award-table { border-collapse: collapse; font-size: 12px; }
+.award-table th, .award-table td { padding: 2px 6px; text-align: center; border-bottom: 1px solid var(--line); min-width: 34px; }
+.award-table thead th { position: sticky; top: 0; background: var(--panel); font-weight: 600; z-index: 1; }
+.award-table thead tr.totals th { top: 21px; font: 400 11px var(--mono); }
+.award-table .name { text-align: left; min-width: 220px; white-space: nowrap; }
+.award-table .name .key { display: inline-block; width: 34px; }
+.award-table .sep { border-right: 1px solid var(--line); }
+.award-table tbody tr { cursor: pointer; }
+.award-table tbody tr:hover { background: var(--panel-2); }
+.award-table td.confirmed { color: var(--ok); font-weight: 700; }
+.award-table td.worked { color: var(--new); }
+.awards { display: flex; flex-direction: column; min-height: 0; }
+button.chip { white-space: nowrap; }

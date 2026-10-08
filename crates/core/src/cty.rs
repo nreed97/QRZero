@@ -228,6 +228,11 @@ impl CtyDb {
         self.entities.len()
     }
 
+    /// Every entity in the file.
+    pub fn entities(&self) -> &[Entity] {
+        &self.entities
+    }
+
     /// Whether the database has no entities.
     pub fn is_empty(&self) -> bool {
         self.entities.is_empty()

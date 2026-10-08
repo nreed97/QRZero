@@ -662,6 +662,10 @@ impl Hub {
 
     // ---- country file ---------------------------------------------------
 
+    pub fn cty(&self) -> Option<Arc<CtyDb>> {
+        self.cty.read().unwrap_or_else(|p| p.into_inner()).clone()
+    }
+
     pub fn entity(&self, call: &str) -> Option<Entity> {
         self.cty.read().unwrap_or_else(|p| p.into_inner()).as_ref()?.lookup(call)
     }

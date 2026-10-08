@@ -1,13 +1,30 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { onLive } from "../live";
-import type { Location, QslConfig, QslOverview, QslRun, StationCallsign } from "../types";
+import type { Location, QslConfig, QslDownload, QslOverview, QslRun, QslService, StationCallsign } from "../types";
 import Modal from "./Modal";
+import PaperQsl from "./PaperQsl";
 
 interface Props {
+  logId: number;
   callsigns: StationCallsign[];
   locations: Location[];
   onClose: () => void;
+}
+
+function DownloadLine({ d }: { d?: QslDownload }) {
+  if (!d) return <span className="muted">Not downloaded yet this session.</span>;
+  if (d.running) return <span>Downloading…</span>;
+  if (d.error) return <span className="err">{d.error}</span>;
+  const when = new Date(d.at * 1000).toISOString().slice(11, 16);
+  return (
+    <span>
+      Last check {when}Z: {d.received} confirmation{d.received === 1 ? "" : "s"}, {d.confirmed} new.
+      {d.unmatched_count > 0 && (
+        <span className="muted small" title={d.unmatched.join("\n")}> {d.unmatched_count} not found in the log.</span>
+      )}
+    </span>
+  );
 }
 
 function RunLine({ run }: { run?: QslRun }) {
@@ -26,12 +43,27 @@ function RunLine({ run }: { run?: QslRun }) {
   );
 }
 
-export default function QslDialog({ callsigns, locations, onClose }: Props) {
+export default function QslDialog(props: Props) {
+  const [tab, setTab] = useState<"online" | "paper">("online");
+  return (
+    <Modal title="QSL" onClose={props.onClose} wide>
+      <nav className="tabs">
+        <button className={tab === "online" ? "active" : ""} onClick={() => setTab("online")}>LoTW, QRZ, Club Log, eQSL</button>
+        <button className={tab === "paper" ? "active" : ""} onClick={() => setTab("paper")}>Paper cards</button>
+      </nav>
+      {tab === "online" ? <Online {...props} /> : <PaperQsl logId={props.logId} />}
+    </Modal>
+  );
+}
+
+function Online({ callsigns, locations }: Props) {
   const [o, setO] = useState<QslOverview | null>(null);
   const [cfg, setCfg] = useState<QslConfig | null>(null);
   const [qrzKeys, setQrzKeys] = useState<Record<string, string>>({});
   const [clPassword, setClPassword] = useState("");
   const [clKey, setClKey] = useState("");
+  const [lotwPassword, setLotwPassword] = useState("");
+  const [eqslPassword, setEqslPassword] = useState("");
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [busy, setBusy] = useState("");
 
@@ -45,14 +77,15 @@ export default function QslDialog({ callsigns, locations, onClose }: Props) {
     load().catch((e) => setMsg({ text: e.message, ok: false }));
     return onLive((e) => {
       if (e.type === "qsl") setO((cur) => (cur ? { ...cur, runs: { ...cur.runs, [e.service]: e.run } } : cur));
+      if (e.type === "qsl_download") setO((cur) => (cur ? { ...cur, downloads: { ...cur.downloads, [e.service]: e.run } } : cur));
     });
   }, []);
 
-  if (!o || !cfg) return <Modal title="QSL uploads" onClose={onClose} wide><p className="muted">Loading…</p></Modal>;
+  if (!o || !cfg) return <p className="muted">Loading…</p>;
 
   const calls = callsigns.map((c) => c.callsign);
   const set = (patch: Partial<QslConfig>) => setCfg({ ...cfg, ...patch });
-  const toggleCall = (list: "qrz_calls" | "clublog_calls", call: string, on: boolean) =>
+  const toggleCall = (list: "qrz_calls" | "clublog_calls" | "eqsl_calls", call: string, on: boolean) =>
     set({ [list]: on ? [...cfg[list].filter((c) => c !== call), call] : cfg[list].filter((c) => c !== call) });
 
   const save = async () => {
@@ -62,6 +95,8 @@ export default function QslDialog({ callsigns, locations, onClose }: Props) {
         qrz_keys: Object.fromEntries(Object.entries(qrzKeys).filter(([, v]) => v.trim())),
         ...(clPassword ? { clublog_password: clPassword } : {}),
         ...(clKey ? { clublog_app_key: clKey } : {}),
+        ...(lotwPassword ? { lotw_password: lotwPassword } : {}),
+        ...(eqslPassword ? { eqsl_password: eqslPassword } : {}),
       };
       const r = await api.saveQsl(cfg, secrets);
       setO(r);
@@ -69,13 +104,29 @@ export default function QslDialog({ callsigns, locations, onClose }: Props) {
       setQrzKeys({});
       setClPassword("");
       setClKey("");
+      setLotwPassword("");
+      setEqslPassword("");
       setMsg({ text: "Saved.", ok: true });
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
     }
   };
 
-  const upload = async (service: "qrz" | "clublog" | "lotw") => {
+  const download = async (service: "lotw" | "eqsl") => {
+    setBusy(`${service}-rcvd`);
+    setMsg(null);
+    try {
+      await save();
+      await api.qslDownload(service);
+      await load();
+    } catch (e) {
+      setMsg({ text: (e as Error).message, ok: false });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const upload = async (service: QslService) => {
     setBusy(service);
     setMsg(null);
     try {
@@ -107,7 +158,6 @@ export default function QslDialog({ callsigns, locations, onClose }: Props) {
   const lotwPending = o.pending.lotw.reduce((n, p) => n + p.pending, 0);
 
   return (
-    <Modal title="QSL uploads" onClose={onClose} wide>
       <div className="qsl">
         <fieldset>
           <legend>LoTW</legend>
@@ -155,6 +205,13 @@ export default function QslDialog({ callsigns, locations, onClose }: Props) {
               {busy === "lotw" ? "Signing and uploading…" : `Sign and upload ${lotwPending} QSO${lotwPending === 1 ? "" : "s"} to LoTW`}
             </button>
             <RunLine run={o.runs.lotw} />
+          </div>
+          <p className="small muted">To download confirmations (for awards), enter your LoTW website login. It's not your TQSL password.</p>
+          <div className="row">
+            <label className="f w-m"><span>LoTW username</span><input value={cfg.lotw_username} onChange={(e) => set({ lotw_username: e.target.value })} /></label>
+            <label className="f w-m"><span>Password</span><input type="password" value={lotwPassword} placeholder={o.secrets.lotw_password ? "saved" : ""} onChange={(e) => setLotwPassword(e.target.value)} /></label>
+            <button disabled={!!busy || !cfg.lotw_username} onClick={() => download("lotw")}>{busy === "lotw-rcvd" ? "Downloading…" : "Download confirmations"}</button>
+            <DownloadLine d={o.downloads.lotw} />
           </div>
         </fieldset>
 
@@ -209,16 +266,41 @@ export default function QslDialog({ callsigns, locations, onClose }: Props) {
           </div>
         </fieldset>
 
+        <fieldset>
+          <legend>eQSL</legend>
+          <label className="check"><input type="checkbox" checked={cfg.eqsl_enabled} onChange={(e) => set({ eqsl_enabled: e.target.checked })} /> Upload new QSOs every {cfg.interval_min} minutes</label>
+          <div className="row">
+            <label className="f w-m"><span>eQSL username</span><input value={cfg.eqsl_username} onChange={(e) => set({ eqsl_username: e.target.value.toUpperCase() })} /></label>
+            <label className="f w-m"><span>Password</span><input type="password" value={eqslPassword} placeholder={o.secrets.eqsl_password ? "saved" : ""} onChange={(e) => setEqslPassword(e.target.value)} /></label>
+            <label className="f w-m"><span>QTH nickname (optional)</span><input value={cfg.eqsl_nickname} onChange={(e) => set({ eqsl_nickname: e.target.value })} /></label>
+          </div>
+          <div className="row">
+            <span className="muted small">Callsigns:</span>
+            {calls.map((call) => (
+              <label key={call} className="check"><input type="checkbox" checked={cfg.eqsl_calls.includes(call)} onChange={(e) => toggleCall("eqsl_calls", call, e.target.checked)} /> {call}</label>
+            ))}
+          </div>
+          <div className="row">
+            <label className="f w-m"><span>QSOs from</span><input type="date" value={cfg.eqsl_since} onChange={(e) => set({ eqsl_since: e.target.value })} /></label>
+            <button disabled={!!busy || !cfg.eqsl_calls.length} onClick={() => upload("eqsl")}>{busy === "eqsl" ? "Uploading…" : `Upload ${o.pending.eqsl} now`}</button>
+            <RunLine run={o.runs.eqsl} />
+          </div>
+          <div className="row">
+            <button disabled={!!busy || !cfg.eqsl_username} onClick={() => download("eqsl")}>{busy === "eqsl-rcvd" ? "Downloading…" : "Download confirmations"}</button>
+            <DownloadLine d={o.downloads.eqsl} />
+          </div>
+        </fieldset>
+
         <div className="row">
           <label className="f w-m">
             <span>Upload every (min)</span>
             <input value={cfg.interval_min} inputMode="numeric" onChange={(e) => set({ interval_min: Math.max(1, Number(e.target.value) || 15) })} />
           </label>
+          <label className="check"><input type="checkbox" checked={cfg.confirm_daily} onChange={(e) => set({ confirm_daily: e.target.checked })} /> Download LoTW and eQSL confirmations once a day</label>
           <span className="spacer" />
           {msg && <span className={msg.ok ? "ok" : "err"}>{msg.text}</span>}
           <button className="primary" onClick={save}>Save</button>
         </div>
       </div>
-    </Modal>
   );
 }

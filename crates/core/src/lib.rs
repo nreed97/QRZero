@@ -1,7 +1,9 @@
 //! QRZero core: the log database, ADIF and callsign lookup.
 
 pub mod adif;
+pub mod awards;
 pub mod band;
+pub mod confirm;
 pub mod cty;
 pub mod error;
 pub mod model;

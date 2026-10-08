@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { api } from "../api";
+import { PAPER_ACTIONS } from "../paper";
 import { BANDS, MODES } from "../modes";
 import { COLUMNS, DEFAULT_COLUMNS } from "../fields";
 import type { Location, Qso, QsoFilter } from "../types";
@@ -66,6 +67,10 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logId, filterKey, refreshKey]);
 
+  useEffect(() => {
+    if ((filter.call ?? "") !== search) setSearch(filter.call ?? "");
+  }, [filter.call]);
+
   // Debounce the call search box.
   useEffect(() => {
     const t = setTimeout(() => {
@@ -128,6 +133,17 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
     }
   };
 
+  const markPaper = async (key: string) => {
+    const action = PAPER_ACTIONS.find((a) => a.key === key);
+    if (!action || !selection.size) return;
+    try {
+      await api.markQsos([...selection], action.fields());
+      onDeleted();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
   const one = (v: string) => (v ? [v] : undefined);
 
   return (
@@ -146,6 +162,11 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
             <option key={m.label}>{m.label}</option>
           ))}
         </select>
+        {(filter.dxcc !== undefined || (filter.fields && Object.keys(filter.fields).length > 0)) && (
+          <button className="tiny chip" onClick={() => onFilter({ ...filter, dxcc: undefined, fields: undefined })} title="Show all QSOs again">
+            {filter.dxcc !== undefined ? `DXCC ${filter.dxcc}` : Object.entries(filter.fields ?? {}).map(([k, v]) => `${k} ${v}`).join(", ")} ×
+          </button>
+        )}
         <span className="muted">
           {total.toLocaleString()} QSO{total === 1 ? "" : "s"}
           {selection.size > 0 && ` · ${selection.size} selected`}
@@ -154,6 +175,10 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
         {error && <span className="err">{error}</span>}
         <button onClick={() => setPicking(!picking)}>Columns</button>
         <button disabled={!selection.size} onClick={() => onSelection(new Set())}>Clear selection</button>
+        <select value="" disabled={!selection.size} onChange={(e) => void markPaper(e.target.value)} aria-label="Paper QSL">
+          <option value="">Paper QSL…</option>
+          {PAPER_ACTIONS.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
+        </select>
         <button disabled={!selection.size} onClick={onExportSelected}>Export selected</button>
         <button disabled={!selection.size} className="danger" onClick={deleteSelected}>Delete</button>
       </div>
@@ -211,7 +236,7 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
             );
           })}
         </div>
-        {total === 0 && <div className="grid-empty muted">No QSOs{filter.call || filter.bands || filter.modes ? " match the search" : " yet"}.</div>}
+        {total === 0 && <div className="grid-empty muted">No QSOs{filter.call || filter.bands || filter.modes || filter.dxcc !== undefined || filter.fields ? " match the search" : " yet"}.</div>}
       </div>
     </section>
   );
