@@ -101,15 +101,15 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // The QSO above it in the log, from the editor's arrows.
   await editor.getByRole("button", { name: "Previous QSO" }).click();
   await expect(editor.getByLabel("Call", { exact: true })).not.toHaveValue("K1ABC");
-  // QRZ lookup with no QRZ login says how to turn it on.
-  await editor.getByRole("button", { name: "QRZ lookup" }).click();
+  // Fill from QRZ with no QRZ login says how to turn it on.
+  await editor.getByRole("button", { name: "Fill from QRZ" }).click();
   await expect(editor.getByRole("alert")).toContainText("QRZ login");
   await Promise.all([editWin.waitForEvent("close"), closeWindow(editor.getByRole("button", { name: "Close editor" }))]);
 
   // Right-click a logged QSO for its menu; sending needs a UDP connection first.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click({ button: "right" });
   const menu = page.getByRole("menu");
-  await expect(menu.getByRole("menuitem", { name: /Look up .* on QRZ/ })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: /Fill .* from QRZ/ })).toBeVisible();
   await menu.getByRole("menuitem", { name: /Send .* through UDP connections/ }).click();
   await expect(menu).toBeHidden();
   await expect(page.locator(".grid > .grid-tools")).toContainText("No UDP connection is set up");

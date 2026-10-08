@@ -121,6 +121,19 @@ button {
   white-space: nowrap;
 }
 button:hover:not(:disabled) { border-color: var(--accent); }
+a.button-link {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 3px 10px;
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+}
+a.button-link:hover { border-color: var(--accent); }
+a.button-link.disabled { opacity: 0.5; pointer-events: none; }
 button:disabled { opacity: 0.5; cursor: default; }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 button.danger { color: var(--err); }

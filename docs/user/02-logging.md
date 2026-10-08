@@ -20,6 +20,11 @@ The fields below the first line can be changed: see **Entry fields**.
 | <kbd>Tab</kbd> | Next field |
 | <kbd>F1</kbd> | This guide |
 
+Two buttons next to **Clear** deal with QRZ.com:
+
+- **Fill from QRZ** looks the call up now and fills in the boxes that are still blank. It does the same as leaving the call field, so use it after you add your QRZ login or when the first lookup failed. It needs your QRZ XML login (Settings, **Callsign lookup**).
+- **View on QRZ.com** opens that station's page on the QRZ.com website in your web browser, to read their bio or QSL instructions. It needs no login and doesn't change the form.
+
 If you press <kbd>Enter</kbd> straight from the call field, QRZero waits up to two seconds for the lookup so its details are still saved with the QSO.
 
 ## Frequency, band and mode
