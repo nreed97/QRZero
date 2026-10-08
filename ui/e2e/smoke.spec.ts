@@ -238,6 +238,26 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await popup.getByRole("button", { name: "Dock back" }).click();
   await expect(page.getByRole("tab", { name: "FTx monitor" })).toBeVisible();
 
+  // Backups: back up now, download it, then stage a restore and cancel it.
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("button", { name: "Backups", exact: true }).click();
+  await page.getByRole("button", { name: "Back up now" }).click();
+  await expect(page.getByText(/^Saved qrzero-.*-manual\.db\.$/)).toBeVisible();
+  const backupRow = page.locator("table.backups tbody tr", { hasText: "Manual" });
+  await expect(backupRow).toHaveCount(1);
+  const [backupFile] = await Promise.all([page.waitForEvent("download"), backupRow.getByRole("button", { name: "Download" }).click()]);
+  expect(backupFile.suggestedFilename()).toMatch(/^qrzero-.*-manual\.db$/);
+  expect(readFileSync((await backupFile.path())!).subarray(0, 15).toString()).toBe("SQLite format 3");
+  await page.getByTestId("restore-file").setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("not a log") });
+  await expect(page.getByText(/isn't a QRZero log/)).toBeVisible();
+  page.once("dialog", (d) => d.accept());
+  await backupRow.getByRole("button", { name: "Restore" }).click();
+  await expect(page.getByText("Restart QRZero to finish restoring.")).toBeVisible();
+  await page.getByRole("button", { name: "Cancel restore" }).click();
+  await expect(page.getByText("Restore cancelled.")).toBeVisible();
+  await expect(page.getByText("Restart QRZero to finish restoring.")).toHaveCount(0);
+  await page.getByRole("button", { name: "Close" }).click();
+
   // The user guide opens from the top bar.
   await page.getByRole("button", { name: "Help" }).click();
   await expect(page.getByRole("heading", { name: "Getting started" })).toBeVisible();

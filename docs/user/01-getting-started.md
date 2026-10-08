@@ -15,7 +15,7 @@ The first time QRZero starts, the setup wizard walks you through:
 
 Every step except the callsign can be skipped. You can run the wizard again from **Settings → General**; it never removes anything.
 
-Your log is stored in one file, `qrzero.db`, in `%APPDATA%\QRZero` on Windows or `~/.local/share/QRZero` on Linux. Back that folder up the way you back up anything else, or export an ADIF file now and then.
+Your log is stored in one file, `qrzero.db`, in `%APPDATA%\QRZero` on Windows or `~/.local/share/QRZero` on Linux. QRZero backs it up once a day when it starts, into the `backups` folder next to it; **Settings → Backups** lists those copies, makes one on demand and restores from one (see **Callsigns, locations and logs**). Copy the backups folder to another drive or a USB stick now and then, so a dead disk doesn't take your log with it.
 
 ## The main window
 

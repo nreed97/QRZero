@@ -12,6 +12,8 @@ pub enum Error {
     Invalid(String),
     #[error("lookup failed: {0}")]
     Lookup(String),
+    #[error("file error: {0}")]
+    Io(#[from] std::io::Error),
     #[error("credential store: {0}")]
     Secret(String),
 }

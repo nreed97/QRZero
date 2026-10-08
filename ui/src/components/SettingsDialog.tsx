@@ -6,6 +6,7 @@ import Modal from "./Modal";
 import EquipmentTree from "./EquipmentTree";
 import EntryFieldsEditor from "./EntryFieldsEditor";
 import { StartupAppsTab, UdpConnectionsTab } from "./ConnectionsSettings";
+import BackupsTab from "./BackupsTab";
 
 export interface GeneralPrefs { units: "km" | "mi" }
 
@@ -26,7 +27,7 @@ interface Props {
   initialTab?: string;
 }
 
-type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "udp" | "startup" | "cluster" | "logs" | "lookup" | "general";
+type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "udp" | "startup" | "cluster" | "logs" | "lookup" | "backups" | "general";
 
 const TAB_NAMES: Record<Tab, string> = {
   station: "Callsigns",
@@ -39,6 +40,7 @@ const TAB_NAMES: Record<Tab, string> = {
   cluster: "DX cluster",
   logs: "Logs",
   lookup: "Callsign lookup",
+  backups: "Backups",
   general: "General",
 };
 
@@ -78,6 +80,7 @@ export default function SettingsDialog(props: Props) {
       {tab === "udp" && <UdpConnectionsTab />}
       {tab === "startup" && <StartupAppsTab />}
       {tab === "cluster" && <ClusterTab />}
+      {tab === "backups" && <BackupsTab />}
       {tab === "general" && (
         <div>
           <label className="block">
