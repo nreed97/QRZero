@@ -38,12 +38,24 @@ Rows calling you are highlighted, and needed stations are shaded. Stations on yo
 
 Set **View** to **Call boxes** to see the stations heard rather than every line, much like JTAlert's callsign list. Each period gets its own row of boxes, one per station, with its signal report. The newest period is at the top.
 
-- A **red** box is calling you, a **shaded** box is needed (new DXCC, band or mode), and a **grey** call is already worked on this band.
-- A green line under the box means the station is calling CQ. Watched stations have their call in colour.
-- The boxes in a row are in order of importance: calling you first, then needed, then CQs, then the rest.
-- Hover over a box to see the full message, country and flags. Click and double-click work as in the line view, and **CQ only**, **Needed only** and the source box apply here too.
+- A box is coloured by its most important alert, with a short tag beside the call: **ME** calling you, **WL** on your watch list, **DXCC** new country, **BAND** country new on this band, **MODE** country new in this mode, **NEW** new call, **NB** call new on this band. The colours and which alerts are on are yours to choose (see below).
+- A line under the box means the station is calling CQ. A grey call is already worked on this band.
+- The boxes in a row are in order of importance, following the alert list, with CQs ahead of the rest and worked stations last.
+- Hover over a box to see the full message, country and alerts. Click and double-click work as in the line view, and **CQ only**, **Needed only** and the source box apply here too.
 
 Both choices are remembered.
+
+### Alerts and filters
+
+**Alerts and filters…** in the toolbar chooses which stations stand out and which are hidden. Changes apply straight away, in the main window and any popped-out monitor.
+
+- **Alerts**: tick the ones you want and pick a colour for each. A station gets the colour of the first ticked alert that fits it, from the top of the list down. The same colours shade the rows in the line view and name the alerts in its Flags column. **Needed only** shows just the stations with a ticked alert. New call and New call on band are off to start with.
+- **Hide stations already worked on this band.**
+- **Weakest signal to show**: hides decodes below that many dB. Leave it empty to show all.
+- **Continents to show**: tick the ones you want; with none ticked, all are shown.
+- **Calls to ignore**: a list such as `K1ABC, W1AW, VE*`, where a `*` at the end matches every call starting with what comes before it.
+
+Stations calling you always show, whatever the filters. **Reset** puts everything back as it started.
 
 ### Where each decode came from
 

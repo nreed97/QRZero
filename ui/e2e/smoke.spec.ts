@@ -138,10 +138,19 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(ftx.locator(".ftx-break").first()).toContainText("00:01:00 2 decodes, 2 calls");
   await ftx.getByRole("combobox").filter({ hasText: "Call boxes" }).selectOption("calls");
   const first = ftx.locator(".ftx-cycle").first().locator(".ftx-box");
-  await expect(first).toHaveText(["EA8AB-14", "DL1ABC-3"]);
-  await expect(first.first()).toHaveClass(/to-me/);
+  await expect(first).toHaveText(["EA8ABME-14", "DL1ABC-3"]);
+  await expect(first.first()).toHaveClass(/alerted/);
+  await expect(first.nth(1)).toHaveClass(/cq/);
   await first.nth(1).click();
   await expect(page.getByTestId("call")).toHaveValue("DL1ABC");
+  // Alerts and filters: ignoring a call hides it; one calling you always shows.
+  await ftx.getByRole("button", { name: "Alerts and filters…" }).click();
+  const alerts = page.getByRole("dialog", { name: "FTx alerts and filters" });
+  await alerts.getByLabel("Calls to ignore").fill("DL1*, EA8AB");
+  await expect(first).toHaveText(["EA8ABME-14"]);
+  await alerts.getByRole("button", { name: "Reset" }).click();
+  await alerts.getByRole("button", { name: "Done" }).click();
+  await expect(first).toHaveCount(2);
   await ftx.getByRole("combobox").filter({ hasText: "Call boxes" }).selectOption("lines");
   await ftx.getByLabel("Period breaks").uncheck();
   await page.getByRole("tab", { name: "Log", exact: true }).click();

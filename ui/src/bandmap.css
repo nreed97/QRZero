@@ -52,3 +52,12 @@
 .bm-empty { position: absolute; left: 120px; top: 10px; right: 10px; }
 .bm-label.watched .call { color: var(--watch, var(--src-3)); font-weight: 700; }
 .bm-label .watch-mark { color: var(--watch, var(--src-3)); font-weight: 700; }
+
+/* Spots coloured by mode, matching the segment colours */
+.bm-label.mode-cw { border-left: 3px solid var(--mode-cw); }
+.bm-label.mode-digital { border-left: 3px solid var(--mode-digital); }
+.bm-label.mode-phone { border-left: 3px solid var(--mode-phone); }
+.bm-label.mode-cw .call { color: var(--mode-cw); }
+.bm-label.mode-digital .call { color: var(--mode-digital); }
+.bm-label.mode-phone .call { color: var(--mode-phone); }
+.bm-label.worked .call { color: var(--muted); }

@@ -24,6 +24,8 @@ Older spots fade out. The map uses the age setting from the Cluster pane (**Last
 
 **Click a spot** to fill in the QSO panel. When the panel follows a radio QRZero controls, the radio tunes to the spot and changes mode, the same as clicking a spot in the Cluster pane.
 
+Cluster spots are coloured by mode, the same as in the Cluster pane: blue for CW, green for digital and orange for phone, shown as the call's colour and a bar on its left edge. A worked station's call stays grey. The key is in the toolbar.
+
 **Needed only** hides spots and decodes that aren't new for DXCC, band or mode. When there are more spots above or below what you can see, a small note at the top or bottom of the scale says how many. Click it to jump to the nearest one.
 
 ## FT8 and FT4 decodes

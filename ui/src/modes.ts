@@ -38,3 +38,19 @@ export const BANDS: [string, number, number][] = [
 export function bandForFreq(mhz: number): string | undefined {
   return BANDS.find(([, lo, hi]) => mhz >= lo && mhz <= hi)?.[0];
 }
+
+export type ModeGroup = "cw" | "phone" | "digital";
+
+const DIGITAL = ["FT8", "FT4", "RTTY", "PSK31", "PSK", "JS8", "Q65", "MSK144", "SSTV", "JT65", "JT9", "FST4", "MFSK", "OLIVIA", "WSPR", "DATA", "DIGI"];
+const PHONE = ["SSB", "USB", "LSB", "AM", "FM", "PHONE", "DV"];
+
+/** CW, phone or digital, for filters and the colour of a spot; "" when the mode isn't known. */
+export function modeGroup(mode: string): ModeGroup | "" {
+  const m = mode.toUpperCase();
+  if (m === "CW") return "cw";
+  if (PHONE.includes(m)) return "phone";
+  if (DIGITAL.includes(m)) return "digital";
+  return "";
+}
+
+export const MODE_GROUP_NAME: Record<ModeGroup, string> = { cw: "CW", phone: "Phone", digital: "Digital" };

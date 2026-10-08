@@ -27,6 +27,10 @@
   --src-5: #4fc4c4;
   --src-6: #e87b9c;
   --src-7: #a0a8b4;
+  /* Spots by mode: the same colours as the band map's CW, data and phone segments. */
+  --mode-cw: var(--src-0);
+  --mode-digital: var(--src-2);
+  --mode-phone: var(--src-1);
   --mono: "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
   --ui: "Segoe UI", Tahoma, system-ui, sans-serif;
   color-scheme: dark;
@@ -318,8 +322,7 @@ table.list.fields input:not([type=checkbox]), table.list.fields select { width: 
 .ftx-row .num { text-align: right; }
 .ftx-row.head { position: sticky; top: 0; background: var(--title); font-weight: 600; font-size: 12px; z-index: 1; }
 .ftx-row.cq .msg { font-weight: 600; }
-.ftx-row.needed { background: color-mix(in srgb, var(--new) 12%, transparent); }
-.ftx-row.to-me { background: color-mix(in srgb, var(--err) 18%, transparent); }
+.ftx-row.alerted { background: color-mix(in srgb, var(--alert) 18%, transparent); }
 .ftx-row.selected { background: var(--row-sel); }
 .ftx-row.low { opacity: 0.6; }
 .ftx-row .flags { display: flex; gap: 8px; margin: 0; flex-wrap: nowrap; }
@@ -429,11 +432,33 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 .ftx-box { display: inline-flex; align-items: baseline; gap: 5px; min-width: 92px; padding: 1px 5px; border: 1px solid var(--line); border-left: 3px solid var(--src, var(--line)); border-radius: 2px; background: var(--panel); font: 12.5px var(--mono); text-align: left; cursor: pointer; }
 .ftx-box .call { flex: 1; font-weight: 600; }
 .ftx-box .snr { font-size: 11px; color: var(--muted); }
-.ftx-box.cq { border-color: var(--line); border-left-color: var(--src, var(--line)); box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ok, #3fa34d) 70%, transparent); }
-.ftx-box.needed { background: color-mix(in srgb, var(--new) 22%, var(--panel)); }
-.ftx-box.watched .call { color: var(--watch, var(--src-3)); }
+.ftx-box.cq { box-shadow: inset 0 -2px 0 var(--cq); }
+.ftx-box.alerted { background: color-mix(in srgb, var(--alert) 28%, var(--panel)); border-color: color-mix(in srgb, var(--alert) 70%, var(--line)); border-left-color: var(--src, var(--line)); }
+.ftx-box .tag { font-size: 10px; font-weight: 700; letter-spacing: 0.02em; color: color-mix(in srgb, var(--alert) 65%, var(--text)); }
 .ftx-box.worked .call { color: var(--muted); font-weight: 400; }
-.ftx-box.to-me { background: color-mix(in srgb, var(--err) 30%, var(--panel)); }
 .ftx-box.selected { outline: 2px solid var(--accent); outline-offset: -1px; }
 .ftx-box.low { opacity: 0.6; }
 .ftx-box:hover { background: var(--row-sel); }
+
+/* FTx alerts and filters dialog */
+.ftx-alerts h3 { font-size: 12px; margin: 4px 0 2px; }
+.ftx-alerts p { margin: 0 0 6px; }
+.ftx-alerts table.list td { padding: 2px 5px; vertical-align: middle; }
+.ftx-alerts .ftx-box.sample { min-width: 52px; cursor: default; justify-content: center; }
+.ftx-alerts input[type="color"] { width: 34px; height: 20px; padding: 0 1px; border: 1px solid var(--line); background: var(--panel); }
+.ftx-alerts .form-grid { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.ftx-alerts fieldset { border: 1px solid var(--line); border-radius: 2px; padding: 3px 8px 5px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.ftx-alerts legend { font-size: 12px; color: var(--muted); padding: 0 3px; }
+.ftx-alerts input.narrow { width: 64px; }
+.ftx-alerts input:not([type]) { width: 260px; }
+
+/* Spots coloured by mode: CW, digital, phone */
+.spot-row { border-left: 3px solid transparent; }
+.spot-row.mode-cw { border-left-color: var(--mode-cw); }
+.spot-row.mode-digital { border-left-color: var(--mode-digital); }
+.spot-row.mode-phone { border-left-color: var(--mode-phone); }
+.spot-row.mode-cw .mode { color: var(--mode-cw); font-weight: 700; }
+.spot-row.mode-digital .mode { color: var(--mode-digital); font-weight: 700; }
+.spot-row.mode-phone .mode { color: var(--mode-phone); font-weight: 700; }
+.mode-key { display: inline-flex; gap: 8px; font-size: 11px; color: var(--muted); }
+.mode-key span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 3px; border-radius: 1px; background: var(--k); }
