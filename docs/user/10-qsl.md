@@ -6,6 +6,16 @@ Each QSO keeps its upload status in the standard ADIF fields (`LOTW_QSL_SENT`, `
 
 Every service has a **QSOs from** date. Only QSOs on or after it are uploaded. When you turn a service on it starts from today, so a log you imported (and probably uploaded years ago) isn't sent again. Set an earlier date if you want older QSOs sent.
 
+## Confirmation status and OQRS
+
+The **QSL** section of the QSO editor shows every service in one place: sent and received for LoTW, card and eQSL, upload and received for QRZ, and your **Club Log OQRS** request. A line underneath sums it up, for example "Confirmed by LoTW, Card" or "Not confirmed yet. OQRS requested on Club Log."
+
+QSOs count as confirmed when LoTW R, QSL R (card), eQSL R or QRZ R is Y (or V). QRZ R is the standard ADIF field `QRZCOM_QSO_DOWNLOAD_STATUS`. QRZero doesn't download QRZ confirmations yet, so set it by hand if you want to track one.
+
+Club Log OQRS (online QSL request) has no ADIF field, so QRZero keeps your request in its own fields, `APP_QRZERO_OQRS` and `APP_QRZERO_OQRSDATE`. It doesn't talk to Club Log's OQRS queue; it's a reminder that you've asked. To mark many QSOs, select them in the log and pick **Paper QSL…, Mark OQRS requested**, or right-click.
+
+Log grid columns for all of this: **LoTW R**, **QSL R**, **QRZ R**, **OQRS** and **Confirmed** (letters for each confirming service: L LoTW, C card, E eQSL, Q QRZ).
+
 ## LoTW
 
 LoTW uploads use TQSL, already installed and set up with your certificate, and only happen when you click **Sign and upload**.

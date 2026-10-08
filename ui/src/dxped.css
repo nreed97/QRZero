@@ -1,0 +1,7 @@
+/* DXpeditions pane; the table and editor reuse the watch list styles. */
+.dxped-list { flex: 1 1 auto; }
+.dxped-pane .watch-table.hits tbody tr.need td { font-weight: 600; }
+.dxped-pane .watch-table.hits tbody tr.dim td { color: var(--muted); }
+.dxped-need { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.dxped-foot { padding: 2px 8px; border-top: 1px solid var(--line); flex: 0 0 auto; }
+.watch-edit-row input[type="date"] { margin-left: 3px; }

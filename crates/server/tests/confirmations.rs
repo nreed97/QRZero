@@ -234,7 +234,7 @@ async fn award_hints_follow_the_log() {
     // Empty log: everything is new; DXCC and zone come from the country file.
     let h = hints("call=W8ABC&band=20m&mode=CW&state=OH").await;
     let keys: Vec<(&str, &str)> = h.as_array().unwrap().iter().map(|h| (h["award"].as_str().unwrap(), h["key"].as_str().unwrap())).collect();
-    assert_eq!(keys, [("dxcc", "291"), ("was", "OH"), ("waz", "5"), ("wpx", "W8")], "{h}");
+    assert_eq!(keys, [("dxcc", "291"), ("was", "OH"), ("waz", "5"), ("wpx", "W8"), ("wac", "NA"), ("itu", "8")], "{h}");
     assert_eq!(h[0]["name"], "United States");
     assert_eq!(hint_cells(&h, "dxcc"), cells(&[("mixed", "new"), ("cw", "new"), ("20m", "new")]));
 
@@ -268,7 +268,7 @@ async fn award_hints_follow_the_log() {
     assert_eq!(h[0]["name"], "Germany");
     assert_eq!(hint_cells(&h, "dxcc"), cells(&[("mixed", "worked"), ("cw", "worked"), ("20m", "worked")]), "{h}");
     assert_eq!(hint_cells(&h, "waz")[0].1, "worked");
-    // No band column (2m) and no mode: just the mixed cell.
-    let h = hints("call=DL2XX&band=2m").await;
+    // No band column (1.25m) and no mode: just the mixed cell.
+    let h = hints("call=DL2XX&band=1.25m").await;
     assert_eq!(hint_cells(&h, "dxcc"), cells(&[("mixed", "worked")]));
 }

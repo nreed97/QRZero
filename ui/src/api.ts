@@ -1,4 +1,4 @@
-import type { PropagationReport } from "./types";
+import type { DxpedList, DxpedPlanned, PropagationReport } from "./types";
 import type { QslService, QslDownload, AwardHint, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
@@ -73,7 +73,7 @@ export const api = {
     const q = new URLSearchParams({ calls: o.calls.join(","), lotw: String(o.lotw), paper: String(o.paper), eqsl: String(o.eqsl), unworked: String(o.unworked) });
     return json<AwardTable>("GET", `/logs/${logId}/awards/${award}?${q}`);
   },
-  awardHints: (logId: number, o: { call: string; band: string; mode: string; state: string; cqz: string; dxcc: string; lotw: boolean; paper: boolean; eqsl: boolean }) => {
+  awardHints: (logId: number, o: { call: string; band: string; mode: string; state: string; cqz: string; dxcc: string; grid?: string; iota?: string; cnty?: string; lotw: boolean; paper: boolean; eqsl: boolean }) => {
     const q = new URLSearchParams(Object.entries(o).map(([k, v]) => [k, String(v)]));
     return json<AwardHint[]>("GET", `/logs/${logId}/award-hints?${q}`);
   },
@@ -117,7 +117,9 @@ export const api = {
 
   setActive: (logId: number, locationId: number | null, stationCallsign: string) =>
     json<null>("POST", "/station/active", { log_id: logId, location_id: locationId, station_callsign: stationCallsign }),
-  tune: (key: string, freqHz?: number, mode?: string) => json<null>("POST", "/radios/tune", { key, freq_hz: freqHz, mode }),
+  /** `split`: { tx_freq_hz } transmits there with split on; { split: false } turns split off. */
+  tune: (key: string, freqHz?: number, mode?: string, split?: { tx_freq_hz?: number; split?: boolean }) =>
+    json<null>("POST", "/radios/tune", { key, freq_hz: freqHz, mode, ...split }),
   integrations: () => json<{ config: Integrations; status: IntegrationStatus }>("GET", "/integrations"),
   saveIntegrations: (c: Integrations) => json<{ config: Integrations; status: IntegrationStatus }>("PUT", "/integrations", c),
   udpConnections: () => json<{ connections: UdpConnection[]; status: Record<string, RunStatus> }>("GET", "/udp-connections"),
@@ -140,6 +142,9 @@ export const api = {
   ctyEntities: () => json<CtyEntityInfo[]>("GET", "/cty/entities"),
   watch: () => json<WatchEntry[]>("GET", "/watch"),
   saveWatch: (entries: WatchEntry[]) => json<WatchEntry[]>("PUT", "/watch", entries),
+  dxpeditions: () => json<DxpedList>("GET", "/dxpeditions"),
+  refreshDxpeditions: () => json<DxpedList>("POST", "/dxpeditions/refresh"),
+  saveDxpeditions: (list: DxpedPlanned[]) => json<DxpedList>("PUT", "/dxpeditions", list),
   watchHits: () => json<WatchHit[]>("GET", "/watch/hits"),
   installCty: async (file: Blob) => (await request("POST", "/cty", undefined, file)).json() as Promise<CtyStatus>,
 

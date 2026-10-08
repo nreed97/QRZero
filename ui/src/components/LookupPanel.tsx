@@ -78,6 +78,9 @@ function useAwardHints(logId: number, result: LookupResult | null, entry: EntryC
   const state = pick("STATE");
   const cqz = pick("CQZ") || (result?.entity?.cq ? String(result.entity.cq) : "");
   const dxcc = pick("DXCC") || (result?.entity?.dxcc ? String(result.entity.dxcc) : "");
+  const grid = pick("GRIDSQUARE");
+  const iota = pick("IOTA");
+  const cnty = pick("CNTY");
   useEffect(() => {
     if (!call) {
       setHints(null);
@@ -88,7 +91,7 @@ function useAwardHints(logId: number, result: LookupResult | null, entry: EntryC
       // Count confirmations the way the Awards pane is set to.
       const c = localGet("qrzero.awards", { lotw: true, paper: true, eqsl: false });
       api
-        .awardHints(logId, { call, band: entry.band, mode: entry.mode, state, cqz, dxcc, lotw: c.lotw, paper: c.paper, eqsl: c.eqsl })
+        .awardHints(logId, { call, band: entry.band, mode: entry.mode, state, cqz, dxcc, grid, iota, cnty, lotw: c.lotw, paper: c.paper, eqsl: c.eqsl })
         .then((h) => live && setHints(h))
         .catch(() => live && setHints(null));
     }, 150);
@@ -96,18 +99,18 @@ function useAwardHints(logId: number, result: LookupResult | null, entry: EntryC
       live = false;
       clearTimeout(timer);
     };
-  }, [logId, call, entry.band, entry.mode, state, cqz, dxcc, refreshKey]);
+  }, [logId, call, entry.band, entry.mode, state, cqz, dxcc, grid, iota, cnty, refreshKey]);
   return call ? hints : null;
 }
 
-const AWARD_NAMES: Record<AwardKind, string> = { dxcc: "DXCC", was: "WAS", waz: "WAZ", wpx: "WPX" };
-const ROW_WORDS: Record<AwardKind, string> = { dxcc: "country", was: "state", waz: "zone", wpx: "prefix" };
+const AWARD_NAMES: Record<AwardKind, string> = { dxcc: "DXCC", was: "WAS", waz: "WAZ", wpx: "WPX", wac: "WAC", itu: "ITU", vucc: "VUCC", iota: "IOTA", counties: "County" };
+const ROW_WORDS: Record<AwardKind, string> = { dxcc: "country", was: "state", waz: "zone", wpx: "prefix", wac: "continent", itu: "ITU zone", vucc: "grid", iota: "island group", counties: "county" };
 const COLUMN_NAMES: Record<string, string> = { cw: "CW", phone: "Phone", digital: "Digital" };
 const colName = (c: string) => COLUMN_NAMES[c] ?? c;
 
 function rowLabel(h: AwardHint): string {
   if (h.award === "was") return `${h.key} ${h.name}`;
-  if (h.award === "waz") return h.key;
+  if (h.award === "waz" || h.award === "itu") return h.key;
   return h.name;
 }
 
@@ -129,8 +132,8 @@ function AwardHints({ hints, band, mode }: { hints: AwardHint[]; band: string; m
       if (!fresh.length && !unconfirmed.length) return null;
       return (
         <>
-          {h.award !== "waz" && <span>{rowLabel(h)}: </span>}
-          {h.award === "waz" && <span>zone {h.key}: </span>}
+          {h.award !== "waz" && h.award !== "itu" && <span>{rowLabel(h)}: </span>}
+          {(h.award === "waz" || h.award === "itu") && <span>zone {h.key}: </span>}
           {fresh.map((c, i) => (
             <Fragment key={c.column}>
               {i > 0 && ", "}

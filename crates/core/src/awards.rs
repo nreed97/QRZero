@@ -1,4 +1,4 @@
-//! Award tracking (DXCC, WAS, WAZ, WPX): pure logic, no database.
+//! Award tracking (DXCC, WAS, WAZ, WPX, WAC, ITU zones, VUCC, IOTA, US counties): pure logic, no database.
 //!
 //! The store feeds one [`AwardQso`] per QSO into a [`Tally`], which produces an
 //! [`AwardTable`]: rows (entities, states, zones, prefixes) by columns (mixed,
@@ -13,6 +13,25 @@ pub enum Award {
     Was,
     Waz,
     Wpx,
+    /// Worked All Continents.
+    Wac,
+    /// ITU zones.
+    Itu,
+    /// VHF/UHF Century Club: 4-character grid squares on 6 m and up.
+    Vucc,
+    /// Islands on the Air references.
+    Iota,
+    /// US counties (USA-CA).
+    Counties,
+}
+
+/// What the country file knows about a callsign.
+#[derive(Clone, Debug, Default)]
+pub struct CtyFacts {
+    pub dxcc: Option<u32>,
+    /// Continent abbreviation (NA, EU, ...).
+    pub cont: Option<String>,
+    pub itu: Option<u32>,
 }
 
 /// Which confirmation sources count.
@@ -38,6 +57,16 @@ pub struct AwardQso {
     pub state: Option<String>,
     /// ADIF CQZ.
     pub cq_zone: Option<u32>,
+    /// ADIF CONT, or the country file's continent.
+    pub cont: Option<String>,
+    /// ADIF ITUZ, or the country file's ITU zone.
+    pub itu: Option<u32>,
+    /// The first four characters of GRIDSQUARE, uppercase, when they form a valid grid.
+    pub grid: Option<String>,
+    /// ADIF IOTA reference like "EU-005", uppercase.
+    pub iota: Option<String>,
+    /// ADIF CNTY as "ST,County" for US counties.
+    pub cnty: Option<String>,
     /// LOTW_QSL_RCVD == Y (or V).
     pub lotw: bool,
     /// QSL_RCVD == Y (or V).
@@ -50,15 +79,24 @@ pub struct AwardQso {
 
 impl AwardQso {
     /// The award facts of a QSO's ADIF fields. `resolve` supplies the DXCC
-    /// entity when the fields have none.
-    pub fn from_fields(f: &crate::adif::Fields, resolve: impl Fn(&str) -> Option<u32>) -> Self {
+    /// entity, continent and ITU zone when the fields have none.
+    pub fn from_fields(f: &crate::adif::Fields, resolve: impl Fn(&str) -> CtyFacts) -> Self {
         let get = |k: &str| f.get(k).map(|v| v.trim()).filter(|v| !v.is_empty());
         let yes = |k: &str| matches!(get(k), Some("Y") | Some("V"));
         let call = get("CALL").unwrap_or_default().to_ascii_uppercase();
+        let dxcc = get("DXCC").and_then(|d| d.parse().ok());
+        let cont = get("CONT").map(str::to_ascii_uppercase);
+        let itu = get("ITUZ").and_then(|z| z.parse().ok());
+        let facts = if dxcc.is_none() || cont.is_none() || itu.is_none() { resolve(&call) } else { CtyFacts::default() };
         AwardQso {
             band: get("BAND").map(str::to_ascii_lowercase),
             mode: get("SUBMODE").or(get("MODE")).map(str::to_ascii_uppercase),
-            dxcc: get("DXCC").and_then(|d| d.parse().ok()).or_else(|| resolve(&call)),
+            dxcc: dxcc.or(facts.dxcc),
+            cont: cont.or(facts.cont),
+            itu: itu.or(facts.itu),
+            grid: get("GRIDSQUARE").and_then(grid4),
+            iota: get("IOTA").and_then(iota_ref),
+            cnty: get("CNTY").and_then(county),
             state: get("STATE").map(str::to_ascii_uppercase),
             cq_zone: get("CQZ").and_then(|z| z.parse().ok()),
             lotw: yes("LOTW_QSL_RCVD"),
@@ -97,7 +135,7 @@ pub struct AwardTable {
     pub award: Award,
     pub columns: Vec<Column>,
     pub rows: Vec<Row>,
-    /// How many exist to work (340 DXCC, 50 WAS, 40 WAZ); 0 for WPX (open-ended).
+    /// How many exist to work (340 DXCC, 50 WAS, 40 WAZ, 90 ITU, 6 WAC, 3077 counties); 0 where open-ended.
     pub total: usize,
 }
 
@@ -106,14 +144,61 @@ pub const AWARD_BANDS: &[&str] = &["160m", "80m", "40m", "30m", "20m", "17m", "1
 
 /// All column keys, in display order.
 pub const COLUMNS: &[&str] = &[
-    "mixed", "cw", "phone", "digital", "160m", "80m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m",
+    "mixed", "cw", "phone", "digital", "160m", "80m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m", "2m", "70cm",
 ];
 
-const NCOLS: usize = 14;
+const NCOLS: usize = 16;
 const COL_CW: usize = 1;
 const COL_PHONE: usize = 2;
 const COL_DIGITAL: usize = 3;
 const COL_BAND0: usize = 4;
+
+/// The six continents WAC counts.
+pub const CONTINENTS: &[(&str, &str)] = &[
+    ("AF", "Africa"),
+    ("AS", "Asia"),
+    ("EU", "Europe"),
+    ("NA", "North America"),
+    ("OC", "Oceania"),
+    ("SA", "South America"),
+];
+
+/// How many US counties USA-CA lists.
+pub const US_COUNTY_COUNT: usize = 3077;
+
+/// The 4-character grid square at the start of a locator, uppercase.
+pub fn grid4(s: &str) -> Option<String> {
+    let b = s.trim().as_bytes();
+    if b.len() < 4 {
+        return None;
+    }
+    let ok = b[0].to_ascii_uppercase().is_ascii_uppercase()
+        && (b'A'..=b'R').contains(&b[0].to_ascii_uppercase())
+        && (b'A'..=b'R').contains(&b[1].to_ascii_uppercase())
+        && b[2].is_ascii_digit()
+        && b[3].is_ascii_digit();
+    ok.then(|| String::from_utf8_lossy(&b[..4]).to_ascii_uppercase())
+}
+
+/// An IOTA reference like "EU-005" (uppercase), or `None`.
+pub fn iota_ref(s: &str) -> Option<String> {
+    let s = s.trim().to_ascii_uppercase();
+    let b = s.as_bytes();
+    (b.len() == 6 && b[0].is_ascii_uppercase() && b[1].is_ascii_uppercase() && b[2] == b'-' && b[3..].iter().all(u8::is_ascii_digit)).then_some(s)
+}
+
+/// A county as "ST,Name" with the state uppercased, or `None`.
+pub fn county(s: &str) -> Option<String> {
+    let (st, name) = s.split_once(',')?;
+    let (st, name) = (st.trim(), name.trim());
+    (st.len() == 2 && st.bytes().all(|c| c.is_ascii_alphabetic()) && !name.is_empty()).then(|| format!("{},{}", st.to_ascii_uppercase(), name))
+}
+
+/// Whether a band is 6 m or higher (the bands VUCC counts).
+fn vhf_band(band: &str) -> bool {
+    let b = band.trim().to_ascii_lowercase();
+    matches!(b.as_str(), "6m" | "4m" | "2m" | "1.25m") || b.ends_with("cm")
+}
 
 /// The 50 US states (no DC), as (code, name), sorted by code.
 pub const US_STATES: &[(&str, &str)] = &[
@@ -209,7 +294,7 @@ fn mode_col(mode: &str) -> Option<usize> {
 
 fn band_col(band: &str) -> Option<usize> {
     let band = band.trim();
-    AWARD_BANDS
+    COLUMNS[COL_BAND0..]
         .iter()
         .position(|b| b.eq_ignore_ascii_case(band))
         .map(|i| COL_BAND0 + i)
@@ -303,6 +388,17 @@ fn row_id(award: Award, q: &AwardQso) -> Option<RowId> {
         }
         Award::Waz => q.cq_zone.filter(|z| (1..=40).contains(z)).map(RowId::Num),
         Award::Wpx => wpx_prefix(&q.call).map(RowId::Text),
+        Award::Wac => q.cont.as_deref().filter(|c| CONTINENTS.iter().any(|(k, _)| k == c)).map(|c| RowId::Text(c.to_string())),
+        Award::Itu => q.itu.filter(|z| (1..=90).contains(z)).map(RowId::Num),
+        Award::Vucc => match (&q.grid, q.band.as_deref()) {
+            (Some(g), Some(b)) if vhf_band(b) => Some(RowId::Text(g.clone())),
+            _ => None,
+        },
+        Award::Iota => q.iota.clone().map(RowId::Text),
+        Award::Counties => match (&q.cnty, q.dxcc) {
+            (Some(c), Some(DXCC_USA | DXCC_ALASKA | DXCC_HAWAII) | None) => Some(RowId::Text(c.clone())),
+            _ => None,
+        },
     }
 }
 
@@ -400,7 +496,9 @@ impl Tally {
                 Award::Dxcc => names.keys().cloned().collect(),
                 Award::Was => US_STATES.iter().map(|(c, _)| c.to_string()).collect(),
                 Award::Waz => (1..=40).map(|z: u32| z.to_string()).collect(),
-                Award::Wpx => Vec::new(),
+                Award::Itu => (1..=90).map(|z: u32| z.to_string()).collect(),
+                Award::Wac => CONTINENTS.iter().map(|(c, _)| c.to_string()).collect(),
+                Award::Wpx | Award::Vucc | Award::Iota | Award::Counties => Vec::new(),
             };
             let have: std::collections::HashSet<String> = entries.iter().map(|(k, _)| k.clone()).collect();
             entries.extend(all.into_iter().filter(|k| !have.contains(k)).map(|k| (k, [0; NCOLS])));
@@ -443,8 +541,8 @@ impl Tally {
                     .cmp(&b.name)
                     .then_with(|| num_order(&a.key).cmp(&num_order(&b.key)))
             }),
-            Award::Waz => rows.sort_by(|a, b| num_order(&a.key).cmp(&num_order(&b.key)).then(a.key.cmp(&b.key))),
-            Award::Was | Award::Wpx => rows.sort_by(|a, b| a.key.cmp(&b.key)),
+            Award::Waz | Award::Itu => rows.sort_by(|a, b| num_order(&a.key).cmp(&num_order(&b.key)).then(a.key.cmp(&b.key))),
+            Award::Was | Award::Wpx | Award::Wac | Award::Vucc | Award::Iota | Award::Counties => rows.sort_by(|a, b| a.key.cmp(&b.key)),
         }
 
         let total = match award {
@@ -452,7 +550,10 @@ impl Tally {
             Award::Dxcc => names.len(),
             Award::Was => US_STATES.len(),
             Award::Waz => 40,
-            Award::Wpx => 0,
+            Award::Itu => 90,
+            Award::Wac => CONTINENTS.len(),
+            Award::Counties => US_COUNTY_COUNT,
+            Award::Wpx | Award::Vucc | Award::Iota => 0,
         };
         AwardTable {
             award,
@@ -464,7 +565,17 @@ impl Tally {
 }
 
 /// Every award, in display order.
-pub const AWARDS: [Award; 4] = [Award::Dxcc, Award::Was, Award::Waz, Award::Wpx];
+pub const AWARDS: [Award; 9] = [
+    Award::Dxcc,
+    Award::Was,
+    Award::Waz,
+    Award::Wpx,
+    Award::Wac,
+    Award::Itu,
+    Award::Vucc,
+    Award::Iota,
+    Award::Counties,
+];
 
 // Cell bits in an [`AwardIndex`]: worked, and which sources confirmed it.
 const BIT_WORKED: u8 = 1;
@@ -486,13 +597,19 @@ fn counts_mask(c: Counts) -> u8 {
 /// Every award cell of one log, with the confirmation sources seen in it, so
 /// "what would this QSO add?" is a few hash lookups. Built once per log and
 /// added to as QSOs are logged.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct AwardIndex {
-    /// DXCC, WAS and WAZ rows by number (WAS: index into `US_STATES`).
-    nums: [HashMap<u32, Cells>; 3],
-    /// WPX rows by prefix.
-    wpx: HashMap<String, Cells>,
+    /// Rows by number for each award, indexed by `Award as usize` (WAS: index into `US_STATES`).
+    nums: Vec<HashMap<u32, Cells>>,
+    /// Rows by text (prefix, continent, grid, IOTA, county) for each award.
+    texts: Vec<HashMap<String, Cells>>,
     qsos: usize,
+}
+
+impl Default for AwardIndex {
+    fn default() -> Self {
+        AwardIndex { nums: vec![HashMap::new(); AWARDS.len()], texts: vec![HashMap::new(); AWARDS.len()], qsos: 0 }
+    }
 }
 
 /// Whether a QSO would fill an award cell for the first time.
@@ -526,15 +643,15 @@ pub struct AwardHint {
 
 impl AwardIndex {
     fn slot(&mut self, award: Award, id: RowId) -> &mut Cells {
-        match (award, id) {
-            (_, RowId::Text(s)) => self.wpx.entry(s).or_insert([0; NCOLS]),
-            (a, RowId::Num(n)) => self.nums[a as usize].entry(n).or_insert([0; NCOLS]),
+        match id {
+            RowId::Text(s) => self.texts[award as usize].entry(s).or_insert([0; NCOLS]),
+            RowId::Num(n) => self.nums[award as usize].entry(n).or_insert([0; NCOLS]),
         }
     }
 
     fn get(&self, award: Award, id: &RowId) -> Option<&Cells> {
         match id {
-            RowId::Text(s) => self.wpx.get(s),
+            RowId::Text(s) => self.texts.get(award as usize)?.get(s),
             RowId::Num(n) => self.nums.get(award as usize)?.get(n),
         }
     }
@@ -609,8 +726,10 @@ fn default_name(award: Award, key: &str) -> String {
             .find(|(c, _)| *c == key)
             .map(|(_, n)| n.to_string())
             .unwrap_or_else(|| key.to_string()),
-        Award::Waz => format!("Zone {key}"),
-        Award::Wpx => key.to_string(),
+        Award::Waz | Award::Itu => format!("Zone {key}"),
+        Award::Wac => CONTINENTS.iter().find(|(c, _)| *c == key).map_or_else(|| key.to_string(), |(_, n)| n.to_string()),
+        Award::Counties => key.replacen(',', ", ", 1),
+        Award::Wpx | Award::Vucc | Award::Iota => key.to_string(),
     }
 }
 
@@ -753,7 +872,7 @@ mod tests {
         // Unknown name.
         t.add(&AwardQso {
             dxcc: Some(999),
-            ..q("ZZ1ZZ", "2m", "FM")
+            ..q("ZZ1ZZ", "1.25m", "FM")
         });
 
         let tab = t.finish(false);
@@ -778,7 +897,7 @@ mod tests {
         assert_eq!(us.cells.get("20m"), Some(&Status::Worked));
         assert_eq!(us.cells.get("cw"), None);
 
-        // 2m is not a column, but the QSO counts for mixed and phone.
+        // 1.25m is not a column, but the QSO counts for mixed and phone.
         let zz = row(&tab, "999");
         assert_eq!(zz.cells.len(), 2);
         assert_eq!(zz.cells.get("phone"), Some(&Status::Worked));
@@ -973,6 +1092,55 @@ mod tests {
         );
     }
 
+    #[test]
+    fn new_awards_rows() {
+        let base = |call: &str, band: &str| q(call, band, "CW");
+        let qsos = [
+            AwardQso { cont: Some("EU".into()), itu: Some(28), iota: Some("EU-005".into()), ..base("DL1ABC", "20m") },
+            AwardQso { cont: Some("NA".into()), grid: Some("FN31".into()), cnty: Some("OH,Franklin".into()), dxcc: Some(291), ..base("W8ABC", "6m") },
+            AwardQso { grid: Some("FN31".into()), ..base("W1ABC", "20m") },
+            AwardQso { cont: Some("XX".into()), itu: Some(91), iota: None, cnty: Some("ON,Peel".into()), dxcc: Some(1), ..base("VE3ABC", "20m") },
+        ];
+        let rows = |award: Award| {
+            let mut t = Tally::new(award, all_counts(), BTreeMap::new());
+            qsos.iter().for_each(|x| t.add(x));
+            t.finish(false).rows.into_iter().map(|r| r.key).collect::<Vec<_>>()
+        };
+        assert_eq!(rows(Award::Wac), ["EU", "NA"]);
+        assert_eq!(rows(Award::Itu), ["28"]);
+        assert_eq!(rows(Award::Vucc), ["FN31"], "HF grids don't count");
+        assert_eq!(rows(Award::Iota), ["EU-005"]);
+        assert_eq!(rows(Award::Counties), ["OH,Franklin"]);
+        let t = Tally::new(Award::Wac, all_counts(), BTreeMap::new()).finish(true);
+        assert_eq!((t.total, t.rows.len(), t.rows[0].name.as_str()), (6, 6, "Africa"));
+        assert_eq!(Tally::new(Award::Itu, all_counts(), BTreeMap::new()).finish(true).rows.len(), 90);
+    }
+
+    #[test]
+    fn parsers() {
+        assert_eq!(grid4("fn31pr").as_deref(), Some("FN31"));
+        assert_eq!(grid4("ZZ31"), None);
+        assert_eq!(grid4("FN3"), None);
+        assert_eq!(iota_ref(" eu-005 ").as_deref(), Some("EU-005"));
+        assert_eq!(iota_ref("EU5"), None);
+        assert_eq!(county("oh, Franklin").as_deref(), Some("OH,Franklin"));
+        assert_eq!(county("Franklin"), None);
+        assert!(vhf_band("2m") && vhf_band("70cm") && !vhf_band("10m"));
+    }
+
+    #[test]
+    fn new_award_hints() {
+        let mut idx = AwardIndex::default();
+        let qso = AwardQso { cont: Some("NA".into()), itu: Some(7), grid: Some("EM79".into()), ..q("W8ABC", "2m", "FT8") };
+        let h = idx.hints(&qso, lotw_only());
+        let awards: Vec<Award> = h.iter().map(|x| x.award).collect();
+        assert_eq!(awards, [Award::Wpx, Award::Wac, Award::Itu, Award::Vucc]);
+        idx.add(&qso);
+        let h = idx.hints(&qso, lotw_only());
+        assert_eq!(hint(&h, Award::Vucc).unwrap().cells[0].status, HintStatus::Worked);
+        assert_eq!(hint(&h, Award::Wac).unwrap().name, "North America");
+    }
+
     fn hint(h: &[AwardHint], award: Award) -> Option<&AwardHint> {
         h.iter().find(|x| x.award == award)
     }
@@ -1037,7 +1205,7 @@ mod tests {
         assert_eq!(h.len(), 4);
         assert!(h.iter().all(|x| x.cells.iter().all(|c| c.status == HintStatus::Confirmed)));
         // No band column for 2m, no mode: mixed only. No state, no zone: no WAS or WAZ.
-        let h = idx.hints(&AwardQso { dxcc: Some(291), call: "W8ABC".into(), band: Some("2m".into()), ..AwardQso::default() }, all_counts());
+        let h = idx.hints(&AwardQso { dxcc: Some(291), call: "W8ABC".into(), band: Some("1.25m".into()), ..AwardQso::default() }, all_counts());
         let awards: Vec<Award> = h.iter().map(|x| x.award).collect();
         assert_eq!(awards, [Award::Dxcc, Award::Wpx]);
         assert_eq!(statuses(&h[0]), [("mixed", HintStatus::Confirmed)]);
@@ -1049,7 +1217,7 @@ mod tests {
             .into_iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect();
-        let qso = AwardQso::from_fields(&f, |c| (c == "W8ABC").then_some(291));
+        let qso = AwardQso::from_fields(&f, |c| CtyFacts { dxcc: (c == "W8ABC").then_some(291), ..Default::default() });
         assert_eq!(qso.call, "W8ABC");
         assert_eq!(qso.band.as_deref(), Some("20m"));
         assert_eq!(qso.mode.as_deref(), Some("FT4"));
@@ -1061,7 +1229,7 @@ mod tests {
     fn tally_is_fast() {
         let mut t = Tally::new(Award::Dxcc, all_counts(), BTreeMap::new());
         let modes = ["CW", "SSB", "FT8", "RTTY"];
-        let bands = ["160m", "80m", "40m", "20m", "15m", "10m", "2m"];
+        let bands = ["160m", "80m", "40m", "20m", "15m", "10m", "1.25m"];
         let qsos: Vec<AwardQso> = (0..200_000u32)
             .map(|i| AwardQso {
                 dxcc: Some(i % 340 + 1),

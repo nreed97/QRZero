@@ -22,6 +22,15 @@ pub struct Needed {
     pub new_mode: bool,
 }
 
+/// What is already worked for one DXCC entity.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct DxccProfile {
+    pub worked: bool,
+    pub bands: Vec<String>,
+    /// "CW", "PHONE" or "DIGITAL".
+    pub mode_groups: Vec<&'static str>,
+}
+
 impl WorkedIndex {
     /// Adds one QSO. `mode` is the submode when there is one (FT4), else the mode.
     pub fn add(&mut self, call: &str, dxcc: Option<u32>, band: Option<&str>, mode: Option<&str>) {
@@ -39,6 +48,20 @@ impl WorkedIndex {
                 self.dxcc_modes.insert((d, m.to_string()));
             }
         }
+    }
+
+    /// Which bands and mode groups (CW, PHONE, DIGITAL) are worked for an entity.
+    pub fn dxcc_profile(&self, dxcc: u32) -> DxccProfile {
+        let mut p = DxccProfile { worked: self.dxcc.contains(&dxcc), ..DxccProfile::default() };
+        p.bands = self.dxcc_bands.iter().filter(|(d, _)| *d == dxcc).map(|(_, b)| b.clone()).collect();
+        for (_, m) in self.dxcc_modes.iter().filter(|(d, _)| *d == dxcc) {
+            if let Some(g) = crate::awards::mode_group(m) {
+                if !p.mode_groups.contains(&g) {
+                    p.mode_groups.push(g);
+                }
+            }
+        }
+        p
     }
 
     pub fn len(&self) -> usize {

@@ -15,11 +15,12 @@ The grid shows every QSO in the open log, newest first. It stays fast with hundr
 
 With rows selected you can **Export selected** or **Delete** them. Deleting asks first and can't be undone.
 
-**Paper QSL…** sets the card fields on the selected QSOs: queue a card to send, card sent (bureau or direct), card received (bureau or direct), or not sending. Sent and received also record today's date. See [QSL](10-qsl.md) for printing labels.
+**Paper QSL…** sets the card fields on the selected QSOs: queue a card to send, card sent (bureau or direct), card received (bureau or direct), or not sending, plus **Mark OQRS requested** and **Clear OQRS request** for Club Log OQRS. Sent and received also record today's date. See [QSL](10-qsl.md) for printing labels.
 
 Right-click a row for a menu. It acts on the selected rows when you right-click one of them, otherwise on that row alone:
 
 - **Edit** opens the QSO editor.
+- **Mark OQRS requested**, **Card sent via bureau**, **Card sent direct** and **Card received** set the QSL fields on the QSOs the menu acts on, the same as **Paper QSL…**.
 - **Fill from QRZ** looks each call up on QRZ and fills in name, QTH, state, grid and the rest wherever the QSO has nothing. Nothing you already have is changed. It needs your QRZ login (Settings, **Callsign lookup**).
 - **View CALL on QRZ.com** (one row only) opens that station's page on QRZ.com in your web browser. It needs no login.
 - **Send through UDP connections** sends the QSOs again to every **QSO logged** connection under Settings, **UDP connections**, just as if they had been logged now. Use it to push older contacts into another program. See [UDP connections](16-udp-and-startup.md).

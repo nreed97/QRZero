@@ -16,7 +16,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use qrzero_core::adif::Fields;
-use qrzero_core::awards::{Award, AwardHint, AwardQso, AwardTable, Counts, Tally};
+use qrzero_core::awards::{Award, AwardHint, AwardQso, AwardTable, Counts, CtyFacts, Tally};
 use qrzero_core::model::*;
 use qrzero_core::qrz::{QrzClient, DEFAULT_ENDPOINT};
 use qrzero_core::store::Sort;
@@ -31,12 +31,13 @@ mod qsl;
 mod startup;
 mod station;
 mod udp_out;
+mod dxped;
 mod watch;
 
 pub use qsl::Endpoints as QslEndpoints;
 use cluster::{Cluster, ClusterConfig};
 use qsl::{Qsl, QslConfig, SecretsUpdate};
-use station::{Active, Hub, Integrations};
+use station::{cty_facts, Active, Hub, Integrations};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 const LOOKUP_CACHE_SECS: i64 = 30 * 24 * 3600;
@@ -61,6 +62,8 @@ pub struct Config {
     pub qsl_endpoints: QslEndpoints,
     /// N0NBH's solar data feed (tests point this at a stand-in).
     pub propagation_url: String,
+    /// NG3K's DXpedition calendar (tests point this at a stand-in).
+    pub dxped_url: String,
     /// Start the programs listed under Settings, Startup programs.
     pub launch_apps: bool,
 }
@@ -76,6 +79,7 @@ impl Config {
             update_cty: true,
             qsl_endpoints: QslEndpoints::default(),
             propagation_url: propagation::DEFAULT_URL.to_string(),
+            dxped_url: dxped::DEFAULT_URL.to_string(),
             launch_apps: true,
         }
     }
@@ -135,6 +139,19 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
     let store = Arc::new(Mutex::new(store));
     let hub = Hub::new(store.clone(), cfg.data_dir.clone());
     hub.start(cfg.update_cty);
+    hub.dxped.set_url(cfg.dxped_url);
+    if cfg.update_cty {
+        // Keeps the DXpedition calendar fresh in the background (weak, so it never holds the database open).
+        let weak = Arc::downgrade(&hub);
+        tokio::spawn(async move {
+            loop {
+                let Some(hub) = weak.upgrade() else { break };
+                let wait = dxped::refresh(&hub, false).await;
+                drop(hub);
+                tokio::time::sleep(wait).await;
+            }
+        });
+    }
     let cluster = Cluster::new(&hub);
     let qsl = Qsl::new(store.clone(), hub.clone(), cfg.secret_service.clone(), cfg.data_dir.clone(), cfg.qsl_endpoints);
     qsl.start();
@@ -249,6 +266,8 @@ fn router(state: Shared) -> Router {
         .route("/cty/entities", get(cty_entities))
         .route("/watch", get(watch_get).put(watch_put))
         .route("/watch/hits", get(watch_hits))
+        .route("/dxpeditions", get(dxped_get).put(dxped_put))
+        .route("/dxpeditions/refresh", post(dxped_refresh))
         .route("/cluster", get(cluster_get).put(cluster_put))
         .route("/cluster/connect", post(cluster_connect))
         .route("/cluster/send", post(cluster_send))
@@ -569,7 +588,7 @@ async fn award(State(s): State<Shared>, Path((id, award)): Path<(i64, Award)>, Q
             return Ok(t.1.clone());
         }
         let mut tally = Tally::new(award, counts, names);
-        let resolve = |c: &str| cty.as_ref().and_then(|db| db.lookup(c)).and_then(|e| e.dxcc);
+        let resolve = |c: &str| cty_facts(cty.as_deref(), c);
         st.for_each_award_qso(id, &calls, resolve, |qso| tally.add(qso))?;
         let table = Arc::new(tally.finish(q.unworked));
         let mut c = cache.lock().unwrap_or_else(|p| p.into_inner());
@@ -593,6 +612,10 @@ struct HintQuery {
     /// CQ zone and DXCC entity; taken from the country file when missing.
     cqz: Option<String>,
     dxcc: Option<String>,
+    /// Grid square, IOTA reference and county ("ST,Name") of the station, when known.
+    grid: Option<String>,
+    iota: Option<String>,
+    cnty: Option<String>,
     #[serde(default)]
     lotw: bool,
     #[serde(default)]
@@ -607,14 +630,14 @@ async fn award_hints(State(s): State<Shared>, Path(log_id): Path<i64>, Query(q):
     for (k, v) in [("CALL", &q.call), ("BAND", &q.band), ("MODE", &q.mode), ("STATE", &q.state)] {
         fields.insert(k.into(), v.clone());
     }
-    for (k, v) in [("CQZ", &q.cqz), ("DXCC", &q.dxcc)] {
+    for (k, v) in [("CQZ", &q.cqz), ("DXCC", &q.dxcc), ("GRIDSQUARE", &q.grid), ("IOTA", &q.iota), ("CNTY", &q.cnty)] {
         if let Some(v) = v.as_ref().filter(|v| !v.trim().is_empty()) {
             fields.insert(k.into(), v.clone());
         }
     }
     // The same country-file facts a logged QSO would get.
     s.hub.fill_from_cty(&mut fields);
-    let qso = AwardQso::from_fields(&fields, |_| None);
+    let qso = AwardQso::from_fields(&fields, |_| CtyFacts::default());
     let counts = Counts { lotw: q.lotw, paper: q.paper, eqsl: q.eqsl };
     let hub = s.hub.clone();
     let mut hints = tokio::task::spawn_blocking(move || hub.award_hints(log_id, &qso, counts))
@@ -1023,10 +1046,19 @@ struct TuneBody {
     key: String,
     freq_hz: Option<u64>,
     mode: Option<String>,
+    /// Transmit on this frequency and turn split on.
+    tx_freq_hz: Option<u64>,
+    /// `false` turns split off (ignored when `tx_freq_hz` is given).
+    split: Option<bool>,
 }
 
 async fn tune(State(s): State<Shared>, Json(b): Json<TuneBody>) -> ApiResult<()> {
-    s.hub.tune(&b.key, b.freq_hz, b.mode).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    let split = match (b.tx_freq_hz, b.split) {
+        (Some(tx), _) => Some(Some(tx)),
+        (None, Some(false)) => Some(None),
+        _ => None,
+    };
+    s.hub.tune(&b.key, b.freq_hz, b.mode, split).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
     Ok(Json(()))
 }
 
@@ -1272,6 +1304,25 @@ async fn watch_put(State(s): State<Shared>, Json(entries): Json<Vec<watch::Watch
     let text = serde_json::to_string(&saved).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     s.hub.set_setting(watch::SETTING_KEY, &text).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))?;
     Ok(Json(saved))
+}
+
+fn dxped_view(s: &Shared) -> serde_json::Value {
+    s.hub.dxped.view(&s.hub, chrono::Utc::now().date_naive())
+}
+
+async fn dxped_get(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
+    Ok(Json(dxped_view(&s)))
+}
+
+/// Replaces the hand-added list.
+async fn dxped_put(State(s): State<Shared>, Json(list): Json<Vec<dxped::Planned>>) -> ApiResult<serde_json::Value> {
+    dxped::save_manual(&s.hub, list).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(Json(dxped_view(&s)))
+}
+
+async fn dxped_refresh(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
+    dxped::refresh(&s.hub, true).await;
+    Ok(Json(dxped_view(&s)))
 }
 
 async fn watch_hits(State(s): State<Shared>) -> ApiResult<Vec<watch::WatchHit>> {

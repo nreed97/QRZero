@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../api";
 import { CUSTOM_PREFIX, DEFAULT_LAYOUT, ENTRY_FIELDS, fieldDef, type EntryLayout } from "../fields";
+import { confirmedText, OQRS, OQRS_DATE } from "../confirmations";
 import { BANDS, MODES, bandForFreq } from "../modes";
 import { usePref } from "../prefs";
 import type { Equipment, Fields, Location, Qso, StationCallsign } from "../types";
 import QrzPageLink from "./QrzPageLink";
+import { confirmDelete } from "../display";
 import "../editor.css";
 
 export interface QsoEditorProps {
@@ -47,7 +49,7 @@ function timeIn(text: string): string {
   return m ? m[1] + m[2] + (m[3] ?? "") : text;
 }
 
-const DATE_KEYS = ["QSO_DATE", "QSO_DATE_OFF", "LOTW_QSLSDATE", "LOTW_QSLRDATE", "QSLSDATE", "QSLRDATE", "EQSL_QSLSDATE", "EQSL_QSLRDATE", "QRZCOM_QSO_UPLOAD_DATE", "CLUBLOG_QSO_UPLOAD_DATE"];
+const DATE_KEYS = ["QSO_DATE", "QSO_DATE_OFF", "LOTW_QSLSDATE", "LOTW_QSLRDATE", "QSLSDATE", "QSLRDATE", "EQSL_QSLSDATE", "EQSL_QSLRDATE", "QRZCOM_QSO_UPLOAD_DATE", "QRZCOM_QSO_DOWNLOAD_DATE", "CLUBLOG_QSO_UPLOAD_DATE", OQRS_DATE];
 const TIME_KEYS = ["TIME_ON", "TIME_OFF"];
 const REQUIRED = ["CALL", "QSO_DATE", "TIME_ON"];
 
@@ -102,13 +104,14 @@ const QSL_ROWS: QslRow[] = [
   { name: "LoTW", sent: "LOTW_QSL_SENT", sdate: "LOTW_QSLSDATE", rcvd: "LOTW_QSL_RCVD", rdate: "LOTW_QSLRDATE", sentOpts: SENT },
   { name: "Card", sent: "QSL_SENT", sdate: "QSLSDATE", rcvd: "QSL_RCVD", rdate: "QSLRDATE", sentOpts: SENT },
   { name: "eQSL", sent: "EQSL_QSL_SENT", sdate: "EQSL_QSLSDATE", rcvd: "EQSL_QSL_RCVD", rdate: "EQSL_QSLRDATE", sentOpts: SENT },
-  { name: "QRZ", sent: "QRZCOM_QSO_UPLOAD_STATUS", sdate: "QRZCOM_QSO_UPLOAD_DATE", sentOpts: UPLOAD },
+  { name: "QRZ", sent: "QRZCOM_QSO_UPLOAD_STATUS", sdate: "QRZCOM_QSO_UPLOAD_DATE", rcvd: "QRZCOM_QSO_DOWNLOAD_STATUS", rdate: "QRZCOM_QSO_DOWNLOAD_DATE", sentOpts: UPLOAD },
   { name: "Club Log", sent: "CLUBLOG_QSO_UPLOAD_STATUS", sdate: "CLUBLOG_QSO_UPLOAD_DATE", sentOpts: UPLOAD },
 ];
 
 /** Fields that have a place in the structured sections. */
 const COVERED = new Set([
   ...Object.keys(LABELS),
+  OQRS, OQRS_DATE,
   ...QSL_ROWS.flatMap((r) => [r.sent, r.sdate, r.rcvd, r.rdate].filter((k): k is string => !!k)),
 ]);
 
@@ -244,7 +247,7 @@ export default function QsoEditor({ qso, locations, equipment, callsigns, onClos
   };
 
   const remove = async () => {
-    if (!confirm(`Delete this QSO with ${base.fields.CALL ?? "?"}? This can't be undone.`)) return;
+    if (!confirmDelete(`Delete this QSO with ${base.fields.CALL ?? "?"}? This can't be undone.`)) return;
     try {
       await api.deleteQsos([base.id]);
       onDeleted();
@@ -514,6 +517,14 @@ export default function QsoEditor({ qso, locations, equipment, callsigns, onClos
               })}
             </tbody>
           </table>
+          <div className="qe-grid">
+            {select(OQRS, 2, [["Y", "Requested"], ["N", "No"]], undefined, "Club Log OQRS")}
+            <label className={cls(OQRS_DATE, 2)}>
+              <span>OQRS date</span>
+              {dateBox(OQRS_DATE, "OQRS date")}
+            </label>
+            <span className="s6 muted" aria-live="polite">{confirmedText(f)}</span>
+          </div>
           <div className="qe-grid">
             {select("QSL_SENT_VIA", 2, VIA)}
             {text("QSL_VIA", 4, { mono: true, upper: true })}

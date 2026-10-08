@@ -46,6 +46,10 @@ pub struct RigState {
     /// True for data modes (DIGU/DIGL/PKTUSB/USB-D/DATA etc.), where the logger keeps its own digital mode.
     pub data: bool,
     pub tx: bool,
+    /// The radio is in split: it receives on `freq_hz` and transmits on `tx_freq_hz`.
+    pub split: bool,
+    /// The transmit VFO's frequency in Hz; 0 when the backend doesn't report it. Only meaningful while `split`.
+    pub tx_freq_hz: u64,
     /// Last connection error, shown to the user. None when fine.
     pub error: Option<String>,
 }
@@ -56,6 +60,8 @@ pub enum RigCommand {
     SetFreq(u64),
     /// ADIF mode, e.g. "CW", "SSB", "AM", "FM", "RTTY", "FT8", "FT4", "PSK31". SSB picks LSB below 10 MHz except 60 m (5.3-5.4 MHz) which is USB. Digital modes pick the rig's USB data mode (DIGU, PKTUSB, USB-D / data on, etc.).
     SetMode(String),
+    /// Transmit on this frequency and turn split on, or turn split off (`None`). Only TCI supports it so far.
+    SetSplit(Option<u64>),
 }
 
 /// Handle to a running rig backend. Dropping it stops the backend.

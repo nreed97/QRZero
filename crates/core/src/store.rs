@@ -15,7 +15,7 @@ use crate::adif::{self, Fields};
 use crate::band;
 use crate::error::{Error, Result};
 use crate::model::*;
-use crate::awards::{AwardIndex, AwardQso};
+use crate::awards::{AwardIndex, AwardQso, CtyFacts};
 use crate::worked::WorkedIndex;
 
 /// Migrations in order; migration N brings the schema to user_version N.
@@ -480,7 +480,7 @@ impl Store {
         &self,
         log_id: i64,
         callsigns: &[String],
-        resolve: impl Fn(&str) -> Option<u32>,
+        resolve: impl Fn(&str) -> CtyFacts,
         mut f: impl FnMut(&AwardQso),
     ) -> Result<()> {
         let marks = vec!["?"; callsigns.len()].join(", ");
@@ -501,6 +501,16 @@ impl Store {
             #[serde(borrow)]
             CQZ: Option<std::borrow::Cow<'a, str>>,
             #[serde(borrow)]
+            CONT: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            ITUZ: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            GRIDSQUARE: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            IOTA: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            CNTY: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
             LOTW_QSL_RCVD: Option<std::borrow::Cow<'a, str>>,
             #[serde(borrow)]
             QSL_RCVD: Option<std::borrow::Cow<'a, str>>,
@@ -515,11 +525,22 @@ impl Store {
             q.band = r.get(2)?;
             q.mode = r.get(3)?;
             let dxcc: Option<i64> = r.get(4)?;
-            q.dxcc = dxcc.and_then(|d| u32::try_from(d).ok()).or_else(|| resolve(&q.call));
+            q.dxcc = dxcc.and_then(|d| u32::try_from(d).ok());
             let raw = r.get_ref(5)?.as_str().map_err(rusqlite::Error::from)?;
             let facts: Facts = serde_json::from_str(raw)?;
             q.state = facts.STATE.map(|s| s.trim().to_ascii_uppercase()).filter(|s| !s.is_empty());
             q.cq_zone = facts.CQZ.and_then(|z| z.trim().parse().ok());
+            q.cont = facts.CONT.map(|c| c.trim().to_ascii_uppercase()).filter(|c| !c.is_empty());
+            q.itu = facts.ITUZ.and_then(|z| z.trim().parse().ok());
+            q.grid = facts.GRIDSQUARE.and_then(|g| crate::awards::grid4(&g));
+            q.iota = facts.IOTA.and_then(|i| crate::awards::iota_ref(&i));
+            q.cnty = facts.CNTY.and_then(|c| crate::awards::county(&c));
+            if q.dxcc.is_none() || q.cont.is_none() || q.itu.is_none() {
+                let r = resolve(&q.call);
+                q.dxcc = q.dxcc.or(r.dxcc);
+                q.cont = q.cont.take().or(r.cont);
+                q.itu = q.itu.or(r.itu);
+            }
             q.lotw = yes(&facts.LOTW_QSL_RCVD);
             q.paper = yes(&facts.QSL_RCVD);
             q.eqsl = yes(&facts.EQSL_QSL_RCVD);
@@ -530,7 +551,7 @@ impl Store {
 
     /// The award cells of a log for "what would this QSO add?", with the QSO
     /// version it reflects (see [`Store::qso_version`]).
-    pub fn award_index(&self, log_id: i64, resolve: impl Fn(&str) -> Option<u32>) -> Result<(i64, AwardIndex)> {
+    pub fn award_index(&self, log_id: i64, resolve: impl Fn(&str) -> CtyFacts) -> Result<(i64, AwardIndex)> {
         let version = self.qso_version()?;
         let mut idx = AwardIndex::default();
         self.for_each_award_qso(log_id, &[], resolve, |q| idx.add(q))?;
@@ -1024,7 +1045,7 @@ const MODIFIED_STATUS: [&str; 2] = ["QRZCOM_QSO_UPLOAD_STATUS", "CLUBLOG_QSO_UPL
 
 /// QSL and upload bookkeeping, as opposed to what happened on the air.
 fn is_qsl_field(k: &str) -> bool {
-    k.contains("QSL") || k.contains("UPLOAD") || k.starts_with("EQSL_") || k.starts_with("LOTW_")
+    k.contains("QSL") || k.contains("UPLOAD") || k.contains("DOWNLOAD") || k.contains("OQRS") || k.starts_with("EQSL_") || k.starts_with("LOTW_")
 }
 
 fn pending_sql(select: &str, log_id: i64, status_key: &str, callsigns: &[String], location_id: Option<i64>, since: i64) -> Result<(String, Vec<Value>)> {

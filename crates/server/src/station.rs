@@ -10,7 +10,7 @@ use std::time::Duration;
 use qrzero_core::adif::{self, Fields};
 use qrzero_core::band::band_for_freq;
 use qrzero_core::cty::{CtyDb, Entity};
-use qrzero_core::awards::{AwardHint, AwardIndex, AwardQso, Counts};
+use qrzero_core::awards::{AwardHint, AwardIndex, AwardQso, Counts, CtyFacts};
 use qrzero_core::worked::{Needed, WorkedIndex};
 use qrzero_core::Store;
 use qrzero_radio::rig::{self, RigCommand, RigConfig, RigHandle, RigState};
@@ -335,6 +335,14 @@ impl Drop for RigConn {
     }
 }
 
+/// What the country file says about a call, for award facts.
+pub(crate) fn cty_facts(cty: Option<&qrzero_core::cty::CtyDb>, call: &str) -> CtyFacts {
+    match cty.and_then(|db| db.lookup(call)) {
+        Some(e) => CtyFacts { dxcc: e.dxcc, cont: Some(e.cont.clone()).filter(|c| !c.is_empty()), itu: Some(u32::from(e.itu)).filter(|&z| z > 0) },
+        None => CtyFacts::default(),
+    }
+}
+
 struct AwardCells {
     log_id: i64,
     version: i64,
@@ -382,6 +390,8 @@ pub struct Hub {
     inner: Mutex<Inner>,
     cty: RwLock<Option<Arc<CtyDb>>>,
     pub(crate) watch: crate::watch::Watch,
+    /// DXpeditions from the calendar feed and the user's own.
+    pub(crate) dxped: crate::dxped::Dxped,
     /// The user's own UDP connections and relays.
     pub(crate) udp: Arc<crate::udp_out::Outputs>,
     /// Where auto-logged QSOs go to be looked up: (log id, QSO id, call).
@@ -409,7 +419,8 @@ impl Hub {
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
         let udp = crate::udp_out::Outputs::new(conns);
-        let hub = Arc::new(Hub { store, data_dir, events, inner: Mutex::default(), cty: RwLock::default(), watch, udp, auto_lookup: Mutex::default() });
+        let dxped = crate::dxped::saved(|k| store.lock().unwrap_or_else(|p| p.into_inner()).get_setting(k).ok().flatten());
+        let hub = Arc::new(Hub { store, data_dir, events, inner: Mutex::default(), cty: RwLock::default(), watch, dxped, udp, auto_lookup: Mutex::default() });
         if let Err(e) = hub.load_cty_file() {
             tracing::info!("no country file yet: {e}");
         }
@@ -505,6 +516,11 @@ impl Hub {
         self.lock().worked.as_ref().map(|(_, idx)| idx.needed(call, dxcc, band, mode))
     }
 
+    /// What is worked for a DXCC entity in the active log, or None before the log is indexed.
+    pub fn dxcc_profile(&self, dxcc: u32) -> Option<qrzero_core::worked::DxccProfile> {
+        self.lock().worked.as_ref().map(|(_, idx)| idx.dxcc_profile(dxcc))
+    }
+
     pub fn active(&self) -> Active {
         self.lock().active.clone()
     }
@@ -541,7 +557,7 @@ impl Hub {
     /// Counts a log's award cells and keeps them, unless newer ones are already kept.
     fn build_award_cells(&self, log_id: i64) -> qrzero_core::Result<()> {
         let cty = self.cty();
-        let (version, index) = self.with_store(|st| st.award_index(log_id, |call| cty.as_ref()?.lookup(call)?.dxcc))?;
+        let (version, index) = self.with_store(|st| st.award_index(log_id, |call| cty_facts(cty.as_deref(), call)))?;
         let mut inner = self.lock();
         if inner.awards.as_ref().is_none_or(|a| a.log_id != log_id || a.version <= version) {
             inner.awards = Some(AwardCells { log_id, version, index });
@@ -578,7 +594,7 @@ impl Hub {
         // counted; otherwise they are stale and get recounted when next asked.
         if let Ok(version) = self.with_store(|st| st.qso_version()) {
             let cty = self.cty();
-            let qso = AwardQso::from_fields(f, |call| cty.as_ref()?.lookup(call)?.dxcc);
+            let qso = AwardQso::from_fields(f, |call| cty_facts(cty.as_deref(), call));
             if let Some(a) = self.lock().awards.as_mut() {
                 if a.log_id == log_id && a.version + 1 == version {
                     a.index.add(&qso);
@@ -683,7 +699,8 @@ impl Hub {
     }
 
     /// Tunes a rig (from the entry panel or a clicked spot).
-    pub fn tune(&self, key: &str, freq_hz: Option<u64>, mode: Option<String>) -> Result<(), String> {
+    /// `split` is `Some(Some(hz))` to transmit on `hz`, `Some(None)` to turn split off, `None` to leave it.
+    pub fn tune(&self, key: &str, freq_hz: Option<u64>, mode: Option<String>, split: Option<Option<u64>>) -> Result<(), String> {
         let mut parts = key.split(':');
         let (Some("rig"), Some(id), Some(ch)) = (parts.next(), parts.next(), parts.next()) else {
             return Err("that radio can't be tuned from QRZero".into());
@@ -693,6 +710,9 @@ impl Hub {
         let conn = inner.rigs.iter().find(|r| r.equipment_id == id).ok_or("that radio isn't connected")?;
         if let Some(f) = freq_hz {
             conn.handle.send(ch, RigCommand::SetFreq(f));
+        }
+        if let Some(tx) = split {
+            conn.handle.send(ch, RigCommand::SetSplit(tx));
         }
         if let Some(m) = mode.filter(|m| !m.is_empty()) {
             // The rig picks the sideband from its current frequency, which may not have caught up yet.
@@ -973,6 +993,7 @@ impl Hub {
                         data: true,
                         tx: transmitting,
                         error: None,
+                        ..Default::default()
                     };
                     self.set_radio(Radio { key: format!("wsjtx:{id}"), name: id, source: "wsjtx", can_tune: false, state });
                 }
@@ -1179,6 +1200,7 @@ impl Hub {
                     rig_mode: mode,
                     tx: is_transmitting,
                     error: None,
+                    ..Default::default()
                 };
                 let name = if station.is_empty() { format!("N1MM radio {radio_nr}") } else { format!("N1MM {station} radio {radio_nr}") };
                 self.set_radio(Radio { key: format!("n1mm:{station}:{radio_nr}"), name, source: "n1mm", can_tune: false, state });
@@ -1215,6 +1237,16 @@ impl Hub {
     pub(crate) fn watch_hit(&self, entry_id: u64, s: &crate::watch::Sighting) {
         if let Some(hit) = self.watch.record(entry_id, s, chrono::Utc::now().timestamp()) {
             self.emit(json!({"type": "watch_hit", "hit": hit}));
+        }
+    }
+
+    /// Notes a cluster spot of a listed DXpedition, and alerts when it would be new for the log.
+    pub(crate) fn dxped_spot(&self, s: &crate::watch::Sighting, dxcc: Option<u32>) {
+        let now = chrono::Utc::now().timestamp();
+        if let Some((label, note)) = self.dxped.on_spot(self, s, dxcc, now) {
+            if let Some(hit) = self.watch.record_other(label, note, s, now) {
+                self.emit(json!({"type": "watch_hit", "hit": hit}));
+            }
         }
     }
 
@@ -1494,7 +1526,7 @@ fn radio_ctx(r: &Radio) -> UdpCtx {
     UdpCtx {
         event: UdpEvent::Radio,
         freq_hz: s.freq_hz,
-        tx_freq_hz: s.freq_hz,
+        tx_freq_hz: if s.split && s.tx_freq_hz > 0 { s.tx_freq_hz } else { s.freq_hz },
         band: band_for_freq(s.freq_hz as f64 / 1e6).unwrap_or_default().to_string(),
         mode: if s.mode.is_empty() { s.rig_mode.clone() } else { s.mode.clone() },
         rig_mode: s.rig_mode.clone(),

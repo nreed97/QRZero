@@ -6,7 +6,10 @@ import Modal from "./Modal";
 import EquipmentTree from "./EquipmentTree";
 import EntryFieldsEditor from "./EntryFieldsEditor";
 import { StartupAppsTab, UdpConnectionsTab } from "./ConnectionsSettings";
+import { confirmDelete } from "../display";
 import BackupsTab from "./BackupsTab";
+import { DISPLAY_DEFAULTS, beep, setDisplay, useDisplay } from "../display";
+import { MODES } from "../modes";
 
 export interface GeneralPrefs { units: "km" | "mi" }
 
@@ -96,19 +99,7 @@ export default function SettingsDialog(props: Props) {
       {tab === "startup" && <StartupAppsTab />}
       {tab === "cluster" && <ClusterTab />}
       {tab === "backups" && <BackupsTab />}
-      {tab === "general" && (
-        <div>
-          <label className="block">
-            <span>Distances</span>
-            <select value={props.general.units} onChange={(e) => props.onGeneral({ ...props.general, units: e.target.value as "km" | "mi" })}>
-              <option value="km">Kilometres</option>
-              <option value="mi">Miles</option>
-            </select>
-          </label>
-          <p className="muted">The setup wizard walks through callsigns, your home location, equipment, entry fields and importing an old log. Running it again doesn't remove anything.</p>
-          <button onClick={props.onWizard}>Run the setup wizard</button>
-        </div>
-      )}
+      {tab === "general" && <GeneralTab general={props.general} onGeneral={props.onGeneral} onWizard={props.onWizard} />}
       </div>
     </Modal>
   );
@@ -188,7 +179,7 @@ function LocationsTab({ logId, locations, guard }: Props & { guard: Guard }) {
               <td className="muted">{[l.fields.MY_GRIDSQUARE, l.fields.MY_POTA_REF, l.fields.MY_SOTA_REF].filter(Boolean).join(" · ")}</td>
               <td>{l.is_default ? <span className="flag info">default</span> : <button onClick={guard(() => api.defaultLocation(l.id))}>Make default</button>}</td>
               <td><button onClick={() => setEditing({ id: l.id, name: l.name, fields: { ...l.fields } })}>Edit</button></td>
-              <td><button className="danger" onClick={guard(async () => { if (confirm(`Remove location ${l.name}? QSOs keep their details.`)) await api.deleteLocation(l.id); })}>Remove</button></td>
+              <td><button className="danger" onClick={guard(async () => { if (confirmDelete(`Remove location ${l.name}? QSOs keep their details.`)) await api.deleteLocation(l.id); })}>Remove</button></td>
             </tr>
           ))}
         </tbody>
@@ -471,6 +462,97 @@ function ClusterTab() {
       <label className="check"><input type="checkbox" checked={cfg.auto_connect} onChange={(e) => setCfg({ ...cfg, auto_connect: e.target.checked })} /> Connect when QRZero starts</label>
       {msg && <p className={msg.ok ? "ok" : "err"}>{msg.text}</p>}
       <div className="buttons"><button className="primary" onClick={save}>Save</button></div>
+    </div>
+  );
+}
+
+/** Modes whose default report can be changed. */
+const RST_MODES = ["CW", "SSB", "FM", "AM", "RTTY", "PSK31", "FT8", "FT4"];
+
+function GeneralTab({ general, onGeneral, onWizard }: Pick<Props, "general" | "onGeneral" | "onWizard">) {
+  const d = useDisplay();
+  return (
+    <div className="general-tab">
+      <fieldset>
+        <legend>Look</legend>
+        <div className="row">
+          <label className="f w-m">
+            <span>Colours</span>
+            <select value={d.theme} onChange={(e) => setDisplay({ theme: e.target.value as typeof d.theme })}>
+              <option value="system">Follow Windows</option>
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+            </select>
+          </label>
+          <label className="f w-m">
+            <span>Text size</span>
+            <select value={d.fontSize} onChange={(e) => setDisplay({ fontSize: Number(e.target.value) })}>
+              {[11, 12, 13, 14, 15, 16, 18].map((n) => <option key={n} value={n}>{n} px{n === 13 ? " (default)" : ""}</option>)}
+            </select>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Units and formats</legend>
+        <div className="row">
+          <label className="f w-m">
+            <span>Distances</span>
+            <select value={general.units} onChange={(e) => onGeneral({ ...general, units: e.target.value as "km" | "mi" })}>
+              <option value="km">Kilometres</option>
+              <option value="mi">Miles</option>
+            </select>
+          </label>
+          <label className="f w-m">
+            <span>Dates in the log</span>
+            <select value={d.dateFormat} onChange={(e) => setDisplay({ dateFormat: e.target.value as typeof d.dateFormat })}>
+              <option value="iso">2026-10-08</option>
+              <option value="dmy">08/10/2026</option>
+              <option value="mdy">10/08/2026</option>
+            </select>
+          </label>
+          <label className="f w-m">
+            <span>Frequencies in the log</span>
+            <select value={d.freqUnit} onChange={(e) => setDisplay({ freqUnit: e.target.value as typeof d.freqUnit })}>
+              <option value="mhz">MHz (14.074)</option>
+              <option value="khz">kHz (14074)</option>
+            </select>
+          </label>
+        </div>
+        <label className="check"><input type="checkbox" checked={d.localTime} onChange={(e) => setDisplay({ localTime: e.target.checked })} /> Show the computer's local time next to the UTC clock</label>
+        <p className="small muted">QSOs are always stored and shown in UTC; this only changes how dates and frequencies read.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Reports filled in for each mode</legend>
+        <div className="row">
+          {RST_MODES.map((m) => (
+            <label key={m} className="f w-s">
+              <span>{m}</span>
+              <input value={d.rst[m] ?? ""} placeholder={MODES.find((x) => x.label === m)?.rst} onChange={(e) => setDisplay({ rst: { ...d.rst, [m]: e.target.value } })} />
+            </label>
+          ))}
+        </div>
+        <p className="small muted">Leave a box empty for the usual report. Other modes keep theirs. A mode you change applies from the next time you pick it in the QSO panel.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Behaviour</legend>
+        <label className="check"><input type="checkbox" checked={d.confirmDelete} onChange={(e) => setDisplay({ confirmDelete: e.target.checked })} /> Ask before deleting QSOs, notes, equipment and layouts</label>
+        <label className="check">
+          <input type="checkbox" checked={d.soundOnLog} onChange={(e) => { setDisplay({ soundOnLog: e.target.checked }); if (e.target.checked) beep(660); }} /> Beep when a QSO is logged
+        </label>
+        <p className="small muted">Deleting a whole log, restoring a backup and discarding edits always ask.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Setup</legend>
+        <p className="small muted">The setup wizard walks through callsigns, your home location, equipment, entry fields and importing an old log. Running it again doesn't remove anything.</p>
+        <div className="row">
+          <button onClick={onWizard}>Run the setup wizard</button>
+          <button onClick={() => setDisplay({ ...DISPLAY_DEFAULTS })}>Reset these options</button>
+        </div>
+      </fieldset>
     </div>
   );
 }

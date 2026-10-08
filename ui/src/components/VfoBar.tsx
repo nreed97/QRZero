@@ -14,10 +14,21 @@ function Readout({ r }: { r: Radio }) {
   const live = r.connected && r.freq_hz > 0;
   const band = live ? bandForFreq(r.freq_hz / 1e6) : undefined;
   const mode = r.mode || r.rig_mode;
+  // In split the radio receives on one VFO and transmits on another: show both, labelled.
+  const split = live && r.split && r.tx_freq_hz > 0 && r.tx_freq_hz !== r.freq_hz;
   return (
     <>
       <span className="vfo-name">{r.name}</span>
-      <span className="vfo-freq">{live ? vfoText(r.freq_hz) : "--.---.---"}</span>
+      {split ? (
+        <span className="vfo-split" title="Split: receiving on RX, transmitting on TX">
+          <span className="vfo-lbl">RX</span>
+          <span className="vfo-freq">{vfoText(r.freq_hz)}</span>
+          <span className="vfo-lbl">TX</span>
+          <span className="vfo-freq">{vfoText(r.tx_freq_hz)}</span>
+        </span>
+      ) : (
+        <span className="vfo-freq">{live ? vfoText(r.freq_hz) : "--.---.---"}</span>
+      )}
       {band && <span className="vfo-band">{band}</span>}
       {live && mode && <span className="vfo-mode">{mode}{r.data && !/DATA|FT|PSK|RTTY/.test(mode) ? "-D" : ""}</span>}
       <span className="vfo-state">{!r.connected ? "off" : r.tx ? "TX" : "RX"}</span>

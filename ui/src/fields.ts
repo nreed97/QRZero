@@ -2,7 +2,9 @@
 
 import type { Fields, Qso } from "./types";
 import { fmtDate, fmtTime } from "./util";
+import { fmtFreq } from "./display";
 import { modeLabel } from "./modes";
+import { confirmedShort, OQRS } from "./confirmations";
 
 export type Width = "s" | "m" | "l" | "xl";
 
@@ -141,7 +143,7 @@ export const COLUMNS: ColumnDef[] = [
   { key: "time", label: "UTC", width: "50px", get: (q) => fmtTime(q.fields) },
   { key: "CALL", label: "Call", width: "110px", cls: "call", get: f("CALL") },
   { key: "BAND", label: "Band", width: "58px", get: f("BAND") },
-  { key: "FREQ", label: "Freq", width: "76px", get: f("FREQ") },
+  { key: "FREQ", label: "Freq", width: "76px", get: (q) => fmtFreq(q.fields.FREQ) },
   { key: "mode", label: "Mode", width: "70px", get: (q) => modeLabel(q.fields) },
   { key: "RST_SENT", label: "Sent", width: "46px", get: f("RST_SENT") },
   { key: "RST_RCVD", label: "Rcvd", width: "46px", get: f("RST_RCVD") },
@@ -170,6 +172,9 @@ export const COLUMNS: ColumnDef[] = [
   { key: "CLUBLOG_QSO_UPLOAD_STATUS", label: "Club Log", width: "60px", get: f("CLUBLOG_QSO_UPLOAD_STATUS") },
   { key: "QSL_SENT", label: "QSL S", width: "46px", get: f("QSL_SENT") },
   { key: "QSL_RCVD", label: "QSL R", width: "46px", get: f("QSL_RCVD") },
+  { key: "QRZCOM_QSO_DOWNLOAD_STATUS", label: "QRZ R", width: "46px", get: f("QRZCOM_QSO_DOWNLOAD_STATUS") },
+  { key: OQRS, label: "OQRS", width: "46px", get: f(OQRS) },
+  { key: "confirmed", label: "Confirmed", width: "70px", get: (q) => confirmedShort(q.fields) },
   { key: "COMMENT", label: "Comment", width: "minmax(100px,2fr)", get: f("COMMENT") },
   { key: "NOTES", label: "Notes", width: "minmax(100px,2fr)", get: f("NOTES") },
 ];

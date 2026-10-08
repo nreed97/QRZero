@@ -726,6 +726,53 @@ impl Telnet {
     }
 }
 
+/// Where a DX station says it listens, from a spot comment: "UP 5", "UP", "DN 2", "UP5K", "QSX 14.205", "LISTENING 14205". Returns the transmit frequency in Hz for a spot on `freq_hz`, or None when the comment says nothing usable. A bare "UP" means 1 kHz. Offsets are kHz, and anything over 100 kHz away is ignored as a typo. "QSX 14.205" is MHz, "QSX 14205" is kHz and "QSX 205" is the last three digits of the spot's kHz.
+pub fn split_target(freq_hz: u64, comment: &str) -> Option<u64> {
+    let text: String = comment.chars().map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '-' { c.to_ascii_uppercase() } else { ' ' }).collect();
+    let toks: Vec<&str> = text.split_whitespace().collect();
+    let spot = freq_hz as f64;
+    let mut found = None;
+    for (i, tok) in toks.iter().enumerate() {
+        let next = toks.get(i + 1).copied();
+        let rest = |prefix: &str| tok.strip_prefix(prefix).filter(|r| !r.is_empty()).and_then(split_number);
+        let offset = |sign: f64, prefix: &str| {
+            let n = if *tok == prefix { next.and_then(split_number) } else { rest(prefix) };
+            // A bare UP is one kHz; a bare DN is not guessed.
+            n.or(if *tok == prefix && sign > 0.0 { Some(1.0) } else { None }).map(|khz| spot + sign * khz * 1000.0)
+        };
+        let absolute = |prefix: &str| {
+            let v = if *tok == prefix { next.and_then(split_number) } else { rest(prefix) }?;
+            Some(if v >= 1000.0 {
+                v * 1000.0
+            } else if v >= 100.0 {
+                (spot / 1e6).floor() * 1e6 + v * 1000.0
+            } else {
+                v * 1e6
+            })
+        };
+        let hz = offset(1.0, "UP")
+            .or_else(|| offset(-1.0, "DN"))
+            .or_else(|| offset(-1.0, "DOWN"))
+            .or_else(|| ["QSX", "LISTENING", "LISTEN", "LSN"].iter().find_map(|p| absolute(p)));
+        if hz.is_some() {
+            found = hz;
+            break;
+        }
+    }
+    let hz = found?.round();
+    ((hz - spot).abs() <= 100_000.0 && hz > 0.0 && hz != spot).then_some(hz as u64)
+}
+
+/// "5", "5K", "5KHZ", "1.5", "14.205", "5-10" (the lower end). None for anything else.
+fn split_number(tok: &str) -> Option<f64> {
+    let t = tok.trim_end_matches("KHZ").trim_end_matches("KC").trim_end_matches('K');
+    let t = t.split('-').next()?;
+    if !t.starts_with(|c: char| c.is_ascii_digit()) {
+        return None;
+    }
+    t.parse::<f64>().ok().filter(|v| v.is_finite())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1123,5 +1170,28 @@ mod tests {
                 break;
             }
         }
+    }
+    #[test]
+    fn split_target_from_comment() {
+        let t = |f: u64, c: &str| split_target(f, c);
+        assert_eq!(t(14_195_000, "UP 5"), Some(14_200_000));
+        assert_eq!(t(14_195_000, "cw up 5k tnx"), Some(14_200_000));
+        assert_eq!(t(14_025_000, "UP"), Some(14_026_000));
+        assert_eq!(t(14_025_000, "UP5"), Some(14_030_000));
+        assert_eq!(t(14_025_000, "up 1.5"), Some(14_026_500));
+        assert_eq!(t(7_010_000, "UP 5-10"), Some(7_015_000));
+        assert_eq!(t(14_205_000, "DN 3"), Some(14_202_000));
+        assert_eq!(t(14_195_000, "QSX 14.205"), Some(14_205_000));
+        assert_eq!(t(14_195_000, "QSX 14205"), Some(14_205_000));
+        assert_eq!(t(14_195_000, "qsx 14205.5 up"), Some(14_205_500));
+        assert_eq!(t(14_195_000, "QSX 205"), Some(14_205_000));
+        assert_eq!(t(14_195_000, "LISTENING 14.200"), Some(14_200_000));
+        // Not a split instruction.
+        assert_eq!(t(14_195_000, "GROUP SETUP LOOKUP"), None);
+        assert_eq!(t(14_195_000, "CQ DX 599"), None);
+        assert_eq!(t(14_195_000, "QSX 21.205"), None);
+        assert_eq!(t(14_195_000, "DOWN"), None);
+        assert_eq!(t(14_195_000, "UP 500"), None);
+        assert_eq!(t(14_195_000, ""), None);
     }
 }

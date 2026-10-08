@@ -1,12 +1,13 @@
 import { useEffect, useReducer, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { api } from "../api";
-import { PAPER_ACTIONS } from "../paper";
+import { OQRS_ACTIONS, PAPER_ACTIONS } from "../paper";
 import { BANDS, MODES } from "../modes";
 import { COLUMNS, DEFAULT_COLUMNS } from "../fields";
 import { localGet, localSet } from "../prefs";
 import type { Location, Qso, QsoFilter } from "../types";
 import { qrzPageUrl } from "./QrzPageLink";
+import { confirmDelete, useDisplay } from "../display";
 import "../worked.css";
 
 const PAGE = 200;
@@ -32,6 +33,7 @@ interface Props {
 }
 
 export default function LogGrid({ logId, refreshKey, filter, onFilter, selection, onSelection, onEdit, onDeleted, onExportSelected, columns, onColumns, locations, stepper, editingId }: Props) {
+  useDisplay(); // redraw when the date or frequency format changes
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
   const [search, setSearch] = useState(filter.call ?? "");
@@ -188,7 +190,7 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
 
   const deleteSelected = async () => {
     if (!selection.size) return;
-    if (!confirm(`Delete ${selection.size} QSO${selection.size === 1 ? "" : "s"}? This can't be undone.`)) return;
+    if (!confirmDelete(`Delete ${selection.size} QSO${selection.size === 1 ? "" : "s"}? This can't be undone.`)) return;
     try {
       await api.deleteQsos([...selection]);
       onSelection(new Set());
@@ -227,11 +229,11 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
     }
   };
 
-  const markPaper = async (key: string) => {
-    const action = PAPER_ACTIONS.find((a) => a.key === key);
-    if (!action || !selection.size) return;
+  const markPaper = async (key: string, ids: number[] = [...selection]) => {
+    const action = [...PAPER_ACTIONS, ...OQRS_ACTIONS].find((a) => a.key === key);
+    if (!action || !ids.length) return;
     try {
-      await api.markQsos([...selection], action.fields());
+      await api.markQsos(ids, action.fields());
       onDeleted();
     } catch (e) {
       setError((e as Error).message);
@@ -334,6 +336,7 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
         <select value="" disabled={!selection.size} onChange={(e) => void markPaper(e.target.value)} aria-label="Paper QSL">
           <option value="">Paper QSL…</option>
           {PAPER_ACTIONS.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
+          {OQRS_ACTIONS.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
         </select>
         <button disabled={!selection.size} onClick={onExportSelected}>Export selected</button>
         <button disabled={!selection.size} className="danger" onClick={deleteSelected}>Delete</button>
@@ -427,6 +430,11 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
               <button role="menuitem" onClick={act(() => void lookupQsos(ids))}>Fill {what} from QRZ</button>
               {ids.length === 1 && menu.q.fields.CALL && <a role="menuitem" className="menu-link" href={qrzPageUrl(menu.q.fields.CALL)} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(null)}>View {menu.q.fields.CALL} on QRZ.com</a>}
               <button role="menuitem" onClick={act(() => void sendQsos(ids))}>Send {what} through UDP connections</button>
+              <hr />
+              <button role="menuitem" onClick={act(() => void markPaper("oqrs", ids))}>Mark OQRS requested ({what})</button>
+              <button role="menuitem" onClick={act(() => void markPaper("sent-b", ids))}>Card sent via bureau ({what})</button>
+              <button role="menuitem" onClick={act(() => void markPaper("sent-d", ids))}>Card sent direct ({what})</button>
+              <button role="menuitem" onClick={act(() => void markPaper("rcvd-b", ids))}>Card received ({what})</button>
               <hr />
               <button role="menuitem" onClick={act(onExportSelected)}>Export {what}…</button>
               <button role="menuitem" onClick={act(() => void deleteSelected())}>Delete {what}…</button>

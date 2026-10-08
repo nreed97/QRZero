@@ -243,6 +243,18 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByLabel("Program", { exact: true }).fill("/no/such/program");
   await page.getByRole("button", { name: "Launch now" }).click();
   await expect(page.locator("table.startup-apps")).toContainText("couldn't start");
+
+  // General: colours and text size apply at once; a changed report is used for the mode.
+  await page.getByRole("button", { name: "General", exact: true }).click();
+  await page.getByLabel("Colours").selectOption("light");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.getByLabel("Text size").selectOption("16");
+  await expect(page.locator("body")).toHaveCSS("font-size", "16px");
+  await page.getByLabel("Colours").selectOption("system");
+  await page.getByLabel("Text size").selectOption("13");
+  await page.getByRole("textbox", { name: "CW" }).fill("579");
+  await page.getByRole("button", { name: "Reset these options" }).click();
+  await expect(page.getByRole("textbox", { name: "CW" })).toHaveValue("");
   await page.getByRole("button", { name: "Close" }).click();
 
   // With no cluster set up, the Cluster pane sends you to Settings to add one.
@@ -269,6 +281,15 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.locator(".paper-queue")).toContainText("K1ABC");
   await expect(page.getByRole("button", { name: "Print 1 label" })).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
+
+  // OQRS: mark from the right-click menu, then see it in the editor.
+  await page.locator(".grid-row", { hasText: "K1ABC" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: /Mark OQRS requested/ }).click();
+  const [oqrsWin] = await Promise.all([page.waitForEvent("popup"), page.locator(".grid-row", { hasText: "K1ABC" }).dblclick()]);
+  const oqrs = oqrsWin.locator(".qso-editor");
+  await expect(oqrs.getByLabel("Club Log OQRS")).toHaveValue("Y");
+  await expect(oqrs.getByText("Not confirmed yet. OQRS requested on Club Log.")).toBeVisible();
+  await Promise.all([oqrsWin.waitForEvent("close"), closeWindow(oqrs.getByRole("button", { name: "Close editor" }))]);
 
   // Awards: everything worked so far, nothing confirmed.
   await page.getByRole("tab", { name: "Awards" }).click();

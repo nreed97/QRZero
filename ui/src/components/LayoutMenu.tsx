@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { localGet, localSet } from "../prefs";
+import { confirmDelete } from "../display";
 import { allPanes, DEFAULT_WORKSPACE, PANES, removePane, sanitize, type PaneId, type Workspace } from "../workspace";
 
 interface Props {
@@ -75,7 +76,7 @@ export default function LayoutMenu({ ws, onChange, onShow, onFocusWindow }: Prop
               role="menuitem"
               className="item"
               onClick={() => {
-                if (!confirm(`Delete the layout "${current}"?`)) return;
+                if (!confirmDelete(`Delete the layout "${current}"?`)) return;
                 const { [current]: _gone, ...rest } = saved;
                 store(rest, "");
               }}

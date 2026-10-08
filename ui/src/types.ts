@@ -69,6 +69,9 @@ export interface Radio {
   rig_mode: string;
   data: boolean;
   tx: boolean;
+  /** In split: receiving on freq_hz, transmitting on tx_freq_hz. */
+  split: boolean;
+  tx_freq_hz: number;
   error: string | null;
 }
 
@@ -178,7 +181,11 @@ export interface Spot {
   band: string | null;
   mode: string;
   comment: string;
+  /** Where the DX listens when the comment says ("UP 5", "QSX 14.205"). */
+  tx_freq_hz?: number | null;
   entity: Entity | null;
+  /** Where the spotter is. */
+  spotter_entity?: Entity | null;
   needed: Needed | null;
   /** Id of the watch list entry this station matches. */
   watched?: number | null;
@@ -186,7 +193,7 @@ export interface Spot {
 
 export interface ClusterNode { name: string; host: string; port: number; login: string; password: string; commands: string[] }
 export interface ClusterConfig { nodes: ClusterNode[]; auto_connect: boolean }
-export interface ClusterSnapshot { config: ClusterConfig; state: string; connected: boolean; spots: Spot[]; lines: string[] }
+export interface ClusterSnapshot { home?: Entity | null; config: ClusterConfig; state: string; connected: boolean; spots: Spot[]; lines: string[] }
 
 export interface QslRun { at: number; running: boolean; uploaded: number; duplicates: number; rejected: string[]; error: string | null }
 export interface LotwMapping { callsign: string; location_id: number; station_location: string }
@@ -224,7 +231,7 @@ export interface QslOverview {
 }
 export interface QslSecrets { qrz_keys?: Record<string, string>; clublog_password?: string; clublog_app_key?: string; lotw_password?: string; eqsl_password?: string }
 
-export type AwardKind = "dxcc" | "was" | "waz" | "wpx";
+export type AwardKind = "dxcc" | "was" | "waz" | "wpx" | "wac" | "itu" | "vucc" | "iota" | "counties";
 export type AwardStatus = "worked" | "confirmed";
 export interface AwardRow { key: string; name: string; cells: Record<string, AwardStatus> }
 export interface AwardColumn { key: string; worked: number; confirmed: number }
@@ -257,6 +264,27 @@ export interface WatchHit {
   detail: string;
   time: number;
 }
+export interface DxpedNeed { unknown: boolean; new_dxcc: boolean; bands: string[]; modes: string[] }
+export interface DxpedSpot { call: string; freq_hz: number; band: string | null; mode: string; comment: string; grid: string | null; time: number }
+export interface DxpedItem {
+  /** Only hand-added ones have an id. */
+  id: number;
+  manual: boolean;
+  call: string;
+  /** YYYY-MM-DD, empty for no date. */
+  start: string;
+  end: string;
+  note: string;
+  active: boolean;
+  entity: string | null;
+  prefix: string | null;
+  dxcc: number | null;
+  need: DxpedNeed;
+  needed: boolean;
+  spot: DxpedSpot | null;
+}
+export interface DxpedList { items: DxpedItem[]; fetched_at: number | null; error: string | null; url: string }
+export interface DxpedPlanned { id: number; call: string; start: string; end: string; note: string }
 export interface CtyEntityInfo { prefix: string; name: string; dxcc: number | null; cont: string }
 
 /** N0NBH solar data as /api/propagation returns it. */
