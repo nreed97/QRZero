@@ -419,3 +419,21 @@ table.list.udp-conns tr.sub td { border-top: none; padding-top: 0; }
 table.list.udp-conns td:nth-child(7), table.list.startup-apps td:nth-child(5) { max-width: 220px; }
 table.list.startup-apps td:nth-child(2) { width: 45%; }
 pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px; padding: 4px 6px; max-height: 160px; overflow: auto; white-space: pre-wrap; word-break: break-all; margin: 4px 0; }
+
+/* FTx monitor: period breaks and the call box view */
+.ftx-break { display: flex; align-items: center; gap: 6px; padding: 1px 6px; font-size: 11px; color: var(--muted); background: var(--panel-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); position: relative; }
+.ftx-break .mono { color: var(--text); font-weight: 600; }
+.ftx-calls { flex: 1; overflow: auto; min-height: 100px; }
+.ftx-cycle:not(.with-break) + .ftx-cycle:not(.with-break) { border-top: 1px dotted color-mix(in srgb, var(--line) 60%, transparent); }
+.ftx-boxes { display: flex; flex-wrap: wrap; gap: 3px; padding: 3px 4px; }
+.ftx-box { display: inline-flex; align-items: baseline; gap: 5px; min-width: 92px; padding: 1px 5px; border: 1px solid var(--line); border-left: 3px solid var(--src, var(--line)); border-radius: 2px; background: var(--panel); font: 12.5px var(--mono); text-align: left; cursor: pointer; }
+.ftx-box .call { flex: 1; font-weight: 600; }
+.ftx-box .snr { font-size: 11px; color: var(--muted); }
+.ftx-box.cq { border-color: var(--line); border-left-color: var(--src, var(--line)); box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ok, #3fa34d) 70%, transparent); }
+.ftx-box.needed { background: color-mix(in srgb, var(--new) 22%, var(--panel)); }
+.ftx-box.watched .call { color: var(--watch, var(--src-3)); }
+.ftx-box.worked .call { color: var(--muted); font-weight: 400; }
+.ftx-box.to-me { background: color-mix(in srgb, var(--err) 30%, var(--panel)); }
+.ftx-box.selected { outline: 2px solid var(--accent); outline-offset: -1px; }
+.ftx-box.low { opacity: 0.6; }
+.ftx-box:hover { background: var(--row-sel); }

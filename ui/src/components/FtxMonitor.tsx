@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { onLive, useInstances } from "../live";
 import { localGet, localSet } from "../prefs";
@@ -15,7 +15,32 @@ export interface DecodePick {
   freq_hz: number;
 }
 
-interface Filters { cq: boolean; needed: boolean; instance: string }
+interface Filters {
+  cq: boolean;
+  needed: boolean;
+  instance: string;
+  /** Draw a line with the time between decode periods. */
+  cycles: boolean;
+  /** "lines": one row per decode; "calls": a box per station heard, like JTAlert. */
+  view: "lines" | "calls";
+}
+
+const DEFAULTS: Filters = { cq: false, needed: false, instance: "", cycles: false, view: "lines" };
+
+/** Decodes of one period share the period's start time. */
+interface Cycle { time: string; decodes: FtxDecode[] }
+
+function cyclesOf(list: FtxDecode[]): Cycle[] {
+  const out: Cycle[] = [];
+  for (const d of list) {
+    const last = out[out.length - 1];
+    if (last && last.time === d.time) last.decodes.push(d);
+    else out.push({ time: d.time, decodes: [d] });
+  }
+  return out;
+}
+
+const hms = (t: string) => `${t.slice(0, 2)}:${t.slice(2, 4)}:${t.slice(4)}`;
 
 /** Flags in order of importance; the first one colours the row. */
 function flagsOf(d: FtxDecode): { text: string; cls: string }[] {
@@ -55,7 +80,7 @@ const isNeeded = (d: FtxDecode) => !!d.needed && (d.needed.new_dxcc || d.needed.
 
 export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick) => void; mycall: string }) {
   const [decodes, setDecodes] = useState<FtxDecode[]>([]);
-  const [filters, setFilters] = useState<Filters>(() => localGet("qrzero.ftx", { cq: false, needed: false, instance: "" }));
+  const [filters, setFilters] = useState<Filters>(() => localGet("qrzero.ftx", DEFAULTS));
   const [selected, setSelected] = useState<number | null>(null);
   const [msg, setMsg] = useState("");
   const instances = useInstances();
@@ -103,6 +128,41 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
     }
   };
 
+  const cycles = useMemo(() => cyclesOf(shown), [shown]);
+
+  const row = (d: FtxDecode) => {
+    const flags = flagsOf(d);
+    const cls = [
+      "ftx-row",
+      d.to_me ? "to-me" : "",
+      d.cq ? "cq" : "",
+      flags[0]?.cls === "new" ? "needed" : "",
+      selected === d.seq ? "selected" : "",
+      d.low_confidence ? "low" : "",
+      `src-${d.color_index % 8}`,
+    ].join(" ");
+    return (
+      <div
+        key={d.seq}
+        className={cls}
+        role="row"
+        onClick={() => pick(d)}
+        onDoubleClick={() => void answer(d)}
+        title={d.call ? `Click to fill in ${d.call}; double-click to call them from ${d.source || d.instance}` : undefined}
+      >
+        <span className="mono">{hms(d.time)}</span>
+        <span className="mono src-tag" title={describe(d.instance, byId.get(d.instance))}>{tagFor(d.instance, d.slice, d.color_index)}</span>
+        <span className="mono num">{d.snr}</span>
+        <span className="mono num">{d.dt.toFixed(1)}</span>
+        <span className="mono num">{d.df}</span>
+        <span className="mono msg">{highlight(d.message, mycall, d.watched ? d.call : null)}</span>
+        <span>{d.entity?.name ?? ""}</span>
+        <span className="mono">{d.band ?? ""}</span>
+        <span className="flags">{d.watched ? <span className="flag watched" title="On your watch list">Watched</span> : null}{flags.map((f) => <span key={f.text} className={`flag ${f.cls}`}>{f.text}</span>)}</span>
+      </div>
+    );
+  };
+
   return (
     <div className="ftx">
       <div className="grid-tools">
@@ -125,49 +185,44 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
           </span>
         ))}
         <span className="spacer" />
+        <label>
+          View{" "}
+          <select value={filters.view} onChange={(e) => setFilter({ view: e.target.value as Filters["view"] })} title="Lines shows every decode; Call boxes shows each station heard, one box per call">
+            <option value="lines">Lines</option>
+            <option value="calls">Call boxes</option>
+          </select>
+        </label>
+        <label className="check" title="Draw a line with the time between decode periods">
+          <input type="checkbox" checked={filters.cycles} onChange={(e) => setFilter({ cycles: e.target.checked })} /> Period breaks
+        </label>
         <label className="check"><input type="checkbox" checked={filters.cq} onChange={(e) => setFilter({ cq: e.target.checked })} /> CQ only</label>
         <label className="check"><input type="checkbox" checked={filters.needed} onChange={(e) => setFilter({ needed: e.target.checked })} /> Needed only</label>
         <button onClick={() => setDecodes([])}>Clear</button>
       </div>
       {msg && <div className="ftx-msg small">{msg}</div>}
-      <div className="ftx-table" role="table" aria-label="Decodes">
-        <div className="ftx-row head" role="row">
-          <span>UTC</span><span title="Source: slice or instance">Src</span><span>dB</span><span>DT</span><span>Freq</span><span>Message</span><span>Country</span><span>Band</span><span>Flags</span>
+      {filters.view === "calls" ? (
+        <div className="ftx-calls" aria-label="Stations heard">
+          {shown.length === 0 && <div className="empty muted">No decodes{decodes.length ? " match the filters" : " yet"}.</div>}
+          {cycles.map((c) => (
+            <CallCycle key={c.time + c.decodes[0].seq} cycle={c} breaks={filters.cycles} selected={selected} onPick={pick} onAnswer={(d) => void answer(d)} />
+          ))}
         </div>
-        {shown.length === 0 && <div className="empty muted">No decodes{decodes.length ? " match the filters" : " yet"}.</div>}
-        {shown.map((d) => {
-          const flags = flagsOf(d);
-          const cls = [
-            "ftx-row",
-            d.to_me ? "to-me" : "",
-            d.cq ? "cq" : "",
-            flags[0]?.cls === "new" ? "needed" : "",
-            selected === d.seq ? "selected" : "",
-            d.low_confidence ? "low" : "",
-            `src-${d.color_index % 8}`,
-          ].join(" ");
-          return (
-            <div
-              key={d.seq}
-              className={cls}
-              role="row"
-              onClick={() => pick(d)}
-              onDoubleClick={() => void answer(d)}
-              title={d.call ? `Click to fill in ${d.call}; double-click to call them from ${d.source || d.instance}` : undefined}
-            >
-              <span className="mono">{d.time.slice(0, 2)}:{d.time.slice(2, 4)}:{d.time.slice(4)}</span>
-              <span className="mono src-tag" title={describe(d.instance, byId.get(d.instance))}>{tagFor(d.instance, d.slice, d.color_index)}</span>
-              <span className="mono num">{d.snr}</span>
-              <span className="mono num">{d.dt.toFixed(1)}</span>
-              <span className="mono num">{d.df}</span>
-              <span className="mono msg">{highlight(d.message, mycall, d.watched ? d.call : null)}</span>
-              <span>{d.entity?.name ?? ""}</span>
-              <span className="mono">{d.band ?? ""}</span>
-              <span className="flags">{d.watched ? <span className="flag watched" title="On your watch list">Watched</span> : null}{flags.map((f) => <span key={f.text} className={`flag ${f.cls}`}>{f.text}</span>)}</span>
-            </div>
-          );
-        })}
-      </div>
+      ) : (
+        <div className="ftx-table" role="table" aria-label="Decodes">
+          <div className="ftx-row head" role="row">
+            <span>UTC</span><span title="Source: slice or instance">Src</span><span>dB</span><span>DT</span><span>Freq</span><span>Message</span><span>Country</span><span>Band</span><span>Flags</span>
+          </div>
+          {shown.length === 0 && <div className="empty muted">No decodes{decodes.length ? " match the filters" : " yet"}.</div>}
+          {filters.cycles
+            ? cycles.map((c) => (
+                <Fragment key={c.time + c.decodes[0].seq}>
+                  <CycleBreak cycle={c} />
+                  {c.decodes.map(row)}
+                </Fragment>
+              ))
+            : shown.map(row)}
+        </div>
+      )}
     </div>
   );
 }
@@ -184,4 +239,76 @@ function highlight(message: string, mycall: string, watched: string | null = nul
       </span>
     );
   });
+}
+
+/** The line between two decode periods: its time and how many stations were heard. */
+function CycleBreak({ cycle }: { cycle: Cycle }) {
+  const calls = new Set(cycle.decodes.map((d) => d.call).filter(Boolean)).size;
+  return (
+    <div className="ftx-break" role="separator">
+      <span className="mono">{hms(cycle.time)}</span> {cycle.decodes.length} decode{cycle.decodes.length === 1 ? "" : "s"}, {calls} call{calls === 1 ? "" : "s"}
+    </div>
+  );
+}
+
+/** One period of the call box view: one box per station heard, most important first. */
+function CallCycle({ cycle, breaks, selected, onPick, onAnswer }: {
+  cycle: Cycle;
+  breaks: boolean;
+  selected: number | null;
+  onPick: (d: FtxDecode) => void;
+  onAnswer: (d: FtxDecode) => void;
+}) {
+  // Keep one decode per station and source; one calling us or calling CQ wins over the rest.
+  const byCall = new Map<string, FtxDecode>();
+  for (const d of cycle.decodes) {
+    if (!d.call) continue;
+    const key = `${d.call}|${d.instance}`;
+    const had = byCall.get(key);
+    if (!had || rank(d) < rank(had)) byCall.set(key, d);
+  }
+  const boxes = [...byCall.values()].sort((a, b) => rank(a) - rank(b) || b.snr - a.snr);
+  if (boxes.length === 0) return null;
+  return (
+    <div className={`ftx-cycle ${breaks ? "with-break" : ""}`}>
+      {breaks && <CycleBreak cycle={cycle} />}
+      <div className="ftx-boxes">
+        {boxes.map((d) => {
+          const flags = flagsOf(d);
+          const cls = [
+            "ftx-box",
+            d.to_me ? "to-me" : flags[0]?.cls === "new" ? "needed" : flags.some((f) => f.cls === "dupe") ? "worked" : "",
+            d.cq ? "cq" : "",
+            d.watched ? "watched" : "",
+            selected === d.seq ? "selected" : "",
+            d.low_confidence ? "low" : "",
+            `src-${d.color_index % 8}`,
+          ].join(" ");
+          const title = [
+            d.message,
+            `${d.snr} dB, ${d.df} Hz, ${d.source || d.instance}`,
+            d.entity?.name,
+            [d.watched ? "Watched" : "", ...flags.map((f) => f.text)].filter(Boolean).join(", "),
+            "Click to fill in; double-click to call them",
+          ].filter(Boolean).join("\n");
+          return (
+            <button key={d.seq} className={cls} onClick={() => onPick(d)} onDoubleClick={() => onAnswer(d)} title={title}>
+              <span className="call">{d.call}</span>
+              <span className="snr">{d.snr > 0 ? `+${d.snr}` : d.snr}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Lower comes first: calling us, then needed, then CQ, then the rest; worked stations last. */
+function rank(d: FtxDecode): number {
+  const flags = flagsOf(d);
+  if (d.to_me) return 0;
+  if (flags[0]?.cls === "new") return d.cq ? 1 : 2;
+  if (d.watched) return 3;
+  if (flags.some((f) => f.cls === "dupe")) return d.cq ? 6 : 7;
+  return d.cq ? 4 : 5;
 }

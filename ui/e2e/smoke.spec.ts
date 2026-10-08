@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import dgram from "node:dgram";
 
 const ADIF = `Test file<EOH>
 <CALL:5>K1ABC<QSO_DATE:8>20240105<TIME_ON:4>1830<BAND:3>40m<MODE:3>SSB<NAME:4>José<EOR>
@@ -121,6 +122,28 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // The FTx monitor waits for WSJT-X, and the integrations are set up in Settings.
   await page.getByRole("tab", { name: "FTx monitor" }).click();
   await expect(page.getByText("Waiting for WSJT-X or JTDX")).toBeVisible();
+
+  // Decodes from a WSJT-X: two periods, shown as lines with period breaks, then as call boxes.
+  await sendWsjtx([
+    status(),
+    decode(45000, -10, "CQ JA1XYZ PM95"),
+    decode(45000, -12, "N0CALL EA8AB IL18"),
+    decode(60000, -3, "CQ DL1ABC JO62"),
+    decode(60000, -14, "N0CALL EA8AB R-10"),
+  ]);
+  const ftx = page.locator(".ftx").first();
+  await expect(ftx.locator(".ftx-row:not(.head)")).toHaveCount(4);
+  await ftx.getByLabel("Period breaks").check();
+  await expect(ftx.locator(".ftx-break")).toHaveCount(2);
+  await expect(ftx.locator(".ftx-break").first()).toContainText("00:01:00 2 decodes, 2 calls");
+  await ftx.getByRole("combobox").filter({ hasText: "Call boxes" }).selectOption("calls");
+  const first = ftx.locator(".ftx-cycle").first().locator(".ftx-box");
+  await expect(first).toHaveText(["EA8AB-14", "DL1ABC-3"]);
+  await expect(first.first()).toHaveClass(/to-me/);
+  await first.nth(1).click();
+  await expect(page.getByTestId("call")).toHaveValue("DL1ABC");
+  await ftx.getByRole("combobox").filter({ hasText: "Call boxes" }).selectOption("lines");
+  await ftx.getByLabel("Period breaks").uncheck();
   await page.getByRole("tab", { name: "Log", exact: true }).click();
   await page.getByRole("button", { name: "Settings" }).click();
   await page.getByRole("button", { name: "Radios and programs" }).click();
@@ -245,7 +268,8 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // A pane pops out into its own window and docks back when that window closes.
   await page.getByRole("tab", { name: "FTx monitor" }).click();
   const [popup] = await Promise.all([page.waitForEvent("popup"), page.getByRole("button", { name: "Pop out FTx monitor" }).click()]);
-  await expect(popup.getByText("Waiting for WSJT-X or JTDX")).toBeVisible();
+  // The WSJT-X fed in above may still be listed, so look for the monitor itself.
+  await expect(popup.getByLabel("Period breaks")).toBeVisible();
   await expect(page.getByRole("tab", { name: "FTx monitor" })).toHaveCount(0);
   await popup.getByRole("button", { name: "Dock back" }).click();
   await expect(page.getByRole("tab", { name: "FTx monitor" })).toBeVisible();
@@ -275,3 +299,36 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Getting started" })).toBeVisible();
   await page.screenshot({ path: "e2e-results/help.png" });
 });
+
+/** A WSJT-X UDP datagram: magic, schema 2, message type and instance id, then the fields. */
+function wsjtx(kind: number, fields: Buffer[]): Buffer {
+  const head = Buffer.alloc(12);
+  head.writeUInt32BE(0xadbccbda, 0);
+  head.writeUInt32BE(2, 4);
+  head.writeUInt32BE(kind, 8);
+  return Buffer.concat([head, qstr("WSJT-X"), ...fields]);
+}
+function qstr(s: string): Buffer {
+  const b = Buffer.from(s, "utf8");
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(b.length);
+  return Buffer.concat([len, b]);
+}
+const u32 = (n: number) => { const b = Buffer.alloc(4); b.writeUInt32BE(n); return b; };
+const i32 = (n: number) => { const b = Buffer.alloc(4); b.writeInt32BE(n); return b; };
+const bools = (...v: boolean[]) => Buffer.from(v.map(Number));
+function status(): Buffer {
+  const freq = Buffer.alloc(8);
+  freq.writeBigUInt64BE(14_074_000n);
+  return wsjtx(1, [freq, qstr("FT8"), qstr(""), qstr(""), qstr("FT8"), bools(false, false, true), u32(1500), u32(1500), qstr("N0CALL"), qstr("EN34"), qstr("")]);
+}
+function decode(timeMs: number, snr: number, message: string): Buffer {
+  const dt = Buffer.alloc(8);
+  dt.writeDoubleBE(0.1);
+  return wsjtx(2, [bools(true), u32(timeMs), i32(snr), dt, u32(1000 + snr * -10), qstr("~"), qstr(message), bools(false, false)]);
+}
+async function sendWsjtx(packets: Buffer[]) {
+  const sock = dgram.createSocket("udp4");
+  for (const p of packets) await new Promise<void>((ok, err) => sock.send(p, 2237, "127.0.0.1", (e) => (e ? err(e) : ok())));
+  sock.close();
+}
