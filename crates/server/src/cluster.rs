@@ -38,6 +38,8 @@ pub struct SpotInfo {
     pub mode: String,
     pub comment: String,
     pub entity: Option<Entity>,
+    /// Where the spotter is, from the country file.
+    pub spotter_entity: Option<Entity>,
     pub needed: Option<Needed>,
     /// The watch list entry this station matches.
     pub watched: Option<u64>,
@@ -82,8 +84,10 @@ impl Cluster {
     }
 
     pub fn snapshot(&self) -> serde_json::Value {
+        let home = self.hub.upgrade().and_then(|h| h.entity(&h.active().station_callsign));
         let inner = self.lock();
         json!({
+            "home": home,
             "config": inner.config,
             "state": inner.state,
             "connected": inner.handle.is_some(),
@@ -188,6 +192,8 @@ impl Cluster {
                 let band = band_for_freq(s.freq_khz / 1000.0).map(str::to_string);
                 let mode = cluster::guess_mode(s.freq_khz, &s.comment).to_string();
                 let entity = hub.entity(&s.call);
+                // Spotters often log in as CALL-# or CALL/P; the country file wants the bare call.
+                let spotter_entity = hub.entity(s.spotter.split('-').next().unwrap_or(&s.spotter));
                 let needed = hub.needed(&s.call, entity.as_ref().and_then(|e| e.dxcc), band.as_deref(), Some(mode.as_str()).filter(|m| !m.is_empty()));
                 let sighting = crate::watch::Sighting {
                     call: &s.call,
@@ -216,6 +222,7 @@ impl Cluster {
                         mode,
                         comment: s.comment,
                         entity,
+                        spotter_entity,
                         needed,
                         watched,
                     };

@@ -179,6 +179,8 @@ export interface Spot {
   mode: string;
   comment: string;
   entity: Entity | null;
+  /** Where the spotter is. */
+  spotter_entity?: Entity | null;
   needed: Needed | null;
   /** Id of the watch list entry this station matches. */
   watched?: number | null;
@@ -186,7 +188,7 @@ export interface Spot {
 
 export interface ClusterNode { name: string; host: string; port: number; login: string; password: string; commands: string[] }
 export interface ClusterConfig { nodes: ClusterNode[]; auto_connect: boolean }
-export interface ClusterSnapshot { config: ClusterConfig; state: string; connected: boolean; spots: Spot[]; lines: string[] }
+export interface ClusterSnapshot { home?: Entity | null; config: ClusterConfig; state: string; connected: boolean; spots: Spot[]; lines: string[] }
 
 export interface QslRun { at: number; running: boolean; uploaded: number; duplicates: number; rejected: string[]; error: string | null }
 export interface LotwMapping { callsign: string; location_id: number; station_location: string }
