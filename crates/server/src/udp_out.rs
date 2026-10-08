@@ -465,16 +465,19 @@ pub fn bearing(from: (f64, f64), to: (f64, f64)) -> f64 {
 }
 
 /// Sends one datagram. Broadcast addresses work too.
+/// Looks up a host, preferring IPv4: "localhost" often resolves to ::1 first, but
+/// the programs hams run (PstRotatorAz, band decoders, WSJT-X) listen on IPv4.
+pub async fn resolve(host: &str, port: u16) -> Option<SocketAddr> {
+    let addrs: Vec<SocketAddr> = tokio::net::lookup_host((host, port)).await.ok()?.collect();
+    addrs.iter().find(|a| a.is_ipv4()).or(addrs.first()).copied()
+}
+
 pub async fn send(host: &str, port: u16, payload: &[u8]) -> Result<SocketAddr, String> {
     let host = host.trim();
     if host.is_empty() || port == 0 {
         return Err("needs a host and a port".into());
     }
-    let addr = tokio::net::lookup_host((host, port))
-        .await
-        .map_err(|e| format!("can't find {host}: {e}"))?
-        .next()
-        .ok_or_else(|| format!("can't find {host}"))?;
+    let addr = resolve(host, port).await.ok_or_else(|| format!("can't find {host}"))?;
     let sock = UdpSocket::bind(if addr.is_ipv4() { "0.0.0.0:0" } else { "[::]:0" }).await.map_err(|e| e.to_string())?;
     let _ = sock.set_broadcast(true);
     sock.send_to(payload, addr).await.map_err(|e| format!("couldn't send to {addr}: {e}"))?;
@@ -545,12 +548,12 @@ impl Outputs {
             let resolve = async move {
                 let mut targets = Vec::new();
                 for c in relays {
-                    match tokio::net::lookup_host((c.host.as_str(), c.port)).await.map(|mut a| a.next()) {
-                        Ok(Some(addr)) if c.port != 0 => {
+                    match resolve(c.host.trim(), c.port).await {
+                        Some(addr) if c.port != 0 => {
                             targets.push((c.id, c.event, addr));
                             me.set_status(c.id, true, format!("relaying to {addr}"));
                         }
-                        Ok(_) | Err(_) => me.set_status(c.id, false, format!("can't find {}:{}", c.host, c.port)),
+                        _ => me.set_status(c.id, false, format!("can't find {}:{}", c.host, c.port)),
                     }
                 }
                 *me.relay.write().unwrap_or_else(|p| p.into_inner()) = Arc::new(targets);
