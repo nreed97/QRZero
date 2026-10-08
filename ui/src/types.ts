@@ -101,6 +101,19 @@ export interface FtxDecode {
   color_index: number;
   /** Id of the watch list entry this station matches. */
   watched?: number | null;
+  /** Our own transmission that period, not a decode: message is what was sent, df the Tx offset. */
+  tx?: boolean;
+}
+
+/** A Configure request to WSJT-X; anything left out stays as it is. */
+export interface FtxConfigure {
+  mode?: string;
+  tr_period?: number;
+  rx_df?: number;
+  dx_call?: string;
+  dx_grid?: string;
+  /** Regenerate Tx1-Tx6, as Generate Std Msgs does. */
+  generate_messages?: boolean;
 }
 
 export interface FtxInstance {
@@ -109,9 +122,25 @@ export interface FtxInstance {
   band: string | null;
   mode: string;
   de_call: string;
+  de_grid: string;
   dx_call: string;
+  dx_grid: string;
+  /** The report WSJT-X will send. */
+  report: string;
   transmitting: boolean;
   tx_enabled: boolean;
+  decoding: boolean;
+  /** Being sent now, or next (empty from programs older than WSJT-X 2.1). */
+  tx_message: string;
+  rx_df: number;
+  tx_df: number;
+  /** The Tx watchdog has stopped transmitting. */
+  tx_watchdog: boolean;
+  /** Seconds, 0 when not sent. */
+  tr_period: number;
+  sub_mode: string;
+  fast_mode: boolean;
+  special_op_mode: number;
   program: string;
   configuration_name: string;
   slice: string | null;

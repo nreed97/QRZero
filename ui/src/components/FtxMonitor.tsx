@@ -5,6 +5,7 @@ import { localGet, localSet } from "../prefs";
 import { ALERTS, activeAlerts, isWorked, passes, useFtxAlerts, type AlertKind, type FtxAlertConfig } from "../ftxAlerts";
 import type { FtxDecode, FtxInstance } from "../types";
 import FtxAlertsDialog from "./FtxAlertsDialog";
+import FtxControls from "./FtxControls";
 import "../watch.css";
 
 const KEEP = 600;
@@ -40,6 +41,26 @@ function cyclesOf(list: FtxDecode[]): Cycle[] {
     else out.push({ time: d.time, decodes: [d] });
   }
   return out;
+}
+
+const secs = (t: string) => Number(t.slice(0, 2)) * 3600 + Number(t.slice(2, 4)) * 60 + Number(t.slice(4, 6));
+
+/** Whether period `a` comes after period `b`, allowing for midnight. */
+function later(a: string, b: string): boolean {
+  let diff = secs(a) - secs(b);
+  if (diff < -43200) diff += 86400;
+  if (diff > 43200) diff -= 86400;
+  return diff > 0;
+}
+
+/**
+ * Adds a decode or TX line to the newest-first list, below anything from a later period, so a
+ * period's decodes arriving just after the next period's TX line still sit together.
+ */
+function insertByTime(list: FtxDecode[], d: FtxDecode): FtxDecode[] {
+  let i = 0;
+  while (i < list.length && i < 100 && later(list[i].time, d.time)) i++;
+  return i === 0 ? [d, ...list] : [...list.slice(0, i), d, ...list.slice(i)];
 }
 
 const hms = (t: string) => `${t.slice(0, 2)}:${t.slice(2, 4)}:${t.slice(4)}`;
@@ -95,9 +116,9 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
   const label = (i: FtxInstance) => (instances.some((o) => o !== i && o.source === i.source) ? `${i.source} (${i.id})` : i.source);
 
   useEffect(() => {
-    api.ftx().then((r) => setDecodes(r.decodes.slice(-KEEP).reverse())).catch(() => {});
+    api.ftx().then((r) => setDecodes(r.decodes.slice(-KEEP).reduce(insertByTime, [] as FtxDecode[]))).catch(() => {});
     return onLive((e) => {
-      if (e.type === "decode") setDecodes((list) => [e.decode, ...list].slice(0, KEEP));
+      if (e.type === "decode" || e.type === "ftx_tx") setDecodes((list) => insertByTime(list, e.decode).slice(0, KEEP));
       if (e.type === "ftx_clear") setDecodes((list) => list.filter((d) => d.instance !== e.instance));
     });
   }, []);
@@ -112,20 +133,22 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
     () =>
       decodes.filter(
         (d) =>
-          (!filters.cq || d.cq || d.to_me) &&
-          (!filters.needed || !!mainAlert(activeAlerts(d, cfg))) &&
-          passes(d, cfg) &&
-          (!filters.instance || d.instance === filters.instance),
+          (!filters.instance || d.instance === filters.instance) &&
+          // Our own transmissions always show.
+          (!!d.tx ||
+            ((!filters.cq || d.cq || d.to_me) && (!filters.needed || !!mainAlert(activeAlerts(d, cfg))) && passes(d, cfg))),
       ),
     [decodes, filters, cfg],
   );
 
   const pick = (d: FtxDecode) => {
+    if (d.tx) return;
     setSelected(d.seq);
     if (d.call) onPick({ call: d.call, grid: d.grid, band: d.band, mode: d.mode, freq_hz: d.freq_hz });
   };
 
   const answer = async (d: FtxDecode) => {
+    if (d.tx) return;
     pick(d);
     setMsg("");
     try {
@@ -139,6 +162,21 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
   const cycles = useMemo(() => cyclesOf(shown), [shown]);
 
   const row = (d: FtxDecode) => {
+    if (d.tx) {
+      return (
+        <div key={d.seq} className={`ftx-row tx src-${d.color_index % 8}`} role="row" title={`Sent by ${d.source || d.instance}`}>
+          <span className="mono">{hms(d.time)}</span>
+          <span className="mono src-tag" title={describe(d.instance, byId.get(d.instance))}>{tagFor(d.instance, d.slice, d.color_index)}</span>
+          <span className="mono txtag">TX</span>
+          <span />
+          <span className="mono num">{d.df}</span>
+          <span className="mono msg">{d.message}</span>
+          <span />
+          <span className="mono">{d.band ?? ""}</span>
+          <span className="flags">Sent</span>
+        </div>
+      );
+    }
     const alerts = activeAlerts(d, cfg);
     const main = mainAlert(alerts);
     const cls = [
@@ -185,14 +223,6 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
             </select>
           </label>
         )}
-        {instances.map((i) => (
-          <span key={i.id} className={`instance src-${i.color_index % 8} ${i.transmitting ? "tx" : ""}`} title={describe(i.id, i)}>
-            <span className="src-tag">{tagFor(i.id, i.slice, i.color_index)}</span>
-            <strong>{i.source}</strong> {i.band ?? ""} {i.mode} {(i.dial_freq / 1e6).toFixed(3)}
-            {i.transmitting ? " TX" : i.tx_enabled ? " TX on" : ""}
-            {i.dx_call ? ` → ${i.dx_call}` : ""}
-          </span>
-        ))}
         <span className="spacer" />
         <label>
           View{" "}
@@ -209,6 +239,14 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
         <button onClick={() => setEditing(true)} title="Choose which stations stand out, their colours, and which to hide">Alerts and filters…</button>
         <button onClick={() => setDecodes([])}>Clear</button>
       </div>
+      <FtxControls
+        instances={filters.instance ? instances.filter((i) => i.id === filters.instance) : instances}
+        mycall={mycall}
+        label={label}
+        tagFor={(i) => tagFor(i.id, i.slice, i.color_index)}
+        describe={(i) => describe(i.id, i)}
+        onMsg={setMsg}
+      />
       {editing && <FtxAlertsDialog cfg={cfg} onChange={setCfg} onClose={() => setEditing(false)} />}
       {msg && <div className="ftx-msg small">{msg}</div>}
       {filters.view === "calls" ? (
@@ -255,9 +293,11 @@ function highlight(message: string, mycall: string, watched: string | null = nul
 /** The line between two decode periods: its time and how many stations were heard. */
 function CycleBreak({ cycle }: { cycle: Cycle }) {
   const calls = new Set(cycle.decodes.map((d) => d.call).filter(Boolean)).size;
+  const n = cycle.decodes.filter((d) => !d.tx).length;
+  const sent = cycle.decodes.some((d) => d.tx);
   return (
     <div className="ftx-break" role="separator">
-      <span className="mono">{hms(cycle.time)}</span> {cycle.decodes.length} decode{cycle.decodes.length === 1 ? "" : "s"}, {calls} call{calls === 1 ? "" : "s"}
+      <span className="mono">{hms(cycle.time)}</span> {sent && n === 0 ? "transmitting" : <>{n} decode{n === 1 ? "" : "s"}, {calls} call{calls === 1 ? "" : "s"}</>}
     </div>
   );
 }
@@ -281,11 +321,17 @@ function CallCycle({ cycle, cfg, breaks, selected, onPick, onAnswer }: {
     if (!had || rank(d) < rank(had)) byCall.set(key, d);
   }
   const boxes = [...byCall.values()].sort((a, b) => rank(a) - rank(b) || b.snr - a.snr);
-  if (boxes.length === 0) return null;
+  const sent = cycle.decodes.filter((d) => d.tx);
+  if (boxes.length === 0 && sent.length === 0) return null;
   return (
     <div className={`ftx-cycle ${breaks ? "with-break" : ""}`}>
       {breaks && <CycleBreak cycle={cycle} />}
-      <div className="ftx-boxes">
+      {sent.map((d) => (
+        <div key={d.seq} className={`ftx-txline src-${d.color_index % 8}`} title={`Sent by ${d.source || d.instance} at ${hms(d.time)}, ${d.df} Hz`}>
+          <span className="mono">{hms(d.time)}</span> <span className="mono">TX: {d.message}</span>
+        </div>
+      ))}
+      {boxes.length > 0 && <div className="ftx-boxes">
         {boxes.map((d) => {
           const alerts = activeAlerts(d, cfg);
           const main = mainAlert(alerts);
@@ -317,7 +363,7 @@ function CallCycle({ cycle, cfg, breaks, selected, onPick, onAnswer }: {
             </button>
           );
         })}
-      </div>
+      </div>}
     </div>
   );
 }

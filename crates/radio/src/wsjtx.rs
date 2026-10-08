@@ -313,6 +313,13 @@ impl Writer {
     fn str(&mut self, s: &str) -> &mut Self {
         self.u32(s.len() as u32).raw(s.as_bytes())
     }
+    /// A string, or a Qt null string (length `0xFFFFFFFF`) for `None`.
+    fn opt_str(&mut self, s: Option<&str>) -> &mut Self {
+        match s {
+            Some(s) => self.str(s),
+            None => self.u32(u32::MAX),
+        }
+    }
     /// QColor: spec, alpha, r, g, b, pad; an absent colour is an invalid QColor (clears it).
     fn color(&mut self, c: Option<(u8, u8, u8)>) -> &mut Self {
         match c {
@@ -359,6 +366,62 @@ pub fn encode_halt_tx(id: &str, auto_only: bool) -> Vec<u8> {
 /// Encodes a Free Text (type 9) setting the Tx5 free-text message, optionally sending it.
 pub fn encode_free_text(id: &str, text: &str, send: bool) -> Vec<u8> {
     Writer::new(9, id).str(text).bool(send).done()
+}
+
+/// Encodes a Clear (type 3) asking WSJT-X to clear its Band Activity (0), Rx Frequency (1) or
+/// both (2) windows.
+pub fn encode_clear(id: &str, window: u8) -> Vec<u8> {
+    Writer::new(3, id).u8(window).done()
+}
+
+/// Encodes a Replay (type 7): WSJT-X sends every decode in its Band Activity window again,
+/// marked not new.
+pub fn encode_replay(id: &str) -> Vec<u8> {
+    Writer::new(7, id).done()
+}
+
+/// Encodes a Switch Configuration (type 14): WSJT-X switches to the named configuration
+/// (File, Settings, Configurations), when it has one with that name.
+pub fn encode_switch_configuration(id: &str, name: &str) -> Vec<u8> {
+    Writer::new(14, id).str(name).done()
+}
+
+/// The fields of a Configure request (type 15). `None` leaves a setting as it is.
+///
+/// WSJT-X has no way to set the Tx offset, pick Tx1-Tx6 or tick Enable Tx this way. A DX call
+/// can be set but not cleared, since an empty one means "unchanged" too.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Configure {
+    pub mode: Option<String>,
+    pub frequency_tolerance: Option<u32>,
+    pub submode: Option<String>,
+    /// JT9 fast mode; WSJT-X only looks at it when its Fast checkbox is shown. There is no
+    /// "unchanged" value, so pass the instance's current setting.
+    pub fast_mode: bool,
+    /// Seconds.
+    pub tr_period: Option<u32>,
+    /// The Rx audio offset in Hz.
+    pub rx_df: Option<u32>,
+    pub dx_call: Option<String>,
+    pub dx_grid: Option<String>,
+    /// Regenerate the standard messages Tx1-Tx6, as the Generate Std Msgs button does.
+    pub generate_messages: bool,
+}
+
+/// Encodes a Configure (type 15). Absent strings are written as a Qt null string and absent
+/// numbers as `u32::MAX`, both of which WSJT-X reads as "leave unchanged".
+pub fn encode_configure(id: &str, c: &Configure) -> Vec<u8> {
+    Writer::new(15, id)
+        .opt_str(c.mode.as_deref())
+        .u32(c.frequency_tolerance.unwrap_or(u32::MAX))
+        .opt_str(c.submode.as_deref())
+        .bool(c.fast_mode)
+        .u32(c.tr_period.unwrap_or(u32::MAX))
+        .u32(c.rx_df.unwrap_or(u32::MAX))
+        .opt_str(c.dx_call.as_deref())
+        .opt_str(c.dx_grid.as_deref())
+        .bool(c.generate_messages)
+        .done()
 }
 
 /// Encodes a Highlight Callsign (type 13); `None` colours clear that highlight.
@@ -724,6 +787,73 @@ mod tests {
             &[1, 0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0x80, 0x80, 0, 0]
         );
         assert_eq!(&tail[11..], &[0, 0xFF, 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
+    }
+
+    /// The start of every outgoing datagram: magic, schema 2, type, then the id "WSJT-X".
+    fn head(kind: u8) -> Vec<u8> {
+        let mut h = vec![0xAD, 0xBC, 0xCB, 0xDA, 0, 0, 0, 2, 0, 0, 0, kind, 0, 0, 0, 6];
+        h.extend_from_slice(b"WSJT-X");
+        h
+    }
+
+    #[test]
+    fn clear_replay_switch_layout() {
+        let mut want = head(3);
+        want.push(2);
+        assert_eq!(encode_clear("WSJT-X", 2), want);
+        // The same layout WSJT-X uses when it says it cleared a window.
+        assert_eq!(
+            parse(&want).unwrap(),
+            Message::Clear {
+                id: "WSJT-X".into(),
+                window: 2
+            }
+        );
+        assert_eq!(encode_replay("WSJT-X"), head(7));
+        let mut want = head(14);
+        want.extend_from_slice(&[0, 0, 0, 3, b'F', b'T', b'4']);
+        assert_eq!(encode_switch_configuration("WSJT-X", "FT4"), want);
+    }
+
+    #[test]
+    fn configure_layout() {
+        let null = [0xFF; 4];
+        // Everything unchanged: null strings and u32::MAX numbers.
+        let mut want = head(15);
+        want.extend_from_slice(&null); // mode
+        want.extend_from_slice(&null); // frequency tolerance
+        want.extend_from_slice(&null); // submode
+        want.push(0); // fast mode
+        want.extend_from_slice(&null); // T/R period
+        want.extend_from_slice(&null); // Rx DF
+        want.extend_from_slice(&null); // DX call
+        want.extend_from_slice(&null); // DX grid
+        want.push(0); // generate messages
+        assert_eq!(encode_configure("WSJT-X", &Configure::default()), want);
+
+        let set = encode_configure(
+            "WSJT-X",
+            &Configure {
+                mode: Some("FT4".into()),
+                rx_df: Some(1234),
+                dx_call: Some("K1ABC".into()),
+                dx_grid: Some("".into()),
+                generate_messages: true,
+                ..Default::default()
+            },
+        );
+        let mut want = head(15);
+        want.extend_from_slice(&[0, 0, 0, 3, b'F', b'T', b'4']);
+        want.extend_from_slice(&null);
+        want.extend_from_slice(&null);
+        want.push(0);
+        want.extend_from_slice(&null);
+        want.extend_from_slice(&[0, 0, 0x04, 0xD2]); // 1234
+        want.extend_from_slice(&[0, 0, 0, 5]);
+        want.extend_from_slice(b"K1ABC");
+        want.extend_from_slice(&[0, 0, 0, 0]); // empty, not null
+        want.push(1);
+        assert_eq!(set, want);
     }
 
     fn ft(text: &str) -> FtMessage {

@@ -237,6 +237,12 @@ fn router(state: Shared) -> Router {
         .route("/startup-apps/launch", post(startup_launch))
         .route("/ftx", get(ftx))
         .route("/ftx/reply", post(ftx_reply))
+        .route("/ftx/halt", post(ftx_halt))
+        .route("/ftx/free-text", post(ftx_free_text))
+        .route("/ftx/configure", post(ftx_configure))
+        .route("/ftx/replay", post(ftx_replay))
+        .route("/ftx/clear", post(ftx_clear))
+        .route("/ftx/switch-configuration", post(ftx_switch_configuration))
         .route("/rotator", post(rotate))
         .route("/cty", get(cty_status).post(cty_install))
         .route("/cty/update", post(cty_update))
@@ -1099,6 +1105,119 @@ struct SeqBody {
 
 async fn ftx_reply(State(s): State<Shared>, Json(b): Json<SeqBody>) -> ApiResult<()> {
     s.hub.ftx_reply(b.seq).await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(()))
+}
+
+// Requests to one WSJT-X / JTDX instance, named by its id. They only work when "Accept UDP
+// requests" is ticked in its Reporting settings.
+
+fn ftx_err(e: String) -> ApiError {
+    ApiError(StatusCode::BAD_REQUEST, e)
+}
+
+#[derive(Deserialize)]
+struct FtxHaltBody {
+    instance: String,
+    /// Just untick Enable Tx, so the current transmission finishes.
+    #[serde(default)]
+    auto_only: bool,
+}
+
+async fn ftx_halt(State(s): State<Shared>, Json(b): Json<FtxHaltBody>) -> ApiResult<()> {
+    s.hub.ftx_send(&b.instance, |i| qrzero_radio::wsjtx::encode_halt_tx(&i.id, b.auto_only)).await.map_err(ftx_err)?;
+    Ok(Json(()))
+}
+
+#[derive(Deserialize)]
+struct FtxFreeTextBody {
+    instance: String,
+    text: String,
+    /// Send it next (as the Tx5 "Now" button would) rather than just setting it.
+    #[serde(default)]
+    send: bool,
+}
+
+async fn ftx_free_text(State(s): State<Shared>, Json(b): Json<FtxFreeTextBody>) -> ApiResult<()> {
+    let text = b.text.trim().to_ascii_uppercase();
+    s.hub.ftx_send(&b.instance, |i| qrzero_radio::wsjtx::encode_free_text(&i.id, &text, b.send)).await.map_err(ftx_err)?;
+    Ok(Json(()))
+}
+
+#[derive(Deserialize)]
+struct FtxConfigureBody {
+    instance: String,
+    mode: Option<String>,
+    tr_period: Option<u32>,
+    rx_df: Option<u32>,
+    dx_call: Option<String>,
+    dx_grid: Option<String>,
+    #[serde(default)]
+    generate_messages: bool,
+}
+
+async fn ftx_configure(State(s): State<Shared>, Json(b): Json<FtxConfigureBody>) -> ApiResult<()> {
+    let up = |v: Option<String>| v.map(|v| v.trim().to_ascii_uppercase()).filter(|v| !v.is_empty());
+    let mut c = qrzero_radio::wsjtx::Configure {
+        mode: up(b.mode),
+        tr_period: b.tr_period,
+        rx_df: b.rx_df,
+        dx_call: up(b.dx_call),
+        dx_grid: b.dx_grid.map(|g| g.trim().to_string()).filter(|g| !g.is_empty()),
+        generate_messages: b.generate_messages,
+        ..Default::default()
+    };
+    s.hub
+        .ftx_send(&b.instance, |i| {
+            c.fast_mode = i.fast_mode;
+            qrzero_radio::wsjtx::encode_configure(&i.id, &c)
+        })
+        .await
+        .map_err(ftx_err)?;
+    Ok(Json(()))
+}
+
+#[derive(Deserialize)]
+struct FtxInstanceBody {
+    instance: String,
+}
+
+async fn ftx_replay(State(s): State<Shared>, Json(b): Json<FtxInstanceBody>) -> ApiResult<()> {
+    s.hub.ftx_send(&b.instance, |i| qrzero_radio::wsjtx::encode_replay(&i.id)).await.map_err(ftx_err)?;
+    Ok(Json(()))
+}
+
+#[derive(Deserialize)]
+struct FtxClearBody {
+    instance: String,
+    /// 0 Band Activity, 1 Rx Frequency, 2 both.
+    #[serde(default = "both_windows")]
+    window: u8,
+}
+
+fn both_windows() -> u8 {
+    2
+}
+
+async fn ftx_clear(State(s): State<Shared>, Json(b): Json<FtxClearBody>) -> ApiResult<()> {
+    if b.window > 2 {
+        return Err(ftx_err("window is 0, 1 or 2".into()));
+    }
+    s.hub.ftx_clear(&b.instance, b.window).await.map_err(ftx_err)?;
+    Ok(Json(()))
+}
+
+#[derive(Deserialize)]
+struct FtxSwitchBody {
+    instance: String,
+    name: String,
+}
+
+async fn ftx_switch_configuration(State(s): State<Shared>, Json(b): Json<FtxSwitchBody>) -> ApiResult<()> {
+    let name = b.name.trim().to_string();
+    if name.is_empty() {
+        return Err(ftx_err("name the configuration to switch to".into()));
+    }
+    s.hub.ftx_send(&b.instance, |i| qrzero_radio::wsjtx::encode_switch_configuration(&i.id, &name)).await.map_err(ftx_err)?;
     Ok(Json(()))
 }
 

@@ -167,6 +167,54 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(first).toHaveCount(2);
   await ftx.getByRole("combobox").filter({ hasText: "Call boxes" }).selectOption("lines");
   await ftx.getByLabel("Period breaks").uncheck();
+
+  // The control strip: WSJT-X transmitting its R+report, sent from a socket that then hears
+  // what QRZero sends back (requests go to the address the status came from).
+  const radio = dgram.createSocket("udp4");
+  const heard: Buffer[] = [];
+  radio.on("message", (m) => heard.push(m));
+  await new Promise<void>((ok) => radio.bind(0, "127.0.0.1", ok));
+  const fromRadio = (p: Buffer) => new Promise<void>((ok, err) => radio.send(p, 2237, "127.0.0.1", (e) => (e ? err(e) : ok())));
+  const sentKind = (kind: number) => heard.filter((m) => m.readUInt32BE(8) === kind);
+  try {
+    await fromRadio(fullStatus({ transmitting: true, txMessage: "EA8AB N0CALL R-14", dx: "EA8AB", report: "-14" }));
+    const strip = ftx.getByRole("group", { name: /^Control / });
+    await expect(strip.getByTestId("ftx-state")).toHaveText("TX");
+    await expect(strip.getByTestId("ftx-txmsg")).toHaveText("Tx: EA8AB N0CALL R-14");
+    await expect(strip.getByTestId("ftx-stage")).toHaveText("Sending R+report");
+    await expect(strip).toContainText("DX EA8AB IL18");
+    await expect(strip).toContainText("Rx 1500 Tx 1210");
+    // Our transmission is a line of its own in the list, and a TX line in the call boxes.
+    const txRow = ftx.locator(".ftx-row.tx");
+    await expect(txRow).toHaveCount(1);
+    await expect(txRow).toContainText("EA8AB N0CALL R-14");
+    await expect(txRow).toContainText("1210");
+    await ftx.getByRole("combobox").filter({ hasText: "Call boxes" }).selectOption("calls");
+    await expect(ftx.locator(".ftx-txline")).toHaveText(/TX: EA8AB N0CALL R-14/);
+    await ftx.getByRole("combobox").filter({ hasText: "Call boxes" }).selectOption("lines");
+
+    await strip.getByRole("button", { name: "Halt TX" }).click();
+    await expect.poll(() => sentKind(8).length).toBe(1);
+    expect(sentKind(8)[0].subarray(-1)[0]).toBe(0); // halt now, not just auto Tx
+    await strip.getByRole("button", { name: "Stop after this" }).click();
+    await expect.poll(() => sentKind(8).length).toBe(2);
+    expect(sentKind(8)[1].subarray(-1)[0]).toBe(1);
+    await strip.getByRole("button", { name: "Call CQ" }).click();
+    await expect.poll(() => sentKind(9).length).toBe(1);
+    expect(sentKind(9)[0].subarray(-15).toString("latin1")).toBe("CQ N0CALL EN34\x01");
+    await strip.getByRole("button", { name: "More controls" }).click();
+    await strip.getByLabel("DX call").fill("dl1abc");
+    await strip.getByRole("button", { name: "Set DX" }).click();
+    await expect.poll(() => sentKind(15).length).toBe(1);
+    expect(sentKind(15)[0].includes(Buffer.from("DL1ABC"))).toBe(true);
+
+    // WSJT-X stops and waits with Enable Tx still on.
+    await fromRadio(fullStatus({ transmitting: false, txMessage: "EA8AB N0CALL R-14", dx: "EA8AB", report: "-14" }));
+    await expect(strip.getByTestId("ftx-state")).toHaveText("Tx on");
+    await expect(txRow).toHaveCount(1);
+  } finally {
+    radio.close();
+  }
   await page.getByRole("tab", { name: "Log", exact: true }).click();
   await page.getByRole("button", { name: "Settings" }).click();
   await page.getByRole("button", { name: "Radios and programs" }).click();
@@ -350,6 +398,16 @@ function status(): Buffer {
   const freq = Buffer.alloc(8);
   freq.writeBigUInt64BE(14_074_000n);
   return wsjtx(1, [freq, qstr("FT8"), qstr(""), qstr(""), qstr("FT8"), bools(false, false, true), u32(1500), u32(1500), qstr("N0CALL"), qstr("EN34"), qstr("")]);
+}
+/** A full WSJT-X 2.6 status: Enable Tx on, Rx 1500 Hz, Tx 1210 Hz, FT8 15 s periods. */
+function fullStatus(o: { transmitting: boolean; txMessage: string; dx: string; report: string }): Buffer {
+  const freq = Buffer.alloc(8);
+  freq.writeBigUInt64BE(14_074_000n);
+  return wsjtx(1, [
+    freq, qstr("FT8"), qstr(o.dx), qstr(o.report), qstr("FT8"), bools(true, o.transmitting, false), u32(1500), u32(1210),
+    qstr("N0CALL"), qstr("EN34"), qstr("IL18"), bools(false), qstr(""), bools(false), Buffer.from([0]), u32(10), u32(15),
+    qstr("Default"), qstr(o.txMessage),
+  ]);
 }
 function decode(timeMs: number, snr: number, message: string): Buffer {
   const dt = Buffer.alloc(8);

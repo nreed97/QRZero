@@ -8,6 +8,8 @@ export type LiveEvent =
   | { type: "radios"; radios: Radio[] }
   | { type: "ftx_instances"; instances: FtxInstance[] }
   | { type: "decode"; decode: FtxDecode }
+  /** What a WSJT-X transmitted this period (decode.tx is true). */
+  | { type: "ftx_tx"; decode: FtxDecode }
   | { type: "ftx_clear"; instance: string }
   | { type: "qso_logged"; log_id: number | null; call: string; source: string; added: boolean }
   | { type: "rotator"; azimuth: number | null }
