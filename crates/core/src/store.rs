@@ -20,7 +20,8 @@ use crate::worked::WorkedIndex;
 
 /// Migrations in order; migration N brings the schema to user_version N.
 const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5];
-const SCHEMA_VERSION: i32 = MIGRATIONS.len() as i32;
+/// The newest schema this build knows (`PRAGMA user_version`).
+pub const SCHEMA_VERSION: i32 = MIGRATIONS.len() as i32;
 
 /// Small partial indexes over QSOs not yet uploaded, so counting what's waiting
 /// stays fast once most of a large log is uploaded. The WHERE clauses must match

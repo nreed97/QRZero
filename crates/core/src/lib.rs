@@ -2,6 +2,7 @@
 
 pub mod adif;
 pub mod awards;
+pub mod backup;
 pub mod band;
 pub mod confirm;
 pub mod cty;

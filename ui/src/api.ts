@@ -18,7 +18,7 @@ const token = sessionToken();
 
 export class ApiError extends Error {}
 
-async function request(method: string, path: string, body?: unknown, raw?: BodyInit): Promise<Response> {
+export async function request(method: string, path: string, body?: unknown, raw?: BodyInit): Promise<Response> {
   const headers: Record<string, string> = { "x-qrzero-token": token };
   let payload: BodyInit | undefined = raw;
   if (body !== undefined) {

@@ -5,6 +5,7 @@ import type { EntryLayout } from "../fields";
 import Modal from "./Modal";
 import EquipmentTree from "./EquipmentTree";
 import EntryFieldsEditor from "./EntryFieldsEditor";
+import BackupsTab from "./BackupsTab";
 
 export interface GeneralPrefs { units: "km" | "mi" }
 
@@ -25,7 +26,7 @@ interface Props {
   initialTab?: string;
 }
 
-type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "cluster" | "logs" | "lookup" | "general";
+type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "cluster" | "logs" | "lookup" | "backups" | "general";
 
 const TAB_NAMES: Record<Tab, string> = {
   station: "Callsigns",
@@ -36,6 +37,7 @@ const TAB_NAMES: Record<Tab, string> = {
   cluster: "DX cluster",
   logs: "Logs",
   lookup: "Callsign lookup",
+  backups: "Backups",
   general: "General",
 };
 
@@ -73,6 +75,7 @@ export default function SettingsDialog(props: Props) {
       {tab === "lookup" && <LookupTab />}
       {tab === "radios" && <RadiosTab />}
       {tab === "cluster" && <ClusterTab />}
+      {tab === "backups" && <BackupsTab />}
       {tab === "general" && (
         <div>
           <label className="block">

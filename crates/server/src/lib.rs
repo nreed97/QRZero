@@ -24,6 +24,7 @@ use qrzero_core::{secrets, Error, Store};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+mod backups;
 mod cluster;
 mod propagation;
 mod qsl;
@@ -101,6 +102,8 @@ struct AppState {
     propagation: Arc<propagation::Propagation>,
     /// Award tables by request, with the QSO version they were counted at.
     award_cache: AwardCache,
+    /// What happened to a restore staged before this start.
+    last_restore: Option<backups::RestoreResult>,
 }
 
 type AwardCache = Arc<Mutex<std::collections::HashMap<String, (i64, Arc<AwardTable>)>>>;
@@ -115,10 +118,13 @@ pub fn default_data_dir() -> PathBuf {
 /// Opens the database (creating a first log if there is none) and starts serving.
 pub async fn start(cfg: Config) -> anyhow::Result<Running> {
     std::fs::create_dir_all(&cfg.data_dir)?;
-    let store = Store::open(&cfg.data_dir.join("qrzero.db"))?;
+    let (store, last_restore) = backups::open_store(&cfg.data_dir)?;
     if store.list_logs()?.is_empty() {
         store.create_log("My log")?;
     }
+    let backup_settings = backups::load_settings(&store)?;
+    let dir = cfg.data_dir.clone();
+    tokio::task::spawn_blocking(move || backups::auto_backup(&dir, backup_settings));
     let token = cfg.token.unwrap_or_else(random_token);
     let store = Arc::new(Mutex::new(store));
     let hub = Hub::new(store.clone(), cfg.data_dir.clone());
@@ -138,6 +144,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
         token: token.clone(),
         data_dir: cfg.data_dir,
         award_cache: AwardCache::default(),
+        last_restore,
     });
     let listener = tokio::net::TcpListener::bind(cfg.addr).await?;
     let addr = listener.local_addr()?;
@@ -209,6 +216,7 @@ fn router(state: Shared) -> Router {
         .route("/qsl/qrz/test", post(qsl_test_qrz))
         .route("/qsl/upload/{service}", post(qsl_upload))
         .route("/qsl/download/{service}", post(qsl_download))
+        .merge(backups::routes())
         .layer(middleware::from_fn_with_state(state.clone(), require_token))
         .with_state(state);
     Router::new().nest("/api", api).fallback(static_file)
