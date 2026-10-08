@@ -314,7 +314,7 @@ function RadiosTab() {
         <legend>WSJT-X and JTDX</legend>
         {check("wsjtx_enabled", "Listen to WSJT-X / JTDX")}
         <div className="row">
-          {text("wsjtx_listen", "Listen on", "w-m", "127.0.0.1:2237")}
+          {text("wsjtx_listen", "Listen on (one per port, comma between)", "w-xl", "127.0.0.1:2237, 127.0.0.1:2238")}
           {text("wsjtx_multicast", "Multicast group (optional)", "w-l", "224.0.0.1")}
           <label className="f w-xl">
             <span>Pass on to (GridTracker, JTAlert …)</span>

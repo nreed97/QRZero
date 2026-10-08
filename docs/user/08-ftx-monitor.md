@@ -7,6 +7,8 @@ QRZero listens to WSJT-X, JTDX and N1MM Logger+ over UDP. Set them up in **Setti
 In WSJT-X open **File → Settings → Reporting** and set:
 
 - **UDP Server**: 127.0.0.1, port **2237** (or the address shown in QRZero's settings).
+
+If you run several copies of WSJT-X or JTDX and each sends to its own port, list them all in Settings, **Radios and programs**, **Listen on**, separated by commas: for example `127.0.0.1:2237, 127.0.0.1:2238`. QRZero listens on every one. (Copies that share one port with a multicast group work too: fill in **Multicast group** instead.)
 - Tick **Accept UDP requests**, so QRZero can ask WSJT-X to call a station.
 
 QSOs you log in WSJT-X are added to the open log at the selected location, unless the same QSO is already there. Turn this off with **Log QSOs that WSJT-X / JTDX log** if another logger already does it.

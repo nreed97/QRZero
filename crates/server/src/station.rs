@@ -1,7 +1,7 @@
 //! The live station: rig connections, WSJT-X/JTDX, N1MM and PstRotatorAz over
 //! UDP, the country file, and the event stream the UI listens to.
 
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::net::{Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
@@ -30,7 +30,8 @@ const CTY_MAX_AGE: Duration = Duration::from_secs(14 * 24 * 3600);
 #[serde(default)]
 pub struct Integrations {
     pub wsjtx_enabled: bool,
-    /// Address WSJT-X/JTDX send to ("UDP Server" in their Reporting settings).
+    /// Addresses WSJT-X/JTDX send to ("UDP Server" in their Reporting settings),
+    /// comma-separated: one per port when several instances each use their own.
     pub wsjtx_listen: String,
     /// Optional multicast group, e.g. 224.0.0.1, when several programs share the stream.
     pub wsjtx_multicast: String,
@@ -42,6 +43,19 @@ pub struct Integrations {
     pub n1mm_auto_log: bool,
     pub rotator_enabled: bool,
     pub rotator_addr: String,
+}
+
+impl Integrations {
+    /// The WSJT-X listen addresses, without duplicates.
+    pub fn wsjtx_addrs(&self) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for a in self.wsjtx_listen.split([',', ';', ' ']).map(str::trim).filter(|a| !a.is_empty()) {
+            if !out.iter().any(|x| x == a) {
+                out.push(a.to_string());
+            }
+        }
+        out
+    }
 }
 
 impl Default for Integrations {
@@ -153,7 +167,10 @@ struct Inner {
     integrations: Integrations,
     listeners: Vec<JoinHandle<()>>,
     status: ListenerStatus,
-    wsjtx_socket: Option<Arc<UdpSocket>>,
+    /// The socket each WSJT-X instance (by its address) talks to, for replies.
+    wsjtx_sockets: HashMap<SocketAddr, Arc<UdpSocket>>,
+    /// Per listen address, how its WSJT-X listener is doing.
+    wsjtx_status: BTreeMap<String, String>,
     rotator_az: Option<f64>,
 }
 
@@ -391,13 +408,17 @@ impl Hub {
         for l in inner.listeners.drain(..) {
             l.abort();
         }
-        inner.wsjtx_socket = None;
+        inner.wsjtx_sockets.clear();
+        inner.wsjtx_status.clear();
         inner.status = ListenerStatus::default();
         inner.integrations = cfg.clone();
         let weak = Arc::downgrade(self);
         if cfg.wsjtx_enabled {
-            inner.status.wsjtx = Some(format!("starting on {}", cfg.wsjtx_listen));
-            inner.listeners.push(tokio::spawn(wsjtx_listener(weak.clone(), cfg.clone())));
+            for addr in cfg.wsjtx_addrs() {
+                inner.wsjtx_status.insert(addr.clone(), format!("starting on {addr}"));
+                inner.listeners.push(tokio::spawn(wsjtx_listener(weak.clone(), cfg.clone(), addr)));
+            }
+            inner.status.wsjtx = Some(inner.wsjtx_status.values().cloned().collect::<Vec<_>>().join("; "));
         }
         if cfg.n1mm_enabled {
             inner.status.n1mm = Some(format!("starting on {}", cfg.n1mm_listen));
@@ -415,6 +436,12 @@ impl Hub {
         drop(inner);
         self.emit(json!({"type": "ftx_instances", "instances": []}));
         self.emit(json!({"type": "integrations", "config": cfg}));
+    }
+
+    fn set_wsjtx_status(&self, addr: &str, text: String) {
+        let mut inner = self.lock();
+        inner.wsjtx_status.insert(addr.to_string(), text);
+        inner.status.wsjtx = Some(inner.wsjtx_status.values().cloned().collect::<Vec<_>>().join("; "));
     }
 
     fn set_status(&self, which: &str, text: String) {
@@ -441,7 +468,7 @@ impl Hub {
             let inner = self.lock();
             let d = inner.decodes.iter().find(|d| d.seq == seq).ok_or("that decode is no longer listed")?;
             let inst = inner.instances.get(&d.instance).ok_or("that WSJT-X is no longer running")?;
-            let socket = inner.wsjtx_socket.clone().ok_or("WSJT-X listening is off")?;
+            let socket = inner.wsjtx_sockets.get(&inst.addr).cloned().ok_or("WSJT-X listening is off")?;
             (socket, inst.addr, wsjtx::encode_reply(&d.raw, 0))
         };
         socket.send_to(&packet, addr).await.map_err(|e| e.to_string())?;
@@ -801,20 +828,19 @@ fn bind_udp(listen: &str, multicast: &str) -> anyhow::Result<UdpSocket> {
     Ok(UdpSocket::from_std(sock.into())?)
 }
 
-async fn wsjtx_listener(hub: std::sync::Weak<Hub>, cfg: Integrations) {
-    let socket = match bind_udp(&cfg.wsjtx_listen, &cfg.wsjtx_multicast) {
+async fn wsjtx_listener(hub: std::sync::Weak<Hub>, cfg: Integrations, listen: String) {
+    let socket = match bind_udp(&listen, &cfg.wsjtx_multicast) {
         Ok(s) => Arc::new(s),
         Err(e) => {
             if let Some(h) = hub.upgrade() {
-                h.set_status("wsjtx", format!("can't listen on {}: {e}", cfg.wsjtx_listen));
+                h.set_wsjtx_status(&listen, format!("can't listen on {listen}: {e}"));
             }
             return;
         }
     };
     let forward: Vec<SocketAddr> = cfg.wsjtx_forward.iter().filter_map(|a| a.trim().parse().ok()).collect();
     if let Some(h) = hub.upgrade() {
-        h.set_status("wsjtx", format!("listening on {}", cfg.wsjtx_listen));
-        h.lock().wsjtx_socket = Some(socket.clone());
+        h.set_wsjtx_status(&listen, format!("listening on {listen}"));
     }
     let mut buf = vec![0u8; 65536];
     loop {
@@ -826,6 +852,7 @@ async fn wsjtx_listener(hub: std::sync::Weak<Hub>, cfg: Integrations) {
             let _ = socket.send_to(&buf[..n], to).await;
         }
         let Some(h) = hub.upgrade() else { return };
+        h.lock().wsjtx_sockets.insert(from, socket.clone());
         match wsjtx::parse(&buf[..n]) {
             Ok(msg) => h.on_wsjtx(msg, from),
             Err(e) => tracing::debug!("WSJT-X packet from {from}: {e}"),
