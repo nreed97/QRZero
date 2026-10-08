@@ -247,6 +247,20 @@ kbd { font: 11px var(--mono); opacity: 0.75; margin-left: 4px; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 3px 4px 3px 10px; background: var(--title); border-bottom: 1px solid var(--line); }
 .modal-head h2 { margin: 0; font-size: 13px; }
 .modal-body { padding: 10px 12px; overflow: auto; }
+
+/* Settings: sections down the left, the chosen page on the right, a steady size */
+.modal.settings { height: min(640px, 90vh); }
+.modal.settings .modal-body { display: flex; padding: 0; overflow: hidden; flex: 1; min-height: 0; }
+.settings-nav { flex: none; width: 168px; overflow: auto; padding: 6px 0; background: var(--panel-2); border-right: 1px solid var(--line); }
+.settings-nav .group + .group { margin-top: 8px; }
+.settings-nav .head { padding: 2px 12px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.settings-nav button { display: block; width: 100%; text-align: left; border: 0; border-radius: 0; background: none; padding: 3px 12px 3px 18px; margin: 0; color: var(--text); }
+.settings-nav button:hover { background: var(--title); }
+.settings-nav button.active { background: var(--row-sel); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
+.settings-page { flex: 1; min-width: 0; overflow: auto; padding: 8px 14px 12px; }
+.settings-title { margin: 0 0 6px; font-size: 14px; }
+.settings-page fieldset { margin: 0 0 8px; padding: 4px 10px 6px; }
+.settings-page fieldset p.small { margin: 4px 0 0; }
 .block { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
 .block > span { color: var(--muted); font-size: 12px; }
 .check { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
