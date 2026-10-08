@@ -32,6 +32,18 @@ Rows calling you are highlighted, and needed stations are shaded. Stations on yo
 - **Click** a decode to put the call, grid, band and mode into the QSO panel and look it up.
 - **Double-click** to have that WSJT-X call the station, as if you'd double-clicked it in WSJT-X.
 - **CQ only** and **Needed only** narrow the list; the source box (**All sources**) shows one WSJT-X or JTDX at a time.
+- **Period breaks** draws a line between decode periods (every 15 seconds for FT8), with the period's time and how many decodes and calls it had.
+
+### Call boxes
+
+Set **View** to **Call boxes** to see the stations heard rather than every line, much like JTAlert's callsign list. Each period gets its own row of boxes, one per station, with its signal report. The newest period is at the top.
+
+- A **red** box is calling you, a **shaded** box is needed (new DXCC, band or mode), and a **grey** call is already worked on this band.
+- A green line under the box means the station is calling CQ. Watched stations have their call in colour.
+- The boxes in a row are in order of importance: calling you first, then needed, then CQs, then the rest.
+- Hover over a box to see the full message, country and flags. Click and double-click work as in the line view, and **CQ only**, **Needed only** and the source box apply here too.
+
+Both choices are remembered.
 
 ### Where each decode came from
 
