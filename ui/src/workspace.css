@@ -1,0 +1,75 @@
+/* Docked pane workspace */
+.ws { flex: 1; min-height: 0; display: flex; padding: 4px; }
+.ws > .ws-group, .ws > .ws-split { flex: 1; }
+.ws-empty { flex: 1; padding: 30px; }
+.ws-split { display: flex; min-width: 0; min-height: 0; flex: 1; }
+.ws-split.ws-row { flex-direction: row; }
+.ws-split.ws-col { flex-direction: column; }
+.ws-cell { display: flex; min-width: 0; min-height: 0; }
+.ws-split.ws-row > .ws-cell { flex-direction: row; }
+.ws-split.ws-col > .ws-cell { flex-direction: column; }
+.ws-cell > .ws-group, .ws-cell > .ws-split { flex: 1; }
+
+.ws-divider { flex: 0 0 5px; background: var(--bg); position: relative; touch-action: none; outline: none; }
+.ws-split.ws-row > .ws-cell > .ws-divider { cursor: col-resize; }
+.ws-split.ws-col > .ws-cell > .ws-divider { cursor: row-resize; }
+.ws-divider::after { content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.ws-split.ws-row > .ws-cell > .ws-divider::after { width: 1px; height: 24px; border-left: 1px dotted var(--muted); }
+.ws-split.ws-col > .ws-cell > .ws-divider::after { height: 1px; width: 24px; border-top: 1px dotted var(--muted); }
+.ws-divider:hover, .ws-divider:focus-visible { background: color-mix(in srgb, var(--accent) 35%, var(--bg)); }
+
+.ws-group { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 2px; }
+.ws-tabs { display: flex; align-items: stretch; min-height: 24px; background: var(--title); border-bottom: 1px solid var(--line); overflow: hidden; }
+.ws-tab {
+  border: 0; border-right: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--muted);
+  padding: 0 10px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;
+}
+.ws-tab[draggable="true"] { cursor: grab; }
+.ws-tab:hover { color: var(--text); }
+.ws-tab.on { color: var(--text); background: var(--panel); box-shadow: inset 0 2px 0 var(--accent); }
+.ws-tools { margin-left: auto; display: flex; align-items: center; gap: 1px; padding: 0 3px; }
+.ws-tool { width: 22px; height: 20px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; background: transparent; color: var(--muted); border-radius: 2px; }
+.ws-tool:hover { border-color: var(--line); color: var(--text); }
+
+.ws-body { flex: 1; min-height: 0; position: relative; display: flex; }
+.ws-pane { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+.ws-pane[hidden] { display: none; }
+.ws-host { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.ws-catch { position: absolute; inset: 0; z-index: 5; }
+.ws-drop {
+  position: absolute; z-index: 6; pointer-events: none; display: flex; align-items: center; justify-content: center;
+  border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); font-size: 12px;
+}
+.ws-drop.center { inset: 0; }
+.ws-drop.left { left: 0; top: 0; bottom: 0; width: 40%; }
+.ws-drop.right { right: 0; top: 0; bottom: 0; width: 40%; }
+.ws-drop.top { left: 0; right: 0; top: 0; height: 40%; }
+.ws-drop.bottom { left: 0; right: 0; bottom: 0; height: 40%; }
+
+/* Panes inside a group lose their own frame; the group draws it. */
+.ws-host > .panel, .ws-host > .grid, .ws-host > .ftx, .ws-host > .awards { flex: 1; margin: 0; border: 0; border-radius: 0; min-height: 0; min-width: 0; }
+.ws-host > .panel > .panel-title > span:first-child:not(.spacer) { display: none; }
+.ws-host > .panel > .panel-title:not(:has(> :nth-child(2))) { display: none; }
+.ws-host > .lookup { overflow: auto; }
+
+/* Layout menu */
+.layout-menu { position: relative; }
+.layout-pop {
+  position: absolute; right: 0; top: calc(100% + 3px); z-index: 50; min-width: 230px; padding: 4px 0;
+  background: var(--panel-2); border: 1px solid var(--line); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); border-radius: 2px;
+}
+.layout-pop button.item, .layout-pop label.item { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border: 0; border-radius: 0; background: none; padding: 3px 12px; font-size: 12.5px; color: var(--text); margin: 0; }
+.layout-pop .item:hover { background: var(--row-sel); }
+.layout-pop .item.cur { font-weight: 700; }
+.layout-pop hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+.layout-pop .head { padding: 3px 12px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.layout-pop .where { margin-left: auto; color: var(--muted); font-size: 11px; }
+
+/* A pane in its own window */
+.popout { display: flex; flex-direction: column; height: 100%; }
+.popout-bar { display: flex; align-items: center; gap: 10px; padding: 2px 8px; background: var(--title); border-bottom: 1px solid var(--line); font-size: 12px; }
+.popout-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.popout-body > .panel, .popout-body > .grid, .popout-body > .ftx, .popout-body > .awards { flex: 1; margin: 0; border: 0; border-radius: 0; min-height: 0; }
+.grid-row.editing { box-shadow: inset 3px 0 0 var(--accent); }
+.grid-body:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+.worked-pane tbody tr, .grid-row { user-select: none; }

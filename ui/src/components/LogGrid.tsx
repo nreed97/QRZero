@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState, type MutableRefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { api } from "../api";
 import { PAPER_ACTIONS } from "../paper";
@@ -22,9 +22,13 @@ interface Props {
   columns: string[];
   onColumns: (c: string[]) => void;
   locations: Location[];
+  /** Filled in with a function that finds the QSO before or after one (for the editor's arrows). */
+  stepper?: MutableRefObject<((id: number, dir: -1 | 1) => Qso | null) | null>;
+  /** The QSO open in the editor. */
+  editingId?: number | null;
 }
 
-export default function LogGrid({ logId, refreshKey, filter, onFilter, selection, onSelection, onEdit, onDeleted, onExportSelected, columns, onColumns, locations }: Props) {
+export default function LogGrid({ logId, refreshKey, filter, onFilter, selection, onSelection, onEdit, onDeleted, onExportSelected, columns, onColumns, locations, stepper, editingId }: Props) {
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
   const [search, setSearch] = useState(filter.call ?? "");
@@ -96,6 +100,44 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
   }, [first, last, filterKey, refreshKey, logId]);
 
   const rowAt = (i: number): Qso | undefined => pages.current.get(Math.floor(i / PAGE))?.[i % PAGE];
+
+  const indexOf = (id: number): number | null => {
+    for (const [p, rows] of pages.current) {
+      const i = rows.findIndex((r) => r.id === id);
+      if (i >= 0) return p * PAGE + i;
+    }
+    return null;
+  };
+
+  /** Moves to the row `dir` away from QSO `id`, selects it and returns it. */
+  const step = (id: number, dir: -1 | 1): Qso | null => {
+    const i = indexOf(id);
+    if (i === null) return null;
+    const q = rowAt(i + dir);
+    if (!q) return null;
+    lastClicked.current = i + dir;
+    onSelection(new Set([q.id]));
+    virtualizer.scrollToIndex(i + dir, { align: "auto" });
+    return q;
+  };
+  if (stepper) stepper.current = step;
+
+  const keys = (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget) return;
+    const cur = lastClicked.current;
+    if (e.key === "Enter" && cur !== null) {
+      const q = rowAt(cur);
+      if (q) onEdit(q);
+      e.preventDefault();
+    } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && total > 0) {
+      e.preventDefault();
+      const next = cur === null ? 0 : Math.max(0, Math.min(total - 1, cur + (e.key === "ArrowDown" ? 1 : -1)));
+      const q = rowAt(next);
+      lastClicked.current = next;
+      virtualizer.scrollToIndex(next, { align: "auto" });
+      if (q) onSelection(new Set([q.id]));
+    }
+  };
 
   const click = (e: React.MouseEvent, i: number, q: Qso) => {
     const next = new Set(e.ctrlKey || e.metaKey ? selection : []);
@@ -213,18 +255,18 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
           <span key={c.key} className={c.cls}>{c.label}</span>
         ))}
       </div>
-      <div className="grid-body" ref={scroller}>
+      <div className="grid-body" ref={scroller} tabIndex={0} onKeyDown={keys} aria-label="QSOs (arrows move, Enter edits)">
         <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
           {items.map((v) => {
             const q = rowAt(v.index);
             return (
               <div
                 key={v.key}
-                className={`grid-row ${q && selection.has(q.id) ? "selected" : ""} ${v.index % 2 ? "odd" : ""}`}
+                className={`grid-row ${q && selection.has(q.id) ? "selected" : ""} ${q && q.id === editingId ? "editing" : ""} ${v.index % 2 ? "odd" : ""}`}
                 style={{ transform: `translateY(${v.start}px)`, height: ROW, gridTemplateColumns: template }}
                 onClick={(e) => q && click(e, v.index, q)}
                 onDoubleClick={() => q && onEdit(q)}
-                title={q ? "Double-click to edit" : undefined}
+                title={q ? "Double-click or Enter to edit" : undefined}
               >
                 <span className="sel">
                   {q && <input type="checkbox" checked={selection.has(q.id)} onChange={() => toggle(q)} onClick={(e) => e.stopPropagation()} />}

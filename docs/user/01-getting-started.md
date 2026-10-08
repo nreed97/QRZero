@@ -19,14 +19,19 @@ Your log is stored in one file, `qrzero.db`, in `%APPDATA%\QRZero`. Back that fo
 
 ## The main window
 
-| Area | What it's for |
+The window is made of panes. Each pane has a tab at its top, and panes can share a spot as tabs.
+
+| Pane | What it's for |
 | --- | --- |
-| Top bar | Pick the log, the station callsign and the location you are logging from. The UTC clock is on the right. |
-| Entry panel | Type the QSO and press <kbd>Enter</kbd> to log it. |
-| Station panel | Details about the station you are working and your history with it. |
+| Top bar | Pick the log, the station callsign and the location you are logging from. The UTC clock and the **Layout** menu are on the right. |
+| New QSO | Type the QSO and press <kbd>Enter</kbd> to log it. |
+| Worked before | Every earlier QSO with the call you are typing. |
+| Station | Details about the station you are working. |
 | Map | Your QTH, the other station, and the path between them with headings and distance. |
-| Log grid | Every QSO in the open log, newest first. |
-| FTx monitor | Decodes from every WSJT-X and JTDX you run, flagged by what you need. Switch with the tabs above the log. |
+| Log | Every QSO in the open log, newest first. |
+| FTx monitor, Cluster, Awards | Tabs next to the log to start with. |
+
+You can move, resize, hide and pop out any of them. See **Arranging the window**. Double-click a QSO to edit it in its own window.
 
 ## Coming from Log4OM 2
 

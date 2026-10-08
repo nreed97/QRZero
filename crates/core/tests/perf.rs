@@ -55,6 +55,8 @@ fn large_log_speed() {
     timed("first query after import", &|| st.search(log, &QsoFilter::default(), Sort::Newest, 0, 200).unwrap().0);
     let page = timed("newest page of 200", &|| st.search(log, &QsoFilter::default(), Sort::Newest, 0, 200).unwrap().0);
     let call = timed("call prefix K5Q", &|| st.search(log, &QsoFilter { call: Some("K5Q".into()), ..Default::default() }, Sort::Newest, 0, 200).unwrap().0);
+    let exact = timed("exact call K5Q100 with portable forms", &|| st.search(log, &QsoFilter { exact_call: Some("K5Q100".into()), ..Default::default() }, Sort::Newest, 0, 10_000).unwrap().0);
+    let exact_pfx = timed("exact call EA8/K5Q100", &|| st.search(log, &QsoFilter { exact_call: Some("EA8/K5Q100".into()), ..Default::default() }, Sort::Newest, 0, 10_000).unwrap().0);
     let band = timed("20m CW", &|| st.search(log, &QsoFilter { bands: vec!["20m".into()], modes: vec!["CW".into()], ..Default::default() }, Sort::Newest, 0, 200).unwrap().0);
     let band_only = timed("all 20m", &|| st.search(log, &QsoFilter { bands: vec!["20m".into()], ..Default::default() }, Sort::Newest, 0, 200).unwrap().0);
     let wb = timed("worked before", &|| st.worked_before(log, "K5Q100", Some(291)).unwrap().call_count);
@@ -76,7 +78,7 @@ fn large_log_speed() {
     let (_, n) = st.export_adif(log, &QsoFilter::default(), ExportProfile::Full, "perf").unwrap();
     println!("export {n} QSOs: {:?}", t.elapsed());
 
-    for e in [page, call, band, band_only, wb, pending, batch] {
+    for e in [page, call, exact, exact_pfx, band, band_only, wb, pending, batch] {
         assert!(e.as_millis() < 100, "interactive query too slow: {e:?}");
     }
 }

@@ -65,7 +65,7 @@ export default function SettingsDialog(props: Props) {
       {tab === "logs" && <LogsTab {...props} guard={guard} />}
       {tab === "equipment" && (
         <>
-          <p className="muted">The radios, antennas, amplifiers and rotators at each location. Pick which ones you're using from the QSO panel; they are saved with each QSO as MY_RIG and MY_ANTENNA, and the power fills TX_PWR.</p>
+          <p className="muted">The radios, antennas, amplifiers and rotators at each location. Pick which ones you're using from the QSO panel; they are saved with each QSO as MY_RIG and MY_ANTENNA, and the power fills TX_PWR. Give antennas their bands and the QSO panel picks the right one for the band.</p>
           <EquipmentTree locations={props.locations} equipment={props.equipment} onChanged={props.onChanged} />
         </>
       )}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { BANDS, MODES, bandForFreq, choiceFor } from "../modes";
+import { antennaForBand, hasBands } from "../antennas";
 import { fieldDef, freshValues, type EntryLayout } from "../fields";
 import { localGet, localSet } from "../prefs";
 import type { Equipment, Fields, Location, LookupResult, Radio } from "../types";
@@ -29,6 +30,8 @@ interface Props {
   onRadio: (key: string) => void;
   /** A station picked from the FTx monitor or a spot. */
   prefill: Prefill | null;
+  /** Fields copied from an earlier QSO (Worked before, Copy): fill them in. */
+  copy?: { nonce: number; fields: Fields } | null;
 }
 
 export interface Prefill {
@@ -57,9 +60,10 @@ function radioMode(r: Radio): string | null {
 // Lookup fields logged even when they aren't shown in the form.
 const CARRIED = ["CQZ", "ITUZ", "CONT", "LAT", "LON", "IOTA", "EMAIL", "QSL_VIA", "DXCC", "COUNTRY", "GRIDSQUARE", "STATE", "CNTY", "NAME", "QTH"];
 
+// Picked equipment ids; -1 is "none", and antenna 0 is "Auto (by band)".
 interface Gear { rig?: number; antenna?: number; amplifier?: number }
 
-export default function EntryPanel({ logId, stationCall, location, layout, equipment, onLogged, onLookup, onContext, onHelp, radios, radioKey, onRadio, prefill }: Props) {
+export default function EntryPanel({ logId, stationCall, location, layout, equipment, onLogged, onLookup, onContext, onHelp, radios, radioKey, onRadio, prefill, copy }: Props) {
   const prefs = useRef(localGet("qrzero.entry", { freq: "", band: "20m", mode: "CW", last: {} as Fields })).current;
   const [freq, setFreq] = useState(prefs.freq);
   const [band, setBand] = useState(prefs.band);
@@ -78,6 +82,9 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
   const [busy, setBusy] = useState(false);
   const gearKey = `qrzero.gear.${location?.id ?? 0}`;
   const [gear, setGear] = useState<Gear>(() => localGet<Gear>(gearKey, {}));
+  // The antenna last picked by hand on each band, preferred by Auto when several fit.
+  const recentKey = `qrzero.antByBand.${location?.id ?? 0}`;
+  const [recentAnt, setRecentAnt] = useState<Record<string, number>>(() => localGet<Record<string, number>>(recentKey, {}));
   const callRef = useRef<HTMLInputElement>(null);
   const lookedUp = useRef("");
   const lookupSeq = useRef(0);
@@ -85,16 +92,22 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
   const visibleKeys = useMemo(() => new Set(layout.rows.flat().map((i) => i.key)), [layout]);
   const byKind = (kind: string) => equipment.filter((e) => e.kind === kind);
   const radio = radios.find((r) => r.key === radioKey) ?? null;
+  const antennas = byKind("antenna");
+  // Auto is offered once an antenna has bands, and is then the default.
+  const canAutoAnt = antennas.some((a) => hasBands(a.fields));
+  const autoAnt = canAutoAnt && (gear.antenna === undefined || gear.antenna === 0);
   const pick = (kind: keyof Gear) => {
+    if (kind === "antenna" && autoAnt) return antennaForBand(antennas, band, recentAnt[band]);
     const list = byKind(kind);
     // A controlled rig is the rig in use while the panel follows it.
     const controlled = kind === "rig" && radio?.source === "rig" ? list.find((e) => radio.key.startsWith(`rig:${e.id}:`)) : undefined;
     if (controlled) return controlled;
-    if (kind !== "amplifier" && gear[kind] === undefined) return list[0];
+    if (kind !== "amplifier" && (gear[kind] === undefined || gear[kind] === 0)) return list[0];
     return list.find((e) => e.id === gear[kind]);
   };
 
   useEffect(() => setGear(localGet<Gear>(gearKey, {})), [gearKey]);
+  useEffect(() => setRecentAnt(localGet<Record<string, number>>(recentKey, {})), [recentKey]);
 
   useEffect(() => {
     onContext({ band, mode: choiceFor(mode).submode ?? choiceFor(mode).mode, fields: { ...lookupFill, ...form, CALL: call } });
@@ -155,9 +168,14 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
   };
 
   const chooseGear = (kind: keyof Gear, id: string) => {
-    const next = { ...gear, [kind]: id === "" ? -1 : Number(id) };
+    const next = { ...gear, [kind]: id === "" ? -1 : id === "auto" ? 0 : Number(id) };
     setGear(next);
     localSet(gearKey, next);
+    if (kind === "antenna" && Number(id) > 0) {
+      const recent = { ...recentAnt, [band]: Number(id) };
+      setRecentAnt(recent);
+      localSet(recentKey, recent);
+    }
   };
 
   type Found = { fill: Fields };
@@ -220,6 +238,12 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill?.nonce]);
 
+  useEffect(() => {
+    if (!copy) return;
+    setForm((f) => ({ ...f, ...copy.fields }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [copy?.nonce]);
+
   const log = async (found: Found | null = null) => {
     const c = call.trim().toUpperCase();
     if (!c || busy) return;
@@ -266,6 +290,7 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
     const rig = pick("rig"), ant = pick("antenna"), amp = pick("amplifier");
     if (rig) fields.MY_RIG = rig.name;
     if (ant) fields.MY_ANTENNA = ant.name;
+    else if (autoAnt && !touched.has("MY_ANTENNA")) delete fields.MY_ANTENNA;
     if (amp) fields.APP_QRZERO_AMPLIFIER = amp.name;
     if (!fields.TX_PWR) {
       const watts = amp?.fields.POWER_W ?? rig?.fields.POWER_W;
@@ -312,11 +337,13 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
     const list = byKind(kind);
     if (!list.length) return null;
     const cur = pick(kind);
+    const auto = kind === "antenna" && autoAnt;
     return (
       <label className="gear">
         {label}
-        <select value={cur?.id ?? ""} onChange={(e) => chooseGear(kind, e.target.value)}>
+        <select value={auto ? "auto" : cur?.id ?? ""} onChange={(e) => chooseGear(kind, e.target.value)} data-testid={`gear-${kind}`}>
           {kind === "amplifier" && <option value="">none</option>}
+          {kind === "antenna" && canAutoAnt && <option value="auto">{auto ? (cur ? `Auto: ${cur.name}` : `Auto: none for ${band}`) : "Auto (by band)"}</option>}
           {list.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
         </select>
       </label>

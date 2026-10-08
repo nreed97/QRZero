@@ -58,7 +58,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByText("QSOs imported")).toContainText("2");
   await expect(page.getByText("1 duplicates skipped")).toBeVisible();
   await page.getByRole("button", { name: "Done" }).click();
-  await expect(page.locator(".grid-tools")).toContainText("3 QSOs");
+  await expect(page.locator(".grid > .grid-tools")).toContainText("3 QSOs");
 
   // Show the rig column; the QSO logged from the keyboard recorded the K3 and its power.
   await page.getByRole("button", { name: "Columns" }).click();
@@ -68,20 +68,27 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
 
   // Search by call prefix and by wildcard.
   await page.getByTestId("search").fill("K1");
-  await expect(page.locator(".grid-tools")).toContainText("2 QSOs");
+  await expect(page.locator(".grid > .grid-tools")).toContainText("2 QSOs");
   await page.getByTestId("search").fill("*XY*");
-  await expect(page.locator(".grid-tools")).toContainText("1 QSO");
+  await expect(page.locator(".grid > .grid-tools")).toContainText("1 QSO");
   await expect(page.locator(".grid-row").first()).toContainText("FT4");
   await page.getByTestId("search").fill("");
-  await expect(page.locator(".grid-tools")).toContainText("3 QSOs");
+  await expect(page.locator(".grid > .grid-tools")).toContainText("3 QSOs");
 
-  // Edit a QSO.
-  await page.locator(".grid-row", { hasText: "K1ABC" }).dblclick();
-  const name = page.getByRole("dialog").locator(".kv-row", { has: page.locator('input[value="NAME"]') }).locator("input").nth(1);
+  // Edit a QSO: the editor opens in its own window.
+  const [editWin] = await Promise.all([page.waitForEvent("popup"), page.locator(".grid-row", { hasText: "K1ABC" }).dblclick()]);
+  const editor = editWin.locator(".qso-editor");
+  const name = editor.getByLabel("Name", { exact: true });
   await expect(name).toHaveValue("José");
   await name.fill("Jose Maria");
-  await page.getByRole("button", { name: "Save" }).click();
+  await expect(editor.locator(".qe-changes")).toHaveText("1 change");
+  await editor.getByRole("button", { name: "Save" }).click();
   await expect(page.locator(".grid-row", { hasText: "K1ABC" })).toContainText("Jose Maria");
+  await expect(editor.getByRole("button", { name: "Save" })).toBeDisabled();
+  // The QSO above it in the log, from the editor's arrows.
+  await editor.getByRole("button", { name: "Previous QSO" }).click();
+  await expect(editor.getByLabel("Call", { exact: true })).not.toHaveValue("K1ABC");
+  await Promise.all([editWin.waitForEvent("close"), editor.getByRole("button", { name: "Close editor" }).click()]);
 
   // Export 40m only, full fields.
   await page.getByRole("button", { name: "Export", exact: true }).click();
@@ -100,21 +107,21 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   expect(text).not.toContain("W1AW");
 
   // The FTx monitor waits for WSJT-X, and the integrations are set up in Settings.
-  await page.getByRole("button", { name: "FTx monitor" }).click();
+  await page.getByRole("tab", { name: "FTx monitor" }).click();
   await expect(page.getByText("Waiting for WSJT-X or JTDX")).toBeVisible();
-  await page.getByRole("button", { name: "Log", exact: true }).click();
+  await page.getByRole("tab", { name: "Log", exact: true }).click();
   await page.getByRole("button", { name: "Settings" }).click();
   await page.getByRole("button", { name: "Radios and programs" }).click();
   await expect(page.getByLabel("Listen to WSJT-X / JTDX")).toBeChecked();
   await page.getByRole("button", { name: "Close" }).click();
 
   // With no cluster set up, the Cluster pane sends you to Settings to add one.
-  await page.getByRole("button", { name: "Cluster" }).click();
+  await page.getByRole("tab", { name: "Cluster" }).click();
   await page.getByRole("button", { name: "Add a cluster…" }).click();
   await page.getByRole("button", { name: "VE7CC" }).click();
   await expect(page.locator("input[aria-label=Host]").first()).toHaveValue("dxc.ve7cc.net");
   await page.getByRole("button", { name: "Close" }).click();
-  await page.getByRole("button", { name: "Log", exact: true }).click();
+  await page.getByRole("tab", { name: "Log", exact: true }).click();
 
   // QSL uploads: keys are saved, never shown back.
   await page.getByRole("button", { name: "QSL", exact: true }).click();
@@ -134,10 +141,70 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "Close" }).click();
 
   // Awards: everything worked so far, nothing confirmed.
-  await page.getByRole("button", { name: "Awards" }).click();
+  await page.getByRole("tab", { name: "Awards" }).click();
   await page.getByRole("button", { name: "WAZ" }).click();
   await expect(page.locator(".award-table")).toContainText("Zone 40");
-  await page.getByRole("button", { name: "Log", exact: true }).click();
+  await page.getByRole("tab", { name: "Log", exact: true }).click();
+
+  // Antennas with bands: the QSO panel picks the one for the band.
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("button", { name: "Equipment" }).click();
+  for (const [antName, bands] of [["Hex beam", ["20m", "15m"]], ["Dipole", ["40m"]]] as const) {
+    await page.getByRole("button", { name: "add antenna" }).click();
+    await page.getByLabel("Name (shown when logging)").fill(antName);
+    for (const b of bands) await page.getByTestId("antenna-bands").getByLabel(b, { exact: true }).check();
+    await page.getByRole("button", { name: "Save" }).click();
+  }
+  await expect(page.locator(".tree .item", { hasText: "Hex beam" })).toContainText("20 15 m");
+  await page.getByRole("button", { name: "Close" }).click();
+  const ant = page.getByTestId("gear-antenna");
+  const bandPick = page.locator(".entry label.f", { has: page.locator("span", { hasText: /^Band$/ }) }).locator("select");
+  await bandPick.selectOption("20m");
+  await expect(ant.locator("option:checked")).toHaveText("Auto: Hex beam");
+  await bandPick.selectOption("6m");
+  await expect(ant.locator("option:checked")).toHaveText("Auto: none for 6m");
+  await bandPick.selectOption("40m");
+  await expect(ant.locator("option:checked")).toHaveText("Auto: Dipole");
+  await call.fill("K9ANT");
+  await call.press("Enter");
+  await expect(page.getByText("Logged K9ANT on 40m")).toBeVisible();
+  const headers = { "x-qrzero-token": "e2e" };
+  const logId = (await (await page.request.get("/api/logs", { headers })).json())[0].id;
+  const found = await (await page.request.post(`/api/logs/${logId}/qsos/search`, { headers, data: { filter: { call: "K9ANT" } } })).json();
+  expect(found.rows[0].fields.MY_ANTENNA).toBe("Dipole");
+
+  // Worked before lists earlier QSOs with the call; double-click one to edit it beside the log.
+  await call.fill("K1XYZ");
+  await call.press("Tab");
+  const worked = page.locator(".worked-pane");
+  await expect(worked.locator("tbody tr")).toHaveCount(1);
+  const [editWin2] = await Promise.all([page.waitForEvent("popup"), worked.locator("tbody tr").first().dblclick()]);
+  await expect(editWin2.getByLabel("Call", { exact: true })).toHaveValue("K1XYZ");
+  await Promise.all([editWin2.waitForEvent("close"), editWin2.getByRole("button", { name: "Close editor" }).click()]);
+
+  // Panes: drag the Cluster tab beside the Station pane, it gets its own group.
+  const station = page.locator(".ws-group", { has: page.getByRole("tab", { name: "Station" }) }).locator(".ws-body");
+  const box = (await station.boundingBox())!;
+  await page.getByRole("tab", { name: "Cluster" }).dragTo(station, { targetPosition: { x: box.width - 10, y: box.height / 2 } });
+  const clusterGroup = page.locator(".ws-group", { has: page.getByRole("tab", { name: "Cluster" }) });
+  await expect(clusterGroup.getByRole("tab")).toHaveCount(1);
+
+  // Layouts are saved by name and come back after a reload.
+  page.once("dialog", (d) => d.accept("Test layout"));
+  await page.getByRole("button", { name: /^Layout/ }).click();
+  await page.getByRole("menuitem", { name: "Save layout as…" }).click();
+  await page.keyboard.press("Escape");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Layout: Test layout" })).toBeVisible();
+  await expect(page.locator(".ws-group", { has: page.getByRole("tab", { name: "Cluster" }) }).getByRole("tab")).toHaveCount(1);
+
+  // A pane pops out into its own window and docks back when that window closes.
+  await page.getByRole("tab", { name: "FTx monitor" }).click();
+  const [popup] = await Promise.all([page.waitForEvent("popup"), page.getByRole("button", { name: "Pop out FTx monitor" }).click()]);
+  await expect(popup.getByText("Waiting for WSJT-X or JTDX")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "FTx monitor" })).toHaveCount(0);
+  await popup.getByRole("button", { name: "Dock back" }).click();
+  await expect(page.getByRole("tab", { name: "FTx monitor" })).toBeVisible();
 
   // The user guide opens from the top bar.
   await page.getByRole("button", { name: "Help" }).click();

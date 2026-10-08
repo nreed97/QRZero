@@ -154,6 +154,14 @@ fn status_from(id: &str, dial: u64, mode: &str) -> Vec<u8> {
     p.0
 }
 
+/// A full Status, as WSJT-X 2.x sends it, with a configuration name.
+fn status_config(id: &str, dial: u64, mode: &str, config: &str) -> Vec<u8> {
+    let mut p = Packet(status_from(id, dial, mode));
+    // tx_watchdog, sub_mode, fast_mode, special_op_mode (u8), frequency_tolerance, tr_period, configuration_name, tx_message
+    p.bool(false).str("").bool(false).bool(false).u32(0).u32(15).str(config).str("");
+    p.0
+}
+
 fn decode(time_ms: u32, snr: i32, df: u32, message: &str) -> Vec<u8> {
     decode_from("WSJT-X", time_ms, snr, df, message)
 }
@@ -333,14 +341,21 @@ async fn wsjtx_instances_on_separate_ports() {
 
     let one = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let two = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-    one.send_to(&status_from("WSJT-X - 20m", 14_074_000, "FT8"), format!("127.0.0.1:{a}")).await.unwrap();
-    one.send_to(&decode_from("WSJT-X - 20m", 45_015_000, -12, 1200, "CQ K1ABC FN42"), format!("127.0.0.1:{a}")).await.unwrap();
-    two.send_to(&status_from("JTDX - 40m", 7_074_000, "FT8"), format!("127.0.0.1:{b}")).await.unwrap();
+    one.send_to(&status_from("WSJT-X - Slice A", 14_074_000, "FT8"), format!("127.0.0.1:{a}")).await.unwrap();
+    one.send_to(&decode_from("WSJT-X - Slice A", 45_015_000, -12, 1200, "CQ K1ABC FN42"), format!("127.0.0.1:{a}")).await.unwrap();
+    two.send_to(&status_config("JTDX - 40m", 7_074_000, "FT8", "Flex Slice B"), format!("127.0.0.1:{b}")).await.unwrap();
     two.send_to(&decode_from("JTDX - 40m", 45_015_000, -5, 900, "CQ JA1XYZ PM95"), format!("127.0.0.1:{b}")).await.unwrap();
 
     let ftx = api.wait_for("/ftx", None, |v| v["decodes"].as_array().is_some_and(|d| d.len() == 2) && v["instances"].as_array().is_some_and(|i| i.len() == 2)).await;
     let ja = ftx["decodes"].as_array().unwrap().iter().find(|d| d["call"] == "JA1XYZ").unwrap().clone();
     assert_eq!(ja["band"], "40m");
+    // Each decode says where it came from: the slice from the id or the configuration name.
+    assert_eq!((&ja["source"], &ja["slice"]), (&json!("Slice B · JTDX"), &json!("B")));
+    let k1 = ftx["decodes"].as_array().unwrap().iter().find(|d| d["call"] == "K1ABC").unwrap().clone();
+    assert_eq!((&k1["source"], &k1["slice"]), (&json!("Slice A · WSJT-X"), &json!("A")));
+    assert_ne!(k1["color_index"], ja["color_index"]);
+    let jtdx = ftx["instances"].as_array().unwrap().iter().find(|i| i["id"] == "JTDX - 40m").unwrap().clone();
+    assert_eq!((&jtdx["program"], &jtdx["configuration_name"], &jtdx["rig_key"]), (&json!("JTDX"), &json!("Flex Slice B"), &Value::Null));
 
     // A reply goes to the instance that decoded it, on its own port.
     api.post("/ftx/reply", json!({"seq": ja["seq"]})).await;
@@ -349,4 +364,37 @@ async fn wsjtx_instances_on_separate_ports() {
     assert_eq!(from.port(), b);
     assert!(String::from_utf8_lossy(&buf[..n]).contains("CQ JA1XYZ PM95"));
     assert!(tokio::time::timeout(Duration::from_millis(200), one.recv_from(&mut buf)).await.is_err(), "nothing for the other instance");
+}
+
+#[tokio::test]
+async fn auto_logged_qsos_get_the_antenna_for_their_band() {
+    let api = Api::new().await;
+    let (log, loc) = setup(&api).await;
+    let port = free_udp_port();
+    let mut cfg = api.get("/integrations").await["config"].clone();
+    cfg["wsjtx_listen"] = json!(format!("127.0.0.1:{port}"));
+    api.send(reqwest::Method::PUT, "/integrations", Some(cfg), None).await;
+    for (name, bands) in [("Dipole", "80m,40m"), ("Hex beam", "20m,17m,15m"), ("Vertical", "40 20 10")] {
+        api.post(&format!("/locations/{loc}/equipment"), json!({"kind": "antenna", "name": name, "fields": {"BANDS": bands}})).await;
+    }
+
+    let wsjtx = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let server = format!("127.0.0.1:{port}");
+    let qso = |call: &str, band: &str, extra: &str| {
+        format!("<call:{}>{call}<mode:3>FT8<qso_date:8>20240102<time_on:6>123015<band:{}>{band}{extra}<eor>", call.len(), band.len())
+    };
+    wsjtx.send_to(&logged_adif(&qso("K1ABC", "20m", "")), &server).await.unwrap();
+    wsjtx.send_to(&logged_adif(&qso("K2ABC", "10m", "")), &server).await.unwrap();
+    wsjtx.send_to(&logged_adif(&qso("K3ABC", "6m", "")), &server).await.unwrap();
+    wsjtx.send_to(&logged_adif(&qso("K4ABC", "20m", "<my_antenna:4>Loop")), &server).await.unwrap();
+
+    let all = api.wait_for(&format!("/logs/{log}/qsos/search"), Some(json!({"filter": {}})), |v| v["total"] == 4).await;
+    let ant = |call: &str| {
+        let row = all["rows"].as_array().unwrap().iter().find(|r| r["fields"]["CALL"] == call).unwrap();
+        row["fields"]["MY_ANTENNA"].as_str().map(str::to_string)
+    };
+    assert_eq!(ant("K1ABC").as_deref(), Some("Hex beam"), "first antenna in tree order for 20m");
+    assert_eq!(ant("K2ABC").as_deref(), Some("Vertical"));
+    assert_eq!(ant("K3ABC"), None, "no antenna covers 6m");
+    assert_eq!(ant("K4ABC").as_deref(), Some("Loop"), "the program's own antenna is kept");
 }

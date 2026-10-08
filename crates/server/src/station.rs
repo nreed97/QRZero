@@ -117,6 +117,10 @@ pub struct FtxDecode {
     pub entity: Option<Entity>,
     pub needed: Option<Needed>,
     pub low_confidence: bool,
+    /// The instance's short source label (see [`FtxInstance::source`]), copied so the UI needn't join.
+    pub source: String,
+    pub slice: Option<String>,
+    pub color_index: u8,
     #[serde(skip)]
     raw: wsjtx::Decode,
 }
@@ -131,8 +135,138 @@ pub struct FtxInstance {
     pub dx_call: String,
     pub transmitting: bool,
     pub tx_enabled: bool,
+    /// "WSJT-X", "JTDX" or "MSHV", from the instance id.
+    pub program: &'static str,
+    /// WSJT-X's configuration name (File, Settings, Configurations), when it sends one.
+    pub configuration_name: String,
+    /// A slice / VFO / receiver letter from the id, the configuration name or the matched rig.
+    pub slice: Option<String>,
+    /// The CAT/TCI/Hamlib radio on the same dial frequency, when there's one clear match.
+    pub rig_key: Option<String>,
+    pub rig_name: Option<String>,
+    /// A short human label, e.g. "Slice A · WSJT-X" or "FT-991A · JTDX".
+    pub source: String,
+    /// Stable per instance (order of first appearance), 0..7, for colouring.
+    pub color_index: u8,
     #[serde(skip)]
     addr: SocketAddr,
+}
+
+/// Where an instance's decodes come from: built once per Status, copied onto each decode.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct FtxSource {
+    pub program: &'static str,
+    pub slice: Option<String>,
+    pub rig_key: Option<String>,
+    pub rig_name: Option<String>,
+    pub source: String,
+}
+
+/// The program behind a WSJT-X protocol id. JTDX and MSHV say so in their id.
+pub fn ftx_program(id: &str) -> &'static str {
+    let up = id.to_ascii_uppercase();
+    if up.contains("JTDX") {
+        "JTDX"
+    } else if up.contains("MSHV") {
+        "MSHV"
+    } else {
+        "WSJT-X"
+    }
+}
+
+/// Finds "Slice A", "slice-b", "VFO B", "RX2" and the like. Returns the letter and a short label.
+pub fn slice_in(text: &str) -> Option<(char, String)> {
+    let up = text.to_ascii_uppercase();
+    let tokens: Vec<&str> = up.split(|c: char| !c.is_ascii_alphanumeric()).filter(|t| !t.is_empty()).collect();
+    let letter = |s: &str, max: u8| {
+        let b = s.as_bytes();
+        (b.len() == 1 && (b'A'..=max).contains(&b[0])).then(|| b[0] as char)
+    };
+    let digit = |s: &str| {
+        let b = s.as_bytes();
+        (b.len() == 1 && (b'1'..=b'8').contains(&b[0])).then(|| b[0])
+    };
+    for (i, t) in tokens.iter().enumerate() {
+        let next = tokens.get(i + 1).copied().unwrap_or("");
+        for (word, max, label) in [("SLICE", b'H', "Slice"), ("VFO", b'B', "VFO")] {
+            if let Some(rest) = t.strip_prefix(word) {
+                if let Some(c) = letter(if rest.is_empty() { next } else { rest }, max) {
+                    return Some((c, format!("{label} {c}")));
+                }
+            }
+        }
+        if let Some(rest) = t.strip_prefix("RX") {
+            if let Some(d) = digit(if rest.is_empty() { next } else { rest }) {
+                return Some(((b'A' + d - b'1') as char, format!("RX{}", d as char)));
+            }
+        }
+    }
+    None
+}
+
+/// The channel letter of a multi-channel rig radio ("FLEX-6600 B"), as `follow_rig` names them.
+fn rig_channel(r: &Radio) -> Option<char> {
+    let (_, last) = r.name.rsplit_once(' ')?;
+    let b = last.as_bytes();
+    (b.len() == 1 && b[0].is_ascii_uppercase()).then(|| b[0] as char)
+}
+
+/// Works out an instance's source label from its id, configuration name, dial frequency and the
+/// rigs QRZero follows. Cheap enough to run on every Status.
+pub fn ftx_source<'a>(id: &str, config: &str, dial: u64, radios: impl IntoIterator<Item = &'a Radio>) -> FtxSource {
+    let program = ftx_program(id);
+    let config = config.trim();
+    let named = slice_in(id).or_else(|| slice_in(config));
+    let hay = format!("{id} {config}").to_ascii_uppercase();
+    let mut best: Option<(u8, &Radio)> = None;
+    let mut tie = false;
+    for r in radios {
+        if r.source != "rig" || !r.state.connected || r.state.freq_hz.abs_diff(dial) > 3000 {
+            continue;
+        }
+        let ch = rig_channel(r);
+        let mut score = 0;
+        if named.as_ref().is_some_and(|(c, _)| ch == Some(*c)) {
+            score += 2;
+        }
+        let base = match ch {
+            Some(_) => r.name.rsplit_once(' ').map_or(r.name.as_str(), |(b, _)| b),
+            None => r.name.as_str(),
+        };
+        if !base.is_empty() && hay.contains(&base.to_ascii_uppercase()) {
+            score += 1;
+        }
+        match best {
+            Some((s, _)) if s > score => {}
+            Some((s, _)) if s == score => tie = true,
+            _ => {
+                best = Some((score, r));
+                tie = false;
+            }
+        }
+    }
+    let rig = best.filter(|_| !tie).map(|(_, r)| r);
+    let slice = named.as_ref().map(|(c, _)| *c).or_else(|| rig.and_then(rig_channel));
+    let source = if let Some((_, label)) = &named {
+        format!("{label} · {program}")
+    } else if let Some(r) = rig {
+        format!("{} · {program}", r.name)
+    } else if !config.is_empty() && !config.eq_ignore_ascii_case("Default") {
+        if config.to_ascii_uppercase().contains(&program.to_ascii_uppercase()) {
+            config.to_string()
+        } else {
+            format!("{config} · {program}")
+        }
+    } else {
+        id.to_string()
+    };
+    FtxSource {
+        program,
+        slice: slice.map(String::from),
+        rig_key: rig.map(|r| r.key.clone()),
+        rig_name: rig.map(|r| r.name.clone()),
+        source,
+    }
 }
 
 #[derive(Default, Serialize)]
@@ -162,6 +296,8 @@ struct Inner {
     radios: BTreeMap<String, Radio>,
     worked: Option<(i64, WorkedIndex)>,
     instances: BTreeMap<String, FtxInstance>,
+    /// Colour slot per instance id, in order of first appearance.
+    ftx_colors: HashMap<String, u8>,
     decodes: VecDeque<FtxDecode>,
     seq: u64,
     integrations: Integrations,
@@ -172,6 +308,17 @@ struct Inner {
     /// Per listen address, how its WSJT-X listener is doing.
     wsjtx_status: BTreeMap<String, String>,
     rotator_az: Option<f64>,
+}
+
+impl Inner {
+    fn ftx_color(&mut self, id: &str) -> u8 {
+        if let Some(c) = self.ftx_colors.get(id) {
+            return *c;
+        }
+        let c = (self.ftx_colors.len() % 8) as u8;
+        self.ftx_colors.insert(id.to_string(), c);
+        c
+    }
 }
 
 pub struct Hub {
@@ -484,25 +631,34 @@ impl Hub {
                     i.addr = from;
                 }
             }
-            M::Status { id, dial_freq, mode, dx_call, de_call, transmitting, tx_enabled, .. } => {
-                let inst = FtxInstance {
-                    id: id.clone(),
-                    dial_freq,
-                    band: band_for_freq(dial_freq as f64 / 1e6).map(str::to_string),
-                    mode: mode.clone(),
-                    de_call,
-                    dx_call,
-                    transmitting,
-                    tx_enabled,
-                    addr: from,
-                };
+            M::Status { id, dial_freq, mode, dx_call, de_call, transmitting, tx_enabled, configuration_name, .. } => {
                 let (changed, instances) = {
                     let mut inner = self.lock();
+                    let src = ftx_source(&id, &configuration_name, dial_freq, inner.radios.values());
+                    let color_index = inner.ftx_color(&id);
+                    let inst = FtxInstance {
+                        id: id.clone(),
+                        dial_freq,
+                        band: band_for_freq(dial_freq as f64 / 1e6).map(str::to_string),
+                        mode: mode.clone(),
+                        de_call,
+                        dx_call,
+                        transmitting,
+                        tx_enabled,
+                        program: src.program,
+                        configuration_name: configuration_name.trim().to_string(),
+                        slice: src.slice,
+                        rig_key: src.rig_key,
+                        rig_name: src.rig_name,
+                        source: src.source,
+                        color_index,
+                        addr: from,
+                    };
+                    let key = |i: &FtxInstance| {
+                        (i.dial_freq, i.mode.clone(), i.dx_call.clone(), i.transmitting, i.tx_enabled, i.source.clone(), i.rig_key.clone(), i.configuration_name.clone())
+                    };
                     let old = inner.instances.insert(id.clone(), inst.clone());
-                    let changed = old.is_none_or(|o| {
-                        (o.dial_freq, &o.mode, &o.dx_call, o.transmitting, o.tx_enabled)
-                            != (inst.dial_freq, &inst.mode, &inst.dx_call, inst.transmitting, inst.tx_enabled)
-                    });
+                    let changed = old.is_none_or(|o| key(&o) != key(&inst));
                     (changed, inner.instances.values().cloned().collect::<Vec<_>>())
                 };
                 if changed {
@@ -557,7 +713,10 @@ impl Hub {
         let ft = wsjtx::parse_ft_message(&d.message);
         let entity = ft.from.as_deref().and_then(|c| self.entity(c));
         let mut inner = self.lock();
+        let color_index = inner.ftx_color(&d.id);
         let inst = inner.instances.get(&d.id);
+        let source = inst.map_or_else(|| d.id.clone(), |i| i.source.clone());
+        let slice = inst.and_then(|i| i.slice.clone());
         let dial = inst.map_or(0, |i| i.dial_freq);
         let band = inst.and_then(|i| i.band.clone());
         let mode = inst.map(|i| i.mode.clone()).filter(|m| !m.is_empty()).unwrap_or_else(|| decode_mode(&d.mode).to_string());
@@ -589,6 +748,9 @@ impl Hub {
             entity,
             needed,
             low_confidence: d.low_confidence,
+            source,
+            slice,
+            color_index,
             raw: d,
         })
     }
@@ -602,6 +764,10 @@ impl Hub {
         }
         self.fill_from_cty(&mut fields);
         let result = self.with_store(|st| {
+            if let Some(loc) = active.location_id {
+                let gear = st.list_equipment(log_id)?;
+                fill_antenna(&mut fields, gear.iter().filter(|e| e.location_id == loc));
+            }
             if let Some((id, replace)) = n1mm_id {
                 fields.insert("APP_QRZERO_N1MM_ID".into(), id.to_string());
                 if replace {
@@ -953,6 +1119,30 @@ pub fn rig_config(f: &Fields) -> Option<RigConfig> {
     })
 }
 
+/// The bands an antenna is set up for: its `BANDS` field, e.g. "40m,20m,15m" (or "40 20 15").
+pub fn antenna_bands(f: &Fields) -> Vec<&'static str> {
+    let text = f.get("BANDS").map(String::as_str).unwrap_or_default();
+    text.split(|c: char| c == ',' || c == ';' || c == '/' || c.is_whitespace())
+        .filter_map(|t| qrzero_core::band::normalize_band(t).or_else(|| qrzero_core::band::normalize_band(&format!("{t}m"))))
+        .collect()
+}
+
+/// Sets MY_ANTENNA on an auto-logged QSO that has none: the first antenna
+/// (in tree order) whose bands include the QSO's band.
+fn fill_antenna<'a>(fields: &mut Fields, gear: impl Iterator<Item = &'a qrzero_core::model::Equipment>) {
+    if fields.get("MY_ANTENNA").is_some_and(|a| !a.trim().is_empty()) {
+        return;
+    }
+    let band = fields
+        .get("BAND")
+        .and_then(|b| qrzero_core::band::normalize_band(b))
+        .or_else(|| fields.get("FREQ").and_then(|f| f.trim().parse().ok()).and_then(band_for_freq));
+    let Some(band) = band else { return };
+    if let Some(ant) = gear.filter(|e| e.kind == "antenna").find(|e| antenna_bands(&e.fields).contains(&band)) {
+        fields.insert("MY_ANTENNA".into(), ant.name.clone());
+    }
+}
+
 /// WSJT-X marks the mode of a decode with a single character.
 fn decode_mode(m: &str) -> &str {
     match m {
@@ -993,5 +1183,44 @@ mod tests {
         );
         assert_eq!(rig_config(&f(&[("CONTROL", "kenwood")])), None, "serial rigs need a port");
         assert_eq!(rig_config(&f(&[])), None);
+    }
+
+    fn rig(key: &str, name: &str, freq_hz: u64) -> Radio {
+        let state = RigState { connected: true, freq_hz, ..Default::default() };
+        Radio { key: key.into(), name: name.into(), source: "rig", can_tune: true, state }
+    }
+
+    #[test]
+    fn slice_patterns() {
+        let s = |t: &str| slice_in(t).map(|(c, l)| format!("{c} {l}"));
+        assert_eq!(s("WSJT-X - Slice A").as_deref(), Some("A Slice A"));
+        assert_eq!(s("Flex slice-b").as_deref(), Some("B Slice B"));
+        assert_eq!(s("SliceC").as_deref(), Some("C Slice C"));
+        assert_eq!(s("IC-9700 VFO B").as_deref(), Some("B VFO B"));
+        assert_eq!(s("JTDX rx2").as_deref(), Some("B RX2"));
+        assert_eq!(s("WSJT-X - 20m"), None);
+        assert_eq!(s("Slicer"), None);
+    }
+
+    #[test]
+    fn ftx_source_labels() {
+        let radios = [rig("rig:1:0", "FLEX-6600 A", 14_074_000), rig("rig:1:1", "FLEX-6600 B", 7_074_000), rig("rig:2:0", "FT-991A", 7_074_500)];
+        let wsjtx = Radio { source: "wsjtx", ..rig("wsjtx:X", "X", 14_074_000) };
+        // A slice in the id wins, and picks the matching rig channel.
+        let a = ftx_source("WSJT-X - Slice A", "", 14_074_000, &radios);
+        assert_eq!((a.source.as_str(), a.slice.as_deref(), a.rig_key.as_deref()), ("Slice A · WSJT-X", Some("A"), Some("rig:1:0")));
+        // Two rigs near 7.074; the configuration name says which.
+        let b = ftx_source("JTDX", "Flex Slice B", 7_074_000, &radios);
+        assert_eq!((b.source.as_str(), b.program, b.rig_name.as_deref()), ("Slice B · JTDX", "JTDX", Some("FLEX-6600 B")));
+        let ft = ftx_source("JTDX - 40m", "FT-991A", 7_074_000, &radios);
+        assert_eq!((ft.source.as_str(), ft.slice), ("FT-991A · JTDX", None));
+        // Ambiguous: no rig, falls back to the id.
+        let amb = ftx_source("WSJT-X", "Default", 7_074_000, &radios);
+        assert_eq!((amb.source.as_str(), amb.rig_key), ("WSJT-X", None));
+        // One rig channel on the frequency gives its letter; wsjtx radios never match.
+        let one = ftx_source("WSJT-X", "", 14_075_000, radios.iter().chain([&wsjtx]));
+        assert_eq!((one.source.as_str(), one.slice.as_deref()), ("FLEX-6600 A · WSJT-X", Some("A")));
+        let none = ftx_source("WSJT-X", "Home", 21_074_000, &radios);
+        assert_eq!(none.source, "Home · WSJT-X");
     }
 }

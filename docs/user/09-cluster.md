@@ -1,6 +1,6 @@
 # DX cluster
 
-Click **Cluster** above the log to see spots from a DX cluster. Tick **Beside the log** to keep the log in view as well.
+Click the **Cluster** tab (next to the Log tab to start with) to see spots from a DX cluster. Drag the tab beside the log to keep both in view, or pop it out to its own window.
 
 ## Setting up nodes
 

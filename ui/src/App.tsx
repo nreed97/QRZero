@@ -1,28 +1,47 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
-import type { Equipment, Location, Log, LookupResult, Qso, QsoFilter, StationCallsign } from "./types";
+import type { Equipment, Fields, Location, Log, LookupResult, Qso, QsoFilter, StationCallsign } from "./types";
 import { utcClock } from "./util";
 import { DEFAULT_COLUMNS, DEFAULT_LAYOUT, type EntryLayout } from "./fields";
 import { gridToLatLon, positionOf } from "./geo";
 import { localGet, localSet, usePref } from "./prefs";
 import EntryPanel, { type EntryContext, type Prefill } from "./components/EntryPanel";
-import FtxMonitor, { type DecodePick } from "./components/FtxMonitor";
-import ClusterPane from "./components/ClusterPane";
+import { type DecodePick } from "./components/FtxMonitor";
 import QslDialog from "./components/QslDialog";
-import { onLive, useIntegrations, useRadios, useRotator } from "./live";
-import LookupPanel from "./components/LookupPanel";
-import MapPanel, { type MapView } from "./components/MapPanel";
+import { onLive, useRadios } from "./live";
 import LogGrid from "./components/LogGrid";
 import ImportDialog from "./components/ImportDialog";
 import ExportDialog from "./components/ExportDialog";
 import SettingsDialog, { type GeneralPrefs } from "./components/SettingsDialog";
-import EditQsoDialog from "./components/EditQsoDialog";
 import HelpView from "./components/HelpView";
-import AwardsPane from "./components/AwardsPane";
+import SharedPane, { type PaneActions } from "./components/SharedPanes";
+import Workspace from "./components/Workspace";
+import LayoutMenu from "./components/LayoutMenu";
+import { listen, openPopout, post, type BusMsg, type PopContext, type WindowId } from "./bus";
+import { DEFAULT_WORKSPACE, canPopOut, findPane, removePane, sanitize, showPane, type PaneId, type Workspace as WS, type Zone } from "./workspace";
 import SetupWizard from "./components/SetupWizard";
 
 type Dialog = "import" | "export" | "settings" | "help" | "wizard" | "qsl" | null;
-interface Pane { tab: "log" | "ftx" | "cluster" | "awards"; beside: boolean }
+
+/** Where a pane goes back to when its window closes. */
+const HOME: Partial<Record<PaneId, [PaneId, Zone]>> = {
+  lookup: ["entry", "right"],
+  worked: ["entry", "bottom"],
+  map: ["lookup", "right"],
+  ftx: ["log", "center"],
+  cluster: ["log", "center"],
+  awards: ["log", "center"],
+};
+
+function dockBack(root: WS["root"], id: PaneId): WS["root"] {
+  const [near, zone] = HOME[id] ?? ["log", "center"];
+  return showPane(root, id, findPane(root, near) ? near : "log", zone, zone === "center" ? 0.5 : 0.3);
+}
+
+function initialWorkspace(): WS {
+  const saved = sanitize(localGet<{ ws: unknown }>("qrzero.workspace", { ws: null }).ws) ?? DEFAULT_WORKSPACE;
+  return saved;
+}
 
 export default function App() {
   const [logs, setLogs] = useState<Log[]>([]);
@@ -34,6 +53,8 @@ export default function App() {
   const [locationId, setLocationId] = useState<number | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [editing, setEditing] = useState<Qso | null>(null);
+  const stepper = useRef<((id: number, dir: -1 | 1) => Qso | null) | null>(null);
+  const [copy, setCopy] = useState<{ nonce: number; fields: Fields } | null>(null);
   const [lookup, setLookup] = useState<LookupResult | null>(null);
   const [entry, setEntry] = useState<EntryContext>({ band: "", mode: "", fields: {} });
   const [filter, setFilter] = useState<QsoFilter>({});
@@ -45,18 +66,20 @@ export default function App() {
   const [columns, setColumns] = usePref<string[]>("grid_columns", DEFAULT_COLUMNS);
   const [general, setGeneral] = usePref<GeneralPrefs>("general", { units: "km" });
   const radios = useRadios();
-  const rotatorAz = useRotator();
-  const integrations = useIntegrations();
-  const rotator = integrations?.rotator_enabled ? rotatorAz : undefined;
   const [radioKey, setRadioKey] = useState(localGet("qrzero.radio", { key: "" }).key);
   const [prefill, setPrefill] = useState<Prefill | null>(null);
-  const [pane, setPane] = useState<Pane>(() => {
-    const saved = localGet<Pane>("qrzero.pane2", { tab: "log", beside: false });
-    return ["log", "ftx", "cluster", "awards"].includes(saved.tab) ? saved : { tab: "log", beside: false };
-  });
+  const locationsRef = useRef(locations);
+  locationsRef.current = locations;
+  const equipmentRef = useRef(equipment);
+  equipmentRef.current = equipment;
+  const callsignsRef = useRef<StationCallsign[]>([]);
+  callsignsRef.current = callsigns ?? [];
+  const [ws, setWsState] = useState<WS>(initialWorkspace);
+  const wsRef = useRef(ws);
+  const windows = useRef(new Map<PaneId, Window>());
+  const greeted = useRef(new Set<WindowId>());
   const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState("");
-  const [mapView, setMapView] = useState<MapView>(localGet("qrzero.map", { view: "flat" as MapView }).view);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -131,10 +154,61 @@ export default function App() {
     setRadioKey(key);
     localSet("qrzero.radio", { key });
   };
-  const choosePane = (p: Partial<Pane>) => {
-    const next = { ...pane, ...p };
-    setPane(next);
-    localSet("qrzero.pane2", next);
+  const setWs = useCallback((next: WS) => {
+    wsRef.current = next;
+    setWsState(next);
+    localSet("qrzero.workspace", { ws: next });
+  }, []);
+
+  const popOut = (id: PaneId) => {
+    const cur = wsRef.current;
+    if (!canPopOut(id)) return;
+    setWs({ ...cur, root: removePane(cur.root, id), popped: [...cur.popped.filter((p) => p !== id), id] });
+  };
+
+  /** Puts a popped-out pane back in the main window. */
+  const dock = (id: PaneId) => {
+    windows.current.delete(id);
+    const cur = wsRef.current;
+    if (!cur.popped.includes(id)) return;
+    setWs({ ...cur, popped: cur.popped.filter((p) => p !== id), root: dockBack(cur.root, id) });
+  };
+
+  const focusWindow = (id: PaneId) => {
+    const w = windows.current.get(id);
+    if (w && !w.closed) w.focus();
+    else {
+      const again = openPopout(id);
+      if (again) windows.current.set(id, again);
+    }
+  };
+
+  // The QSO editor opens in its own window; this one sends it the QSO once it says hello.
+  const editorWindow = useRef<Window | null>(null);
+  const pendingEdit = useRef<Qso | null>(null);
+  const sendEdit = (q: Qso) =>
+    post({ t: "edit-open", edit: { qso: q, locations: locationsRef.current, equipment: equipmentRef.current, callsigns: callsignsRef.current } });
+
+  const openEditor = (q: Qso) => {
+    setEditing(q);
+    const w = editorWindow.current;
+    if (w && !w.closed && greeted.current.has("editor")) {
+      sendEdit(q);
+      w.focus();
+      return;
+    }
+    pendingEdit.current = q;
+    greeted.current.delete("editor");
+    editorWindow.current = openPopout("editor");
+    if (!editorWindow.current) {
+      setEditing(null);
+      setNotice("The editor window didn't open. Allow pop-ups for this page, then try again.");
+    }
+  };
+  const showQsos = (f: QsoFilter) => {
+    setFilter({ ...f, bands: undefined, modes: undefined });
+    const cur = wsRef.current;
+    setWs({ ...cur, root: showPane(cur.root, "log") });
   };
 
   const pick = (p: DecodePick) => setPrefill({ nonce: Date.now(), call: p.call, grid: p.grid, band: p.band, mode: p.mode, freq_hz: p.freq_hz });
@@ -154,6 +228,112 @@ export default function App() {
     gridToLatLon(entry.fields.GRIDSQUARE ?? "") ||
     (dxEntity && entry.fields.CALL ? { lat: dxEntity.lat, lon: dxEntity.lon } : null) ||
     null;
+
+  const actions: PaneActions = {
+    onPick: pick,
+    onEdit: openEditor,
+    onCopy: (fields) => setCopy({ nonce: Date.now(), fields }),
+    onShowQsos: showQsos,
+    onSettings: (tab) => {
+      setSettingsTab(tab);
+      setDialog("settings");
+    },
+  };
+
+  const popCtx: PopContext | null =
+    logId === null
+      ? null
+      : {
+          logId,
+          stationCall,
+          callsigns: callsigns ?? [],
+          lookup,
+          entry,
+          home,
+          dx,
+          dxLabel: entry.fields.CALL || dxStation?.CALL || "",
+          units: general.units,
+          refreshKey,
+          editingId: editing?.id ?? null,
+        };
+
+  // Messages from popped-out panes; a ref so the listener always sees current state.
+  const onBus = useRef<(m: BusMsg) => void>(() => {});
+  onBus.current = (m) => {
+    if (m.t === "hello") greeted.current.add(m.pane);
+    if (m.t === "hello" && m.pane === "editor" && pendingEdit.current) {
+      sendEdit(pendingEdit.current);
+      pendingEdit.current = null;
+    }
+    if ((m.t === "hello" || m.t === "want-ctx") && popCtx) post({ t: "ctx", ctx: popCtx });
+    if (m.t === "bye") dock(m.pane);
+    if (m.t === "edit-step") {
+      const q = stepper.current?.(m.id, m.dir);
+      if (q) {
+        setEditing(q);
+        sendEdit(q);
+      }
+    }
+    if (m.t === "edit-saved") {
+      setEditing(m.qso);
+      refreshGrid();
+    }
+    if (m.t === "edit-deleted") refreshGrid();
+    if (m.t === "edit-closed") {
+      setEditing(null);
+      editorWindow.current = null;
+      greeted.current.delete("editor");
+    }
+    if (m.t === "pick") actions.onPick(m.pick);
+    if (m.t === "edit") openEditor(m.qso);
+    if (m.t === "copy") actions.onCopy(m.fields);
+    if (m.t === "show-qsos") showQsos(m.filter);
+    if (m.t === "settings") actions.onSettings(m.tab);
+  };
+  useEffect(() => listen((m) => onBus.current(m)), []);
+
+  // Keep popped-out panes up to date.
+  const ctxKey = JSON.stringify(popCtx);
+  useEffect(() => {
+    if (popCtx && ws.popped.length) post({ t: "ctx", ctx: popCtx });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctxKey, ws.popped.length]);
+
+  // Open a window for each popped-out pane, close windows of panes docked again.
+  const poppedKey = ws.popped.join(",");
+  useEffect(() => {
+    for (const id of wsRef.current.popped) {
+      const w = windows.current.get(id);
+      if (w && !w.closed) continue;
+      const opened = openPopout(id);
+      if (opened) windows.current.set(id, opened);
+      else {
+        setNotice("The window didn't open. Allow pop-ups for this page, then try again.");
+        dock(id);
+      }
+    }
+    for (const [id, w] of windows.current) {
+      if (!wsRef.current.popped.includes(id)) {
+        windows.current.delete(id);
+        if (!w.closed) w.close();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poppedKey]);
+
+  // Windows reopened at start that never answer (blocked, or closed meanwhile) go back in the main window.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      for (const id of wsRef.current.popped) if (!greeted.current.has(id)) dock(id);
+    }, 8000);
+    const bye = () => post({ t: "close-all" });
+    window.addEventListener("beforeunload", bye);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("beforeunload", bye);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (error) return <div className="fatal">{error}</div>;
   if (logId === null || callsigns === null || !layoutLoaded) return <div className="fatal">Loading…</div>;
@@ -191,6 +371,7 @@ export default function App() {
         {notice && <span className="notice" role="status">{notice}</span>}
         <span className="muted">{currentLog?.qso_count.toLocaleString() ?? 0} QSOs</span>
         <span className="clock" title="UTC">{utcClock(now)}</span>
+        <LayoutMenu ws={ws} onChange={setWs} onShow={(id) => setWs({ ...wsRef.current, root: dockBack(wsRef.current.root, id) })} onFocusWindow={focusWindow} />
         <nav className="menu">
           <button onClick={() => setDialog("import")}>Import</button>
           <button onClick={() => setDialog("export")}>Export</button>
@@ -200,96 +381,62 @@ export default function App() {
         </nav>
       </header>
 
-      <div className="top">
-        {callsigns.length === 0 ? (
-          <section className="panel entry">
-            <div className="panel-title"><span>Welcome</span></div>
-            <div className="panel-body">
-              <p>QRZero needs your callsign and home location before you can log.</p>
-              <button className="primary" onClick={() => setDialog("wizard")}>Start setup</button>
-            </div>
-          </section>
-        ) : (
-          <EntryPanel
-            key={`${logId}-${location?.id ?? 0}`}
-            logId={logId}
-            stationCall={stationCall}
-            location={location}
-            layout={layout}
-            equipment={equipment.filter((e) => e.location_id === location?.id)}
-            onLogged={refreshGrid}
-            onLookup={setLookup}
-            onContext={setEntry}
-            onHelp={() => setDialog("help")}
-            radios={radios}
-            radioKey={radioKey}
-            onRadio={chooseRadio}
-            prefill={prefill}
-          />
-        )}
-        <LookupPanel result={lookup} entry={entry} />
-        <MapPanel
-          home={home}
-          homeLabel={stationCall}
-          dx={dx}
-          dxLabel={entry.fields.CALL || dxStation?.CALL || ""}
-          units={general.units}
-          rotator={rotator}
-          view={mapView}
-          onView={(v) => {
-            setMapView(v);
-            localSet("qrzero.map", { view: v });
-          }}
-        />
-      </div>
-
-      <nav className="pane-tabs">
-        <button className={pane.tab === "log" ? "active" : ""} onClick={() => choosePane({ tab: "log" })}>Log</button>
-        <button className={pane.tab === "ftx" ? "active" : ""} onClick={() => choosePane({ tab: "ftx" })}>FTx monitor</button>
-        <button className={pane.tab === "cluster" ? "active" : ""} onClick={() => choosePane({ tab: "cluster" })}>Cluster</button>
-        <button className={pane.tab === "awards" ? "active" : ""} onClick={() => choosePane({ tab: "awards" })}>Awards</button>
-        {pane.tab !== "log" && (
-          <label className="check beside" title="Show the log next to this pane">
-            <input type="checkbox" checked={pane.beside} onChange={(e) => choosePane({ beside: e.target.checked })} /> Beside the log
-          </label>
-        )}
-      </nav>
-      <div className={`bottom ${pane.tab !== "log" && pane.beside ? "pane-split" : ""}`}>
-      {(pane.tab === "log" || pane.beside) && <LogGrid
-        logId={logId}
-        refreshKey={refreshKey}
-        filter={filter}
-        onFilter={setFilter}
-        selection={selection}
-        onSelection={setSelection}
-        onEdit={setEditing}
-        onDeleted={refreshGrid}
-        onExportSelected={() => setDialog("export")}
-        columns={columns}
-        onColumns={setColumns}
-        locations={locations}
-      />}
-      {pane.tab === "awards" && logId !== null && (
-        <AwardsPane
-          logId={logId}
-          callsigns={callsigns ?? []}
-          onShowQsos={(f) => {
-            setFilter({ ...f, bands: undefined, modes: undefined });
-            if (!pane.beside) choosePane({ tab: "log" });
-          }}
-        />
-      )}
-      {pane.tab === "ftx" && <FtxMonitor mycall={stationCall} onPick={pick} />}
-      {pane.tab === "cluster" && (
-        <ClusterPane
-          onPick={pick}
-          onSettings={() => {
-            setSettingsTab("cluster");
-            setDialog("settings");
-          }}
-        />
-      )}
-      </div>
+      <Workspace
+        ws={ws}
+        onChange={setWs}
+        onPopOut={popOut}
+        onClosePane={(id) => setWs({ ...wsRef.current, root: removePane(wsRef.current.root, id) })}
+        render={(id) => {
+          if (id === "entry")
+            return callsigns.length === 0 ? (
+              <section className="panel entry">
+                <div className="panel-title"><span>Welcome</span></div>
+                <div className="panel-body">
+                  <p>QRZero needs your callsign and home location before you can log.</p>
+                  <button className="primary" onClick={() => setDialog("wizard")}>Start setup</button>
+                </div>
+              </section>
+            ) : (
+              <EntryPanel
+                key={`${logId}-${location?.id ?? 0}`}
+                logId={logId}
+                stationCall={stationCall}
+                location={location}
+                layout={layout}
+                equipment={equipment.filter((e) => e.location_id === location?.id)}
+                onLogged={refreshGrid}
+                onLookup={setLookup}
+                onContext={setEntry}
+                onHelp={() => setDialog("help")}
+                radios={radios}
+                radioKey={radioKey}
+                onRadio={chooseRadio}
+                prefill={prefill}
+                copy={copy}
+              />
+            );
+          if (id === "log")
+            return (
+              <LogGrid
+                logId={logId}
+                refreshKey={refreshKey}
+                filter={filter}
+                onFilter={setFilter}
+                selection={selection}
+                onSelection={setSelection}
+                onEdit={openEditor}
+                onDeleted={refreshGrid}
+                onExportSelected={() => setDialog("export")}
+                columns={columns}
+                onColumns={setColumns}
+                locations={locations}
+                stepper={stepper}
+                editingId={editing?.id ?? null}
+              />
+            );
+          return popCtx && <SharedPane id={id} ctx={popCtx} act={actions} />;
+        }}
+      />
 
       {dialog === "wizard" && (
         <SetupWizard
@@ -354,17 +501,6 @@ export default function App() {
       )}
       {dialog === "qsl" && logId !== null && <QslDialog logId={logId} callsigns={callsigns} locations={locations} onClose={() => setDialog(null)} />}
       {dialog === "help" && <HelpView onClose={() => setDialog(null)} />}
-      {editing && (
-        <EditQsoDialog
-          qso={editing}
-          locations={locations}
-          onClose={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            refreshGrid();
-          }}
-        />
-      )}
     </div>
   );
 }

@@ -580,7 +580,7 @@ impl Store {
         )?;
         // With an indexed filter, sorting the (smaller) match set is faster than
         // walking the whole time index; the unary + stops SQLite using that index.
-        let indexed = filter.call.is_some() || !filter.bands.is_empty() || !filter.modes.is_empty()
+        let indexed = filter.call.is_some() || filter.exact_call.is_some() || !filter.bands.is_empty() || !filter.modes.is_empty()
             || filter.dxcc.is_some() || filter.ids.is_some();
         let t = if indexed { "+time_on" } else { "time_on" };
         let order = match sort {
@@ -1130,6 +1130,26 @@ fn build_where(log_id: i64, f: &QsoFilter) -> (String, Vec<Value>) {
             args.push(Value::Text(upper));
         }
     }
+    if let Some(call) = f.exact_call.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
+        let call = call.to_ascii_uppercase();
+        let base = base_call(&call);
+        if base.is_empty() {
+            sql.push("call = ?".into());
+            args.push(Value::Text(call));
+        } else {
+            // [BASE, BASE + "0") holds BASE itself and BASE/anything ('/' sorts just
+            // below '0'): one range on the (log_id, call) index.
+            args.push(Value::Text(base.to_string()));
+            args.push(Value::Text(format!("{base}0")));
+            if call == base || call.starts_with(&format!("{base}/")) {
+                sql.push("call >= ? AND call < ?".into());
+            } else {
+                // A prefixed form such as EA8/DL1ABC sorts elsewhere: add it by name.
+                sql.push("((call >= ? AND call < ?) OR call = ?)".into());
+                args.push(Value::Text(call));
+            }
+        }
+    }
     in_list(
         &mut sql,
         &mut args,
@@ -1187,6 +1207,12 @@ fn build_where(log_id: i64, f: &QsoFilter) -> (String, Vec<Value>) {
         }
     }
     (sql.join(" AND "), args)
+}
+
+/// The home call inside a portable form: the longest part between slashes
+/// ("EA8/DL1ABC/P" gives "DL1ABC"); the first part wins a tie.
+pub fn base_call(call: &str) -> &str {
+    call.split('/').fold("", |best, p| if p.len() > best.len() { p } else { best })
 }
 
 fn row_to_qso(r: &rusqlite::Row) -> rusqlite::Result<Qso> {

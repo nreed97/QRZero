@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api";
 import type { Equipment, EquipmentKind, Fields, Location } from "../types";
+import { ANTENNA_BANDS, formatBands, parseBands, shortBands } from "../antennas";
 
 export const KINDS: { kind: EquipmentKind; label: string; plural: string }[] = [
   { kind: "rig", label: "Radio", plural: "Radios" },
@@ -13,7 +14,7 @@ export const KINDS: { kind: EquipmentKind; label: string; plural: string }[] = [
 // Details offered per kind. All are optional.
 const DETAILS: Record<EquipmentKind, [string, string, string?][]> = {
   rig: [["MODEL", "Make and model", "e.g. Elecraft K3"], ["POWER_W", "Power (W)"], ["BANDS", "Bands", "e.g. 160-6m"], ["NOTES", "Notes"]],
-  antenna: [["MODEL", "Type / model", "e.g. 3-element yagi"], ["BANDS", "Bands"], ["HEIGHT", "Height"], ["NOTES", "Notes"]],
+  antenna: [["MODEL", "Type / model", "e.g. 3-element yagi"], ["HEIGHT", "Height"], ["NOTES", "Notes"]],
   amplifier: [["MODEL", "Make and model"], ["POWER_W", "Output (W)"], ["BANDS", "Bands"], ["NOTES", "Notes"]],
   rotator: [["MODEL", "Make and model"], ["NOTES", "Notes"]],
   other: [["MODEL", "Description"], ["NOTES", "Notes"]],
@@ -48,6 +49,31 @@ function RigControl({ fields, onChange }: { fields: Fields; onChange: (f: Fields
       {control.id && !control.net && input("SERIAL_PORT", "Serial port", "w-s", "COM3")}
       {control.id && !control.net && input("BAUD", "Baud", "w-s", "38400")}
       {control.id === "icom" && input("CIV_ADDR", "CI-V address", "w-s", "94")}
+    </div>
+  );
+}
+
+// Which bands an antenna covers; picks it automatically when logging on them.
+function BandPicker({ fields, onChange }: { fields: Fields; onChange: (f: Fields) => void }) {
+  const picked = parseBands(fields.BANDS);
+  const offered = [...ANTENNA_BANDS, ...picked.filter((b) => !ANTENNA_BANDS.includes(b))];
+  const flip = (b: string, on: boolean) => {
+    const next = formatBands(on ? [...picked, b] : picked.filter((x) => x !== b));
+    const f = { ...fields };
+    if (next) f.BANDS = next;
+    else delete f.BANDS;
+    onChange(f);
+  };
+  return (
+    <div className="row">
+      <div className="f">
+        <span>Bands (picked automatically when logging on these)</span>
+        <div className="band-picks" data-testid="antenna-bands">
+          {offered.map((b) => (
+            <label key={b}><input type="checkbox" checked={picked.includes(b)} onChange={(e) => flip(b, e.target.checked)} />{b}</label>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -109,7 +135,7 @@ export default function EquipmentTree({ locations, equipment, onChanged }: { loc
                             {list.map((e, i) => (
                               <li key={e.id} className="item">
                                 <span className="item-name">{e.name}</span>
-                                <span className="muted">{[e.fields.MODEL, e.fields.POWER_W && `${e.fields.POWER_W} W`, e.fields.BANDS, e.fields.CONTROL && `control: ${CONTROLS.find((c) => c.id === e.fields.CONTROL)?.label.split(" (")[0] ?? e.fields.CONTROL}`].filter(Boolean).join(" · ")}</span>
+                                <span className="muted">{[e.fields.MODEL, e.fields.POWER_W && `${e.fields.POWER_W} W`, (e.kind === "antenna" && shortBands(parseBands(e.fields.BANDS))) || e.fields.BANDS, e.fields.CONTROL && `control: ${CONTROLS.find((c) => c.id === e.fields.CONTROL)?.label.split(" (")[0] ?? e.fields.CONTROL}`].filter(Boolean).join(" · ")}</span>
                                 <span className="item-actions">
                                   <button className="tiny" disabled={i === 0} onClick={() => run(() => api.moveEquipment(e.id, -1))} title="Move up">↑</button>
                                   <button className="tiny" disabled={i === list.length - 1} onClick={() => run(() => api.moveEquipment(e.id, 1))} title="Move down">↓</button>
@@ -150,6 +176,7 @@ export default function EquipmentTree({ locations, equipment, onChanged }: { loc
               </label>
             ))}
           </div>
+          {draft.kind === "antenna" && <BandPicker fields={draft.fields} onChange={(fields) => setDraft({ ...draft, fields })} />}
           {draft.kind === "rig" && <RigControl fields={draft.fields} onChange={(fields) => setDraft({ ...draft, fields })} />}
           <div className="buttons">
             <button onClick={() => setDraft(null)}>Cancel</button>

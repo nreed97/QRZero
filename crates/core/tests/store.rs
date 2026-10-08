@@ -81,6 +81,35 @@ fn search_filters() {
 }
 
 #[test]
+fn search_exact_call_with_portable_forms() {
+    let (st, log) = setup();
+    for (call, time) in [
+        ("DL1ABC", "1200"),
+        ("DL1ABC/P", "1300"),
+        ("DL1ABCD", "1400"),
+        ("EA8/DL1ABC", "1500"),
+        ("DL1AB", "1600"),
+        ("DL1ABC/M", "1700"),
+    ] {
+        let fields = f(&[("CALL", call), ("BAND", "20m"), ("MODE", "CW"), ("QSO_DATE", "20240101"), ("TIME_ON", time)]);
+        st.insert_qso(log, None, &fields).unwrap();
+    }
+    let calls = |exact: &str| -> Vec<String> {
+        let filter = QsoFilter { exact_call: Some(exact.into()), ..Default::default() };
+        let (total, rows) = st.search(log, &filter, Sort::Newest, 0, 100).unwrap();
+        assert_eq!(total as usize, rows.len());
+        rows.into_iter().map(|q| q.fields["CALL"].clone()).collect()
+    };
+    // Not a prefix search: DL1ABCD and DL1AB stay out; portable forms come in, newest first.
+    assert_eq!(calls("dl1abc"), ["DL1ABC/M", "DL1ABC/P", "DL1ABC"]);
+    assert_eq!(calls("DL1ABC/P"), ["DL1ABC/M", "DL1ABC/P", "DL1ABC"]);
+    assert_eq!(calls("EA8/DL1ABC"), ["DL1ABC/M", "EA8/DL1ABC", "DL1ABC/P", "DL1ABC"]);
+    assert_eq!(calls("DL1AB"), ["DL1AB"]);
+    assert_eq!(calls("W1AW"), Vec::<String>::new());
+    assert_eq!(qrzero_core::store::base_call("EA8/DL1ABC/P"), "DL1ABC");
+}
+
+#[test]
 fn import_with_duplicates_location_and_callsigns() {
     let (mut st, log) = setup();
     let loc = st.create_location(log, "Portable", &f(&[("MY_GRIDSQUARE", "EM10")])).unwrap();

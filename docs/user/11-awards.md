@@ -1,6 +1,6 @@
 # Awards
 
-The **Awards** tab, next to Log, FTx monitor and Cluster, shows how far you are towards four awards:
+The **Awards** pane, a tab next to the log to start with, shows how far you are towards four awards:
 
 - **DXCC**: DXCC entities (countries).
 - **WAS**: the 50 US states.
