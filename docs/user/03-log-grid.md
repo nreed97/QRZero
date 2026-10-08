@@ -45,4 +45,6 @@ Keys while the editor is open:
 
 ## Choosing columns
 
-Click **Columns** above the grid to choose which columns are shown. Tick the ones you want; **Reset** goes back to the standard set. Besides the usual QSO fields you can show your rig, antenna, location, POTA/SOTA references, QSL status and more. Your choice is saved with your settings.
+Click **Columns** above the grid to choose which columns are shown. Tick the ones you want; new ones are added at the right. **Reset** goes back to the standard set, order and widths.
+
+To move a column, drag its heading left or right; a line shows where it will land. To make a column wider or narrower, drag the right edge of its heading. Double-click that edge to give the column its normal width back. Besides the usual QSO fields you can show your rig, antenna, location, POTA/SOTA references, QSL status and more. Your choice is saved with your settings.

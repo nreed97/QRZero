@@ -22,8 +22,14 @@ jobs:
       - name: Build UI
         working-directory: ui
         run: npm ci && npm run build
+      - name: Install system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev
       - name: Rust tests
         run: cargo test
+      - name: Linux desktop app builds
+        run: cargo check -p qrzero
       - name: Large-log speed check
         run: cargo test --release -p qrzero-core --test perf -- --ignored --nocapture
       - name: End-to-end test

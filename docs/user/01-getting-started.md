@@ -1,6 +1,6 @@
 # Getting started
 
-QRZero is a logbook for amateur radio. It runs as a Windows desktop app; the same screens can also be opened in a web browser.
+QRZero is a logbook for amateur radio. It runs as a desktop app on Windows and Linux; the same screens can also be opened in a web browser.
 
 ## First run
 
@@ -15,7 +15,7 @@ The first time QRZero starts, the setup wizard walks you through:
 
 Every step except the callsign can be skipped. You can run the wizard again from **Settings → General**; it never removes anything.
 
-Your log is stored in one file, `qrzero.db`, in `%APPDATA%\QRZero`. Back that folder up the way you back up anything else, or export an ADIF file now and then.
+Your log is stored in one file, `qrzero.db`, in `%APPDATA%\QRZero` on Windows or `~/.local/share/QRZero` on Linux. Back that folder up the way you back up anything else, or export an ADIF file now and then.
 
 ## The main window
 

@@ -57,4 +57,4 @@ When a card arrives, select its QSOs in the log and pick **Paper QSL…, Card re
 
 Uploads send the standard ADIF fields of each QSO. If a service refuses a QSO, the reason is shown under the service and QRZero doesn't keep retrying it until you restart.
 
-Passwords and keys are kept in Windows Credential Manager, not in the log file.
+Passwords and keys are kept in Windows Credential Manager (on Linux, the desktop keyring), not in the log file.

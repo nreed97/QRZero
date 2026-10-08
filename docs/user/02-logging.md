@@ -36,7 +36,7 @@ Tick **Enter time** to type the date and time (UTC) yourself, for example when c
 
 After a lookup the panel shows:
 
-- **Station details** from QRZ.com (when lookups are on), or from your last QSO with that call.
+- **Station details** from QRZ.com (when lookups are on), or from your last QSO with that call. Notes carry over from that QSO; the Comment, serial numbers and reports do not, because they belong to one contact.
 - **Note**: your station note for the call, if you have written one (see **Station notes**).
 - **Flags**: *New DXCC* when you have never worked that entity, *New band* or *New mode* when you haven't worked the entity on the band or mode set in the entry panel, and *Already worked on …* when this would be a duplicate on the same band and mode.
 

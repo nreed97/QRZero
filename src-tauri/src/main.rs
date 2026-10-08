@@ -19,6 +19,7 @@ fn popout_handler(app: AppHandle, home: String) -> impl Fn(tauri::Url, tauri::we
             .window_features(features)
             .title("QRZero")
             .min_inner_size(320.0, 200.0)
+            .disable_drag_drop_handler()
             .on_document_title_changed(|w, title| {
                 let _ = w.set_title(&title);
             })
@@ -48,6 +49,9 @@ fn main() {
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
                 .title("QRZero")
                 .on_new_window(popout_handler(app.handle().clone(), home))
+                // Tauri's file-drop handler swallows the page's own drag and drop on
+                // Windows, which stopped pane tabs from being dragged.
+                .disable_drag_drop_handler()
                 .inner_size(1440.0, 900.0)
                 .min_inner_size(960.0, 600.0)
                 .build()?;

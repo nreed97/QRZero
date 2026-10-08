@@ -58,7 +58,9 @@ function radioMode(r: Radio): string | null {
 }
 
 // Lookup fields logged even when they aren't shown in the form.
-const CARRIED = ["CQZ", "ITUZ", "CONT", "LAT", "LON", "IOTA", "EMAIL", "QSL_VIA", "DXCC", "COUNTRY", "GRIDSQUARE", "STATE", "CNTY", "NAME", "QTH"];
+const CARRIED = ["CQZ", "ITUZ", "CONT", "LAT", "LON", "IOTA", "EMAIL", "QSL_VIA", "DXCC", "COUNTRY", "GRIDSQUARE", "STATE", "CNTY", "NAME", "QTH", "NOTES"];
+// About one contact only, so never filled in from the last QSO with the same call.
+const PER_QSO = new Set(["COMMENT", "QSLMSG", "STX", "SRX", "STX_STRING", "SRX_STRING", "RST_SENT", "RST_RCVD"]);
 
 // Picked equipment ids; -1 is "none", and antenna 0 is "Auto (by band)".
 interface Gear { rig?: number; antenna?: number; amplifier?: number }
@@ -193,7 +195,7 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
       const last = r.worked.recent[0]?.fields ?? {};
       const fill: Fields = {};
       for (const key of new Set([...CARRIED, ...[...visibleKeys]])) {
-        const v = station[key] ?? (key in station ? undefined : last[key]);
+        const v = station[key] ?? (key in station || PER_QSO.has(key) ? undefined : last[key]);
         if (v && !touched.has(key) && !key.startsWith("MY_")) fill[key] = v;
       }
       setLookupFill(fill);

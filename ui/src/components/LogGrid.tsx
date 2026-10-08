@@ -1,9 +1,10 @@
-import { useEffect, useReducer, useRef, useState, type MutableRefObject } from "react";
+import { useEffect, useReducer, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { api } from "../api";
 import { PAPER_ACTIONS } from "../paper";
 import { BANDS, MODES } from "../modes";
 import { COLUMNS, DEFAULT_COLUMNS } from "../fields";
+import { localGet, localSet } from "../prefs";
 import type { Location, Qso, QsoFilter } from "../types";
 
 const PAGE = 200;
@@ -34,7 +35,11 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
   const [search, setSearch] = useState(filter.call ?? "");
   const [picking, setPicking] = useState(false);
   const cols = (columns.length ? columns : DEFAULT_COLUMNS).map((k) => COLUMNS.find((c) => c.key === k)).filter((c) => c !== undefined);
-  const template = `28px ${cols.map((c) => c.width).join(" ")}`;
+  // Widths the user dragged a column to, in pixels; other columns share what's left.
+  const [widths, setWidths] = useState<Record<string, number>>(() => localGet<Record<string, number>>("qrzero.colWidths", {}));
+  const template = `28px ${cols.map((c) => (widths[c.key] ? `${widths[c.key]}px` : c.width)).join(" ")}`;
+  const head = useRef<HTMLDivElement>(null);
+  const [moving, setMoving] = useState<{ key: string; to: number } | null>(null);
   const ctx = { locationName: (id: number | null) => locations.find((l) => l.id === id)?.name ?? "" };
   const pages = useRef(new Map<number, Qso[]>());
   const loading = useRef(new Set<number>());
@@ -188,6 +193,67 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
 
   const one = (v: string) => (v ? [v] : undefined);
 
+  const setWidth = (key: string, px: number) => {
+    setWidths((w) => {
+      const next = { ...w };
+      if (px > 0) next[key] = px;
+      else delete next[key];
+      localSet("qrzero.colWidths", next);
+      return next;
+    });
+  };
+
+  const resizeColumn = (e: ReactPointerEvent<HTMLSpanElement>, key: string) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const cell = e.currentTarget.parentElement!;
+    const startX = e.clientX;
+    const startW = cell.getBoundingClientRect().width;
+    const move = (ev: PointerEvent) => setWidth(key, Math.max(36, Math.round(startW + ev.clientX - startX)));
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  // Pointer events rather than HTML drag and drop, so it works the same in every webview.
+  const moveColumn = (e: ReactPointerEvent<HTMLSpanElement>, key: string) => {
+    if (e.button !== 0) return;
+    const startX = e.clientX;
+    let to: number | null = null;
+    const slot = (x: number) => {
+      const cells = [...(head.current?.querySelectorAll<HTMLElement>(".col-head") ?? [])];
+      const i = cells.findIndex((el) => {
+        const r = el.getBoundingClientRect();
+        return x < r.left + r.width / 2;
+      });
+      return i < 0 ? cells.length : i;
+    };
+    const move = (ev: PointerEvent) => {
+      if (to === null && Math.abs(ev.clientX - startX) < 5) return;
+      to = slot(ev.clientX);
+      setMoving({ key, to });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setMoving(null);
+      if (to === null) return;
+      const keys = cols.map((c) => c.key);
+      const from = keys.indexOf(key);
+      const at = to > from ? to - 1 : to;
+      if (at === from) return;
+      keys.splice(from, 1);
+      keys.splice(at, 0, key);
+      onColumns(keys);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
   return (
     <section className="panel grid">
       <div className="grid-tools">
@@ -236,23 +302,39 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
                   checked={on}
                   onChange={() => {
                     const current = cols.map((x) => x.key);
-                    // Keep the catalog order so columns don't jump around.
-                    const next = on ? current.filter((k) => k !== c.key) : COLUMNS.map((x) => x.key).filter((k) => k === c.key || current.includes(k));
-                    onColumns(next);
+                    // Keep the order the user dragged the columns into; new ones go last.
+                    onColumns(on ? current.filter((k) => k !== c.key) : [...current, c.key]);
                   }}
                 />
                 {c.label}
               </label>
             );
           })}
-          <button className="tiny" onClick={() => onColumns(DEFAULT_COLUMNS)}>Reset</button>
+          <button
+            className="tiny"
+            onClick={() => {
+              onColumns(DEFAULT_COLUMNS);
+              setWidths({});
+              localSet("qrzero.colWidths", {});
+            }}
+          >
+            Reset
+          </button>
           <button className="tiny" onClick={() => setPicking(false)}>Done</button>
         </div>
       )}
-      <div className="grid-head" style={{ gridTemplateColumns: template }}>
+      <div className="grid-head" ref={head} style={{ gridTemplateColumns: template }}>
         <span className="sel" />
-        {cols.map((c) => (
-          <span key={c.key} className={c.cls}>{c.label}</span>
+        {cols.map((c, i) => (
+          <span
+            key={c.key}
+            className={`${c.cls ?? ""} col-head ${moving?.key === c.key ? "moving" : ""} ${moving && moving.to === i && moving.key !== c.key ? "drop-before" : ""} ${moving && moving.to === cols.length && i === cols.length - 1 ? "drop-after" : ""}`}
+            title="Drag to move this column, drag its right edge to resize"
+            onPointerDown={(e) => moveColumn(e, c.key)}
+          >
+            {c.label}
+            <span className="col-resize" onPointerDown={(e) => resizeColumn(e, c.key)} onDoubleClick={() => setWidth(c.key, 0)} title="Drag to resize, double-click to reset" />
+          </span>
         ))}
       </div>
       <div className="grid-body" ref={scroller} tabIndex={0} onKeyDown={keys} aria-label="QSOs (arrows move, Enter edits)">
