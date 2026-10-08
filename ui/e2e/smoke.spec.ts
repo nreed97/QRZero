@@ -109,7 +109,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // Right-click a logged QSO for its menu; sending needs a UDP connection first.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click({ button: "right" });
   const menu = page.getByRole("menu");
-  await expect(menu.getByRole("menuitem", { name: /Look up .* on QRZ/ })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: /Fill .* from QRZ/ })).toBeVisible();
   await menu.getByRole("menuitem", { name: /Send .* through UDP connections/ }).click();
   await expect(menu).toBeHidden();
   await expect(page.locator(".grid > .grid-tools")).toContainText("No UDP connection is set up");
