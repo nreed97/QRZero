@@ -1,8 +1,14 @@
+import { OQRS, OQRS_DATE } from "./confirmations";
 import type { Fields } from "./types";
 
 const today = () => new Date().toISOString().slice(0, 10).replace(/-/g, "");
 
 /** Bulk paper-QSL actions on selected QSOs, as the ADIF fields each one sets. */
+export const OQRS_ACTIONS: { key: string; label: string; fields: () => Fields }[] = [
+  { key: "oqrs", label: "Mark OQRS requested", fields: () => ({ [OQRS]: "Y", [OQRS_DATE]: today() }) },
+  { key: "oqrs-clear", label: "Clear OQRS request", fields: () => ({ [OQRS]: "", [OQRS_DATE]: "" }) },
+];
+
 export const PAPER_ACTIONS: { key: string; label: string; fields: () => Fields }[] = [
   { key: "queue", label: "Queue a card to send", fields: () => ({ QSL_SENT: "Q" }) },
   { key: "sent-b", label: "Card sent via bureau", fields: () => ({ QSL_SENT: "Y", QSLSDATE: today(), QSL_SENT_VIA: "B" }) },
