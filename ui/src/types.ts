@@ -33,6 +33,8 @@ export interface WorkedBefore {
 export interface Entity { name: string; prefix: string; dxcc: number | null; cont: string; cq: number; itu: number; lat: number; lon: number }
 
 export interface LookupResult {
+  /** The call looked up, uppercase. */
+  call: string;
   worked: WorkedBefore;
   entity: Entity | null;
   station: Fields | null;
@@ -196,6 +198,8 @@ export type AwardStatus = "worked" | "confirmed";
 export interface AwardRow { key: string; name: string; cells: Record<string, AwardStatus> }
 export interface AwardColumn { key: string; worked: number; confirmed: number }
 export interface AwardTable { award: AwardKind; columns: AwardColumn[]; rows: AwardRow[]; total: number }
+/** What a QSO would add to one award: its row and the cells it falls in (mixed, mode group, band). */
+export interface AwardHint { award: AwardKind; key: string; name: string; cells: { column: string; status: "new" | AwardStatus }[] }
 
 /** A station note, stored under the base call. Times are Unix seconds. */
 export interface Note {

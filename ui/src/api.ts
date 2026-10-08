@@ -1,5 +1,5 @@
 import type { PropagationReport } from "./types";
-import type { QslService, QslDownload, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, Settings, StationCallsign, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
+import type { QslService, QslDownload, AwardHint, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, Settings, StationCallsign, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
 function sessionToken(): string {
@@ -68,6 +68,10 @@ export const api = {
   award: (logId: number, award: AwardKind, o: { calls: string[]; lotw: boolean; paper: boolean; eqsl: boolean; unworked: boolean }) => {
     const q = new URLSearchParams({ calls: o.calls.join(","), lotw: String(o.lotw), paper: String(o.paper), eqsl: String(o.eqsl), unworked: String(o.unworked) });
     return json<AwardTable>("GET", `/logs/${logId}/awards/${award}?${q}`);
+  },
+  awardHints: (logId: number, o: { call: string; band: string; mode: string; state: string; cqz: string; dxcc: string; lotw: boolean; paper: boolean; eqsl: boolean }) => {
+    const q = new URLSearchParams(Object.entries(o).map(([k, v]) => [k, String(v)]));
+    return json<AwardHint[]>("GET", `/logs/${logId}/award-hints?${q}`);
   },
   paperQueue: (logId: number) => json<Qso[]>("GET", `/logs/${logId}/paper-queue`),
   search: (logId: number, filter: QsoFilter, offset: number, limit: number, sort = "newest") =>

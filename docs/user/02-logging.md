@@ -38,9 +38,10 @@ After a lookup the panel shows:
 
 - **Station details** from QRZ.com (when lookups are on), or from your last QSO with that call.
 - **Note**: your station note for the call, if you have written one (see **Station notes**).
-- **Flags**: *New DXCC* when you have never worked that entity, *New band* or *New mode* when you haven't worked the entity on the band or mode set in the entry panel, and *Already worked on …* when this would be a duplicate on the same band and mode.
+- **Flags**: *First QSO with this call*, or *Already worked on …* when this would be a duplicate on the same band and mode.
+- **Awards on (band) (mode)**: one line for each award this QSO would move, for the band and mode set in the entry panel. For example *DXCC* **new country** *Japan*, *WAS OH Ohio:* **new band** *20m*, *WAZ zone 5:* **new mode** *CW*, or *WPX* **new prefix** *K1*. Slots you have worked but not had confirmed are listed after *not confirmed:*. When the QSO adds nothing, the block says so in one grey line. It follows the band and mode as you change them.
 
-DXCC flags need the DXCC entity number, which comes from the QRZ lookup. Without lookups, only the per-call flags are shown. Your full history with the call is in the Worked before pane.
+The entity and CQ zone come from the QRZ lookup, or from the country file when lookups are off. The state comes from the lookup or the **State** box, so WAS lines only appear when a state is known. What counts as confirmed is set in the Awards pane (see **Awards**). Your full history with the call is in the Worked before pane.
 
 ## Worked before
 

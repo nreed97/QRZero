@@ -190,6 +190,8 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await call.fill("K1XYZ");
   await call.press("Tab");
   await expect(page.locator(".lookup-note")).toContainText("Runs 5 W / QSL direct only");
+  // The Station pane says what the QSO would add to awards (K1 is already worked).
+  await expect(page.getByLabel("Award hints", { exact: true })).toContainText("WPX");
   await page.getByRole("tab", { name: "Worked before" }).click();
 
   // Panes: drag the Cluster tab beside the Station pane, it gets its own group.
