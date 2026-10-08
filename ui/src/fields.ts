@@ -2,6 +2,7 @@
 
 import type { Fields, Qso } from "./types";
 import { fmtDate, fmtTime } from "./util";
+import { fmtFreq } from "./display";
 import { modeLabel } from "./modes";
 
 export type Width = "s" | "m" | "l" | "xl";
@@ -141,7 +142,7 @@ export const COLUMNS: ColumnDef[] = [
   { key: "time", label: "UTC", width: "50px", get: (q) => fmtTime(q.fields) },
   { key: "CALL", label: "Call", width: "110px", cls: "call", get: f("CALL") },
   { key: "BAND", label: "Band", width: "58px", get: f("BAND") },
-  { key: "FREQ", label: "Freq", width: "76px", get: f("FREQ") },
+  { key: "FREQ", label: "Freq", width: "76px", get: (q) => fmtFreq(q.fields.FREQ) },
   { key: "mode", label: "Mode", width: "70px", get: (q) => modeLabel(q.fields) },
   { key: "RST_SENT", label: "Sent", width: "46px", get: f("RST_SENT") },
   { key: "RST_RCVD", label: "Rcvd", width: "46px", get: f("RST_RCVD") },

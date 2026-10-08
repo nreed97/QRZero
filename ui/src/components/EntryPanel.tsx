@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
+import { beep, getDisplay } from "../display";
 import { BANDS, MODES, bandForFreq, choiceFor } from "../modes";
 import { antennaForBand, hasBands } from "../antennas";
 import { fieldDef, freshValues, type EntryLayout } from "../fields";
@@ -303,6 +304,7 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
       await api.logQso(logId, location?.id ?? null, fields);
       setStatus({ text: `Logged ${c} on ${band} ${choice.label}`, kind: "ok" });
       onLogged();
+      if (getDisplay().soundOnLog) beep(660);
       clear(form);
     } catch (e) {
       setStatus({ text: `Not logged: ${(e as Error).message}`, kind: "err" });

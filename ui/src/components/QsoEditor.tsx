@@ -4,6 +4,7 @@ import { CUSTOM_PREFIX, DEFAULT_LAYOUT, ENTRY_FIELDS, fieldDef, type EntryLayout
 import { BANDS, MODES, bandForFreq } from "../modes";
 import { usePref } from "../prefs";
 import type { Equipment, Fields, Location, Qso, StationCallsign } from "../types";
+import { confirmDelete } from "../display";
 import "../editor.css";
 
 export interface QsoEditorProps {
@@ -243,7 +244,7 @@ export default function QsoEditor({ qso, locations, equipment, callsigns, onClos
   };
 
   const remove = async () => {
-    if (!confirm(`Delete this QSO with ${base.fields.CALL ?? "?"}? This can't be undone.`)) return;
+    if (!confirmDelete(`Delete this QSO with ${base.fields.CALL ?? "?"}? This can't be undone.`)) return;
     try {
       await api.deleteQsos([base.id]);
       onDeleted();

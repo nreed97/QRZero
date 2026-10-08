@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { beep } from "../display";
 import "../watch.css";
 import { api } from "../api";
 import type { PopContext } from "../bus";
@@ -6,6 +7,7 @@ import { onLive } from "../live";
 import { BANDS } from "../modes";
 import { localGet, localSet } from "../prefs";
 import type { CtyEntityInfo, WatchEntry, WatchHit, WatchKind } from "../types";
+import { confirmDelete } from "../display";
 import type { PaneActions } from "./SharedPanes";
 
 const BAND_CHOICES = BANDS.slice(0, 13).map(([b]) => b);
@@ -23,25 +25,6 @@ function loadEntities(): Promise<CtyEntityInfo[]> {
     return [];
   });
   return entityCache;
-}
-
-let audio: AudioContext | null = null;
-/** A short beep; the context is made on the user's click so browsers allow it. */
-function beep() {
-  try {
-    audio ??= new AudioContext();
-    const osc = audio.createOscillator();
-    const gain = audio.createGain();
-    osc.type = "sine";
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.12, audio.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.18);
-    osc.connect(gain).connect(audio.destination);
-    osc.start();
-    osc.stop(audio.currentTime + 0.2);
-  } catch {
-    /* no audio here */
-  }
 }
 
 const modeLabel = (m: string) => MODE_CHOICES.find(([v]) => v === m)?.[1] ?? m;
@@ -119,7 +102,7 @@ export default function WatchPane({ ctx, act }: { ctx: PopContext; act: PaneActi
     if (await save(next)) setEditing(null);
   };
   const remove = (e: WatchEntry) => {
-    if (window.confirm(`Remove ${e.kind === "entity" ? e.name || e.value : e.value} from the watch list?`)) void save(entries.filter((x) => x.id !== e.id));
+    if (confirmDelete(`Remove ${e.kind === "entity" ? e.name || e.value : e.value} from the watch list?`)) void save(entries.filter((x) => x.id !== e.id));
   };
   const toggle = (e: WatchEntry) => void save(entries.map((x) => (x.id === e.id ? { ...x, enabled: !x.enabled } : x)));
 

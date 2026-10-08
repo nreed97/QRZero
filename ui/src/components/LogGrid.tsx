@@ -6,6 +6,7 @@ import { BANDS, MODES } from "../modes";
 import { COLUMNS, DEFAULT_COLUMNS } from "../fields";
 import { localGet, localSet } from "../prefs";
 import type { Location, Qso, QsoFilter } from "../types";
+import { confirmDelete, useDisplay } from "../display";
 import "../worked.css";
 
 const PAGE = 200;
@@ -31,6 +32,7 @@ interface Props {
 }
 
 export default function LogGrid({ logId, refreshKey, filter, onFilter, selection, onSelection, onEdit, onDeleted, onExportSelected, columns, onColumns, locations, stepper, editingId }: Props) {
+  useDisplay(); // redraw when the date or frequency format changes
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
   const [search, setSearch] = useState(filter.call ?? "");
@@ -187,7 +189,7 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
 
   const deleteSelected = async () => {
     if (!selection.size) return;
-    if (!confirm(`Delete ${selection.size} QSO${selection.size === 1 ? "" : "s"}? This can't be undone.`)) return;
+    if (!confirmDelete(`Delete ${selection.size} QSO${selection.size === 1 ? "" : "s"}? This can't be undone.`)) return;
     try {
       await api.deleteQsos([...selection]);
       onSelection(new Set());

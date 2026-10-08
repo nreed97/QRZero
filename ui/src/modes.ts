@@ -1,3 +1,4 @@
+import { getDisplay } from "./display";
 // Modes offered in the entry screen, mapped to ADIF MODE/SUBMODE.
 export interface ModeChoice { label: string; mode: string; submode?: string; rst: string }
 
@@ -24,7 +25,9 @@ export function modeLabel(f: Record<string, string>): string {
 }
 
 export function choiceFor(label: string): ModeChoice {
-  return MODES.find((m) => m.label === label) ?? { label, mode: label, rst: "59" };
+  const c = MODES.find((m) => m.label === label) ?? { label, mode: label, rst: "59" };
+  const own = getDisplay().rst[label]?.trim();
+  return own ? { ...c, rst: own } : c;
 }
 
 export const BANDS: [string, number, number][] = [
