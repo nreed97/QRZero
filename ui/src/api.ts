@@ -1,4 +1,4 @@
-import type { PropagationReport } from "./types";
+import type { DxpedList, DxpedPlanned, PropagationReport } from "./types";
 import type { QslService, QslDownload, AwardHint, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
@@ -140,6 +140,9 @@ export const api = {
   ctyEntities: () => json<CtyEntityInfo[]>("GET", "/cty/entities"),
   watch: () => json<WatchEntry[]>("GET", "/watch"),
   saveWatch: (entries: WatchEntry[]) => json<WatchEntry[]>("PUT", "/watch", entries),
+  dxpeditions: () => json<DxpedList>("GET", "/dxpeditions"),
+  refreshDxpeditions: () => json<DxpedList>("POST", "/dxpeditions/refresh"),
+  saveDxpeditions: (list: DxpedPlanned[]) => json<DxpedList>("PUT", "/dxpeditions", list),
   watchHits: () => json<WatchHit[]>("GET", "/watch/hits"),
   installCty: async (file: Blob) => (await request("POST", "/cty", undefined, file)).json() as Promise<CtyStatus>,
 

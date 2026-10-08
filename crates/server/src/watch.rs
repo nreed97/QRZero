@@ -232,8 +232,18 @@ impl Watch {
     /// Records an alert for a matched station, unless the same entry, call and band
     /// alerted in the last ten minutes.
     pub fn record(&self, entry_id: u64, s: &Sighting, now: i64) -> Option<WatchHit> {
+        let entry = self.lock().entries.iter().find(|e| e.id == entry_id)?.clone();
+        self.push_hit(entry_id, entry.label(), entry.note, s, now)
+    }
+
+    /// An alert that doesn't come from a list entry (a DXpedition that is needed),
+    /// with the same repeat limit and the same place in the hits list.
+    pub fn record_other(&self, label: String, note: String, s: &Sighting, now: i64) -> Option<WatchHit> {
+        self.push_hit(0, label, note, s, now)
+    }
+
+    fn push_hit(&self, entry_id: u64, label: String, note: String, s: &Sighting, now: i64) -> Option<WatchHit> {
         let mut st = self.lock();
-        let entry = st.entries.iter().find(|e| e.id == entry_id)?.clone();
         let call = normalize(s.call);
         let key = (entry_id, call.clone(), s.band.unwrap_or("").to_string());
         if st.last.get(&key).is_some_and(|t| now - t < REPEAT_SECS) {
@@ -247,8 +257,8 @@ impl Watch {
         let hit = WatchHit {
             seq: st.seq,
             entry_id,
-            label: entry.label(),
-            note: entry.note,
+            label,
+            note,
             call,
             freq_hz: s.freq_hz,
             band: s.band.map(str::to_string),

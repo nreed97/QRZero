@@ -202,6 +202,7 @@ impl Cluster {
                 };
                 let watched = hub.watch.check(&sighting);
                 let hit = watched.and_then(|id| hub.watch.record(id, &sighting, chrono::Utc::now().timestamp()));
+                hub.dxped_spot(&sighting, entity.as_ref().and_then(|e| e.dxcc));
                 let spot = {
                     let mut inner = self.lock();
                     inner.seq += 1;
