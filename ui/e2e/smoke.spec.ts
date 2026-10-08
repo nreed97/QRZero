@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import dgram from "node:dgram";
 
@@ -101,7 +101,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // The QSO above it in the log, from the editor's arrows.
   await editor.getByRole("button", { name: "Previous QSO" }).click();
   await expect(editor.getByLabel("Call", { exact: true })).not.toHaveValue("K1ABC");
-  await Promise.all([editWin.waitForEvent("close"), editor.getByRole("button", { name: "Close editor" }).click()]);
+  await Promise.all([editWin.waitForEvent("close"), closeWindow(editor.getByRole("button", { name: "Close editor" }))]);
 
   // Export 40m only, full fields.
   await page.getByRole("button", { name: "Export", exact: true }).click();
@@ -138,7 +138,8 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(ftx.locator(".ftx-break").first()).toContainText("00:01:00 2 decodes, 2 calls");
   await ftx.getByRole("combobox").filter({ hasText: "Call boxes" }).selectOption("calls");
   const first = ftx.locator(".ftx-cycle").first().locator(".ftx-box");
-  await expect(first).toHaveText(["EA8ABME-14", "DL1ABC-3"]);
+  // With a country file (CI downloads one) DL1ABC is also a new DXCC.
+  await expect(first).toHaveText([/^EA8ABME(DXCC)?-14$/, /^DL1ABC(DXCC)?-3$/]);
   await expect(first.first()).toHaveClass(/alerted/);
   await expect(first.nth(1)).toHaveClass(/cq/);
   await first.nth(1).click();
@@ -147,7 +148,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await ftx.getByRole("button", { name: "Alerts and filters…" }).click();
   const alerts = page.getByRole("dialog", { name: "FTx alerts and filters" });
   await alerts.getByLabel("Calls to ignore").fill("DL1*, EA8AB");
-  await expect(first).toHaveText(["EA8ABME-14"]);
+  await expect(first).toHaveText([/^EA8ABME(DXCC)?-14$/]);
   await alerts.getByRole("button", { name: "Reset" }).click();
   await alerts.getByRole("button", { name: "Done" }).click();
   await expect(first).toHaveCount(2);
@@ -244,7 +245,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(worked.locator("tbody tr")).toHaveCount(1);
   const [editWin2] = await Promise.all([page.waitForEvent("popup"), worked.locator("tbody tr").first().dblclick()]);
   await expect(editWin2.getByLabel("Call", { exact: true })).toHaveValue("K1XYZ");
-  await Promise.all([editWin2.waitForEvent("close"), editWin2.getByRole("button", { name: "Close editor" }).click()]);
+  await Promise.all([editWin2.waitForEvent("close"), closeWindow(editWin2.getByRole("button", { name: "Close editor" }))]);
 
   // A note on a station shows again next time the call is typed.
   await page.getByRole("tab", { name: "Notes" }).click();
@@ -340,4 +341,11 @@ async function sendWsjtx(packets: Buffer[]) {
   const sock = dgram.createSocket("udp4");
   for (const p of packets) await new Promise<void>((ok, err) => sock.send(p, 2237, "127.0.0.1", (e) => (e ? err(e) : ok())));
   sock.close();
+}
+
+/** Clicks a button that closes its own window: the click can lose the race with the close and report the page gone. */
+async function closeWindow(button: Locator) {
+  await button.click({ noWaitAfter: true }).catch((e: Error) => {
+    if (!/closed/.test(e.message)) throw e;
+  });
 }
