@@ -146,8 +146,8 @@ export default function ClusterPane({ onPick, onSettings }: { onPick: (p: Decode
               key={s.seq}
               className={`spot-row ${group ? `mode-${group}` : ""} ${flags[0]?.cls === "new" ? "needed" : ""} ${flags.some((f) => f.cls === "dupe") ? "worked" : ""}`}
               role="row"
-              onClick={() => onPick({ call: s.call, grid: null, band: s.band, mode: s.mode, freq_hz: s.freq_hz })}
-              title={`Click to tune to ${s.call}`}
+              onClick={() => onPick({ call: s.call, grid: null, band: s.band, mode: s.mode, freq_hz: s.freq_hz, tx_freq_hz: s.tx_freq_hz ?? undefined })}
+              title={s.tx_freq_hz ? `Click to tune to ${s.call} and set split to ${(s.tx_freq_hz / 1000).toFixed(2)} kHz` : `Click to tune to ${s.call}`}
             >
               <span className="mono">{s.time ? `${s.time.slice(0, 2)}:${s.time.slice(2, 4)}` : ""}</span>
               <span className="mono num">{(s.freq_hz / 1000).toFixed(1)}</span>

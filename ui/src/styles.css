@@ -144,6 +144,9 @@ kbd { font: 11px var(--mono); opacity: 0.75; margin-left: 4px; }
 .vfo .vfo-name { font-family: var(--ui); }
 .vfo .vfo-freq { font-size: 16px; font-weight: 600; color: var(--text); letter-spacing: 0.5px; }
 .vfo.offline .vfo-freq { color: var(--muted); }
+.vfo .vfo-split { display: inline-flex; align-items: baseline; gap: 4px; }
+.vfo .vfo-lbl { font-size: 10px; color: var(--muted); font-family: var(--ui); }
+.vfo-split .vfo-freq { font-size: 14px; }
 .vfo .vfo-state { min-width: 2.2em; text-align: center; }
 .vfo.tx { border-color: var(--err); }
 .vfo.tx .vfo-state { background: var(--err); color: var(--bg); font-weight: 700; }

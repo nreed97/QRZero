@@ -71,6 +71,7 @@ impl Protocol for Kenwood {
                 Some(req) => io.set(&encode_mode(self.dialect, self.has_da, req)),
                 None => Ok(()),
             },
+            RigCommand::SetSplit(_) => anyhow::bail!("split control needs a TCI connection"),
         }
     }
 }

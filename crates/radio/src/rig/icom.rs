@@ -157,6 +157,7 @@ impl Protocol for Icom {
                 }
                 Ok(())
             }
+            RigCommand::SetSplit(_) => anyhow::bail!("split control needs a TCI connection"),
         }
     }
 }

@@ -1023,10 +1023,19 @@ struct TuneBody {
     key: String,
     freq_hz: Option<u64>,
     mode: Option<String>,
+    /// Transmit on this frequency and turn split on.
+    tx_freq_hz: Option<u64>,
+    /// `false` turns split off (ignored when `tx_freq_hz` is given).
+    split: Option<bool>,
 }
 
 async fn tune(State(s): State<Shared>, Json(b): Json<TuneBody>) -> ApiResult<()> {
-    s.hub.tune(&b.key, b.freq_hz, b.mode).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    let split = match (b.tx_freq_hz, b.split) {
+        (Some(tx), _) => Some(Some(tx)),
+        (None, Some(false)) => Some(None),
+        _ => None,
+    };
+    s.hub.tune(&b.key, b.freq_hz, b.mode, split).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
     Ok(Json(()))
 }
 

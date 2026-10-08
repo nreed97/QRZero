@@ -22,7 +22,7 @@ Spots never sit on top of each other. When several are close together they stack
 
 Older spots fade out. The map uses the age setting from the Cluster pane (**Last 30 min** to start with), so spots older than that are left off. If a call is spotted again on another frequency, only the newest spot is shown.
 
-**Click a spot** to fill in the QSO panel. When the panel follows a radio QRZero controls, the radio tunes to the spot and changes mode, the same as clicking a spot in the Cluster pane.
+**Click a spot** to fill in the QSO panel. When the panel follows a radio QRZero controls, the radio tunes to the spot and changes mode, the same as clicking a spot in the Cluster pane, including split when the comment says `UP 5` or `QSX 14.205`.
 
 Cluster spots are coloured by mode, the same as in the Cluster pane: blue for CW, green for digital and orange for phone, shown as the call's colour and a bar on its left edge. A worked station's call stays grey. The key is in the toolbar.
 

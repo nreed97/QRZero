@@ -16,6 +16,8 @@ export interface DecodePick {
   band: string | null;
   mode: string;
   freq_hz: number;
+  /** Where the DX listens, from a spot's comment. */
+  tx_freq_hz?: number;
 }
 
 interface Filters {

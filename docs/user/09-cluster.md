@@ -19,7 +19,7 @@ QRZero connects to the first node and moves down the list if a node doesn't answ
 
 Each spot shows the time, frequency, call, country, a best guess at the mode (from the comment, or the band plan), the spotter and the comment. Spots are flagged against the open log the same way as the FTx monitor: **New DXCC**, **New band**, **New mode**, **New call**, **Worked**. A new spot of a station on the same frequency replaces the older one.
 
-- **Click a spot** to fill in the QSO panel. When the panel follows a radio QRZero controls, the radio tunes to the spot and changes mode.
+- **Click a spot** to fill in the QSO panel. When the panel follows a radio QRZero controls, the radio tunes to the spot and changes mode. If the comment says where the DX listens (`UP 5`, `QSX 14.205`), the radio is also put in split with that transmit frequency; see the Radios chapter.
 - The filters narrow the list by band, mode group (CW, phone, digital), age, **Needed only** and **Hide worked**.
 - Each spot is coloured by its mode group: a bar down its left edge and the mode in colour, blue for CW, green for digital and orange for phone (the key is in the toolbar). These are the same colours as the band plan strip on the band map. When the mode isn't known from the spot's frequency or comment, the spot is left uncoloured.
 - Stations on your watch list (see **Watch list**) are marked **Watched**, with the call in colour.

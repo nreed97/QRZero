@@ -98,9 +98,19 @@ fn apply(chans: &mut Vec<RigState>, msg: &TciMsg) {
                 chans.resize_with(n.clamp(1, MAX_TRX), connected);
             }
         }
+        "vfo" if arg(1) == Some("1") => {
+            if let (Some(t), Some(hz)) = (trx(), arg(2).and_then(|a| a.parse::<u64>().ok())) {
+                chan(chans, t).tx_freq_hz = hz;
+            }
+        }
         "vfo" => {
             if let (Some(t), Some("0"), Some(hz)) = (trx(), arg(1), arg(2).and_then(|a| a.parse::<u64>().ok())) {
                 chan(chans, t).freq_hz = hz;
+            }
+        }
+        "split_enable" => {
+            if let (Some(t), Some(on)) = (trx(), arg(1)) {
+                chan(chans, t).split = on.eq_ignore_ascii_case("true");
             }
         }
         "modulation" => {
@@ -155,6 +165,9 @@ fn encode_mode(req: ModeReq) -> &'static str {
 fn encode_command(trx: usize, cmd: &RigCommand, freq_hz: u64) -> Option<String> {
     match cmd {
         RigCommand::SetFreq(hz) => Some(format!("vfo:{trx},0,{hz};")),
+        // The transmit frequency lives on VFO B, which split switches transmit to.
+        RigCommand::SetSplit(Some(hz)) => Some(format!("vfo:{trx},1,{hz};split_enable:{trx},true;")),
+        RigCommand::SetSplit(None) => Some(format!("split_enable:{trx},false;")),
         RigCommand::SetMode(m) => {
             ModeReq::from_adif(m, freq_hz).map(|req| format!("modulation:{trx},{};", encode_mode(req)))
         }
@@ -193,6 +206,9 @@ mod tests {
         assert_eq!((chans[0].mode.as_str(), chans[0].rig_mode.as_str(), chans[0].data), ("", "DIGU", true));
         assert_eq!((chans[1].freq_hz, chans[1].mode.as_str(), chans[1].tx), (7_030_000, "CW", true));
         assert!(!chans[0].tx);
+        assert_eq!((chans[0].split, chans[0].tx_freq_hz), (false, 14_080_000));
+        apply(&mut chans, &parse("split_enable:0,true;")[0]);
+        assert!(chans[0].split);
         // Unannounced trx grows the list; garbage indexes are ignored.
         apply(&mut chans, &parse("vfo:2,0,3500000;vfo:99,0,1;vfo:x,0,1;")[0]);
         assert_eq!(chans.len(), 3);
@@ -212,6 +228,8 @@ mod tests {
         assert_eq!(set("FT8", 7_074_000).unwrap(), "modulation:0,digu;");
         assert_eq!(set("FM", 145_000_000).unwrap(), "modulation:0,nfm;");
         assert_eq!(set("", 0), None);
+        assert_eq!(encode_command(0, &RigCommand::SetSplit(Some(14_205_000)), 0).unwrap(), "vfo:0,1,14205000;split_enable:0,true;");
+        assert_eq!(encode_command(1, &RigCommand::SetSplit(None), 0).unwrap(), "split_enable:1,false;");
     }
 
     #[tokio::test]
@@ -253,5 +271,14 @@ mod tests {
         let st = wait(|s| s[1].freq_hz == 7_074_000 && s[1].data && s[0].rig_mode == "USB").await;
         assert_eq!(st[0].mode, "SSB");
         assert_eq!(*log.lock().unwrap(), ["vfo:1,0,7074000;", "modulation:1,digu;", "modulation:0,usb;"]);
+
+        // Split: VFO B becomes the transmit frequency, and the echo shows it on.
+        assert!(!st[0].split);
+        handle.send(0, RigCommand::SetSplit(Some(14_079_000)));
+        let st = wait(|s| s[0].split && s[0].tx_freq_hz == 14_079_000).await;
+        assert_eq!(st[0].freq_hz, 14_074_000);
+        handle.send(0, RigCommand::SetSplit(None));
+        let st = wait(|s| !s[0].split).await;
+        assert_eq!(st[0].tx_freq_hz, 14_079_000);
     }
 }

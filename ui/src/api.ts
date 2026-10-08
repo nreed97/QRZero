@@ -117,7 +117,9 @@ export const api = {
 
   setActive: (logId: number, locationId: number | null, stationCallsign: string) =>
     json<null>("POST", "/station/active", { log_id: logId, location_id: locationId, station_callsign: stationCallsign }),
-  tune: (key: string, freqHz?: number, mode?: string) => json<null>("POST", "/radios/tune", { key, freq_hz: freqHz, mode }),
+  /** `split`: { tx_freq_hz } transmits there with split on; { split: false } turns split off. */
+  tune: (key: string, freqHz?: number, mode?: string, split?: { tx_freq_hz?: number; split?: boolean }) =>
+    json<null>("POST", "/radios/tune", { key, freq_hz: freqHz, mode, ...split }),
   integrations: () => json<{ config: Integrations; status: IntegrationStatus }>("GET", "/integrations"),
   saveIntegrations: (c: Integrations) => json<{ config: Integrations; status: IntegrationStatus }>("PUT", "/integrations", c),
   udpConnections: () => json<{ connections: UdpConnection[]; status: Record<string, RunStatus> }>("GET", "/udp-connections"),

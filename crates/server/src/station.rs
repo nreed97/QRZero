@@ -683,7 +683,8 @@ impl Hub {
     }
 
     /// Tunes a rig (from the entry panel or a clicked spot).
-    pub fn tune(&self, key: &str, freq_hz: Option<u64>, mode: Option<String>) -> Result<(), String> {
+    /// `split` is `Some(Some(hz))` to transmit on `hz`, `Some(None)` to turn split off, `None` to leave it.
+    pub fn tune(&self, key: &str, freq_hz: Option<u64>, mode: Option<String>, split: Option<Option<u64>>) -> Result<(), String> {
         let mut parts = key.split(':');
         let (Some("rig"), Some(id), Some(ch)) = (parts.next(), parts.next(), parts.next()) else {
             return Err("that radio can't be tuned from QRZero".into());
@@ -693,6 +694,9 @@ impl Hub {
         let conn = inner.rigs.iter().find(|r| r.equipment_id == id).ok_or("that radio isn't connected")?;
         if let Some(f) = freq_hz {
             conn.handle.send(ch, RigCommand::SetFreq(f));
+        }
+        if let Some(tx) = split {
+            conn.handle.send(ch, RigCommand::SetSplit(tx));
         }
         if let Some(m) = mode.filter(|m| !m.is_empty()) {
             // The rig picks the sideband from its current frequency, which may not have caught up yet.
@@ -973,6 +977,7 @@ impl Hub {
                         data: true,
                         tx: transmitting,
                         error: None,
+                        ..Default::default()
                     };
                     self.set_radio(Radio { key: format!("wsjtx:{id}"), name: id, source: "wsjtx", can_tune: false, state });
                 }
@@ -1179,6 +1184,7 @@ impl Hub {
                     rig_mode: mode,
                     tx: is_transmitting,
                     error: None,
+                    ..Default::default()
                 };
                 let name = if station.is_empty() { format!("N1MM radio {radio_nr}") } else { format!("N1MM {station} radio {radio_nr}") };
                 self.set_radio(Radio { key: format!("n1mm:{station}:{radio_nr}"), name, source: "n1mm", can_tune: false, state });
@@ -1494,7 +1500,7 @@ fn radio_ctx(r: &Radio) -> UdpCtx {
     UdpCtx {
         event: UdpEvent::Radio,
         freq_hz: s.freq_hz,
-        tx_freq_hz: s.freq_hz,
+        tx_freq_hz: if s.split && s.tx_freq_hz > 0 { s.tx_freq_hz } else { s.freq_hz },
         band: band_for_freq(s.freq_hz as f64 / 1e6).unwrap_or_default().to_string(),
         mode: if s.mode.is_empty() { s.rig_mode.clone() } else { s.mode.clone() },
         rig_mode: s.rig_mode.clone(),
