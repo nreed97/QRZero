@@ -101,8 +101,8 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // The QSO above it in the log, from the editor's arrows.
   await editor.getByRole("button", { name: "Previous QSO" }).click();
   await expect(editor.getByLabel("Call", { exact: true })).not.toHaveValue("K1ABC");
-  // QRZ lookup with no QRZ login says how to turn it on.
-  await editor.getByRole("button", { name: "QRZ lookup" }).click();
+  // Fill from QRZ with no QRZ login says how to turn it on.
+  await editor.getByRole("button", { name: "Fill from QRZ" }).click();
   await expect(editor.getByRole("alert")).toContainText("QRZ login");
   await Promise.all([editWin.waitForEvent("close"), closeWindow(editor.getByRole("button", { name: "Close editor" }))]);
 
