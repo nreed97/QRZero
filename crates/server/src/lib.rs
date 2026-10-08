@@ -16,7 +16,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use qrzero_core::adif::Fields;
-use qrzero_core::awards::{Award, AwardTable, Counts, Tally};
+use qrzero_core::awards::{Award, AwardHint, AwardQso, AwardTable, Counts, Tally};
 use qrzero_core::model::*;
 use qrzero_core::qrz::{QrzClient, DEFAULT_ENDPOINT};
 use qrzero_core::store::Sort;
@@ -186,6 +186,7 @@ fn router(state: Shared) -> Router {
         .route("/logs/{id}/paper-queue", get(paper_queue))
         .route("/logs/{id}/awards/{award}", get(award))
         .route("/logs/{id}/lookup/{call}", get(lookup))
+        .route("/logs/{id}/award-hints", get(award_hints))
         .route("/logs/{id}/notes", get(list_notes))
         .route("/logs/{id}/notes/{call}", get(get_note).put(put_note).delete(delete_note))
         .route(
@@ -494,6 +495,7 @@ struct MarkBody {
 async fn mark_qsos(State(s): State<Shared>, Json(b): Json<MarkBody>) -> ApiResult<usize> {
     let n = b.ids.len();
     db(&s, move |st| st.mark_qsos(&b.ids, &b.fields)).await?;
+    s.hub.refresh_awards();
     s.hub.emit(json!({"type": "qso_logged", "log_id": null, "call": "", "source": "mark", "added": false}));
     Ok(Json(n))
 }
@@ -546,6 +548,56 @@ async fn award(State(s): State<Shared>, Path((id, award)): Path<(i64, Award)>, Q
     Ok(Json(table.as_ref().clone()))
 }
 
+#[derive(Deserialize)]
+struct HintQuery {
+    call: String,
+    #[serde(default)]
+    band: String,
+    #[serde(default)]
+    mode: String,
+    #[serde(default)]
+    state: String,
+    /// CQ zone and DXCC entity; taken from the country file when missing.
+    cqz: Option<String>,
+    dxcc: Option<String>,
+    #[serde(default)]
+    lotw: bool,
+    #[serde(default)]
+    paper: bool,
+    #[serde(default)]
+    eqsl: bool,
+}
+
+/// What a QSO with a station on a band and mode would add to each award.
+async fn award_hints(State(s): State<Shared>, Path(log_id): Path<i64>, Query(q): Query<HintQuery>) -> ApiResult<Vec<AwardHint>> {
+    let mut fields = Fields::new();
+    for (k, v) in [("CALL", &q.call), ("BAND", &q.band), ("MODE", &q.mode), ("STATE", &q.state)] {
+        fields.insert(k.into(), v.clone());
+    }
+    for (k, v) in [("CQZ", &q.cqz), ("DXCC", &q.dxcc)] {
+        if let Some(v) = v.as_ref().filter(|v| !v.trim().is_empty()) {
+            fields.insert(k.into(), v.clone());
+        }
+    }
+    // The same country-file facts a logged QSO would get.
+    s.hub.fill_from_cty(&mut fields);
+    let qso = AwardQso::from_fields(&fields, |_| None);
+    let counts = Counts { lotw: q.lotw, paper: q.paper, eqsl: q.eqsl };
+    let hub = s.hub.clone();
+    let mut hints = tokio::task::spawn_blocking(move || hub.award_hints(log_id, &qso, counts))
+        .await
+        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(ApiError::from)?;
+    if let Some(cty) = s.hub.cty() {
+        for h in hints.iter_mut().filter(|h| h.award == Award::Dxcc) {
+            if let Some(e) = cty.entities().iter().find(|e| e.dxcc.is_some_and(|d| d.to_string() == h.key)) {
+                h.name = e.name.clone();
+            }
+        }
+    }
+    Ok(Json(hints))
+}
+
 async fn paper_queue(State(s): State<Shared>, Path(id): Path<i64>) -> ApiResult<Vec<Qso>> {
     Ok(Json(db(&s, move |st| st.paper_queue(id)).await?))
 }
@@ -586,6 +638,8 @@ async fn search_qsos(State(s): State<Shared>, Path(id): Path<i64>, Json(b): Json
 
 #[derive(Serialize)]
 struct LookupResult {
+    /// The call looked up, uppercase.
+    call: String,
     worked: WorkedBefore,
     /// The DXCC entity from the country file.
     entity: Option<qrzero_core::cty::Entity>,
@@ -600,7 +654,7 @@ struct LookupResult {
 async fn lookup(State(s): State<Shared>, Path((log_id, call)): Path<(i64, String)>) -> ApiResult<LookupResult> {
     let call = call.trim().to_ascii_uppercase();
     let call_for_udp = call.clone();
-    let mut result = LookupResult { worked: WorkedBefore::default(), entity: s.hub.entity(&call), station: None, source: None, error: None, note: None };
+    let mut result = LookupResult { call: call.clone(), worked: WorkedBefore::default(), entity: s.hub.entity(&call), station: None, source: None, error: None, note: None };
     match qrz_lookup(&s, &call).await {
         Ok(Some((fields, source))) => {
             result.station = Some(fields);

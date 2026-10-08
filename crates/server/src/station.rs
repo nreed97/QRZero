@@ -10,6 +10,7 @@ use std::time::Duration;
 use qrzero_core::adif::{self, Fields};
 use qrzero_core::band::band_for_freq;
 use qrzero_core::cty::{CtyDb, Entity};
+use qrzero_core::awards::{AwardHint, AwardIndex, AwardQso, Counts};
 use qrzero_core::worked::{Needed, WorkedIndex};
 use qrzero_core::Store;
 use qrzero_radio::rig::{self, RigCommand, RigConfig, RigHandle, RigState};
@@ -293,12 +294,20 @@ impl Drop for RigConn {
     }
 }
 
+struct AwardCells {
+    log_id: i64,
+    version: i64,
+    index: AwardIndex,
+}
+
 #[derive(Default)]
 struct Inner {
     active: Active,
     rigs: Vec<RigConn>,
     radios: BTreeMap<String, Radio>,
     worked: Option<(i64, WorkedIndex)>,
+    /// Award cells of one log, with the QSO version they reflect.
+    awards: Option<AwardCells>,
     instances: BTreeMap<String, FtxInstance>,
     /// Colour slot per instance id, in order of first appearance.
     ftx_colors: HashMap<String, u8>,
@@ -471,10 +480,69 @@ impl Hub {
             }
             Err(e) => tracing::warn!("worked index: {e}"),
         });
+        self.refresh_awards();
+    }
+
+    /// Recounts the active log's award cells in the background, after QSL
+    /// changes, so the next lookup doesn't wait for it.
+    pub fn refresh_awards(self: &Arc<Self>) {
+        let Some(log_id) = self.lock().active.log_id else { return };
+        let hub = self.clone();
+        tokio::task::spawn_blocking(move || {
+            if let Err(e) = hub.build_award_cells(log_id) {
+                tracing::warn!("award index: {e}");
+            }
+        });
+    }
+
+    /// Counts a log's award cells and keeps them, unless newer ones are already kept.
+    fn build_award_cells(&self, log_id: i64) -> qrzero_core::Result<()> {
+        let cty = self.cty();
+        let (version, index) = self.with_store(|st| st.award_index(log_id, |call| cty.as_ref()?.lookup(call)?.dxcc))?;
+        let mut inner = self.lock();
+        if inner.awards.as_ref().is_none_or(|a| a.log_id != log_id || a.version <= version) {
+            inner.awards = Some(AwardCells { log_id, version, index });
+        }
+        Ok(())
+    }
+
+    /// What a QSO would add to each award in a log. Uses the kept award cells
+    /// when they are up to date, else counts the log first (after edits,
+    /// deletes, imports and confirmations).
+    pub fn award_hints(&self, log_id: i64, q: &AwardQso, counts: Counts) -> qrzero_core::Result<Vec<AwardHint>> {
+        let version = self.with_store(|st| st.qso_version())?;
+        let fresh = |inner: &Inner| {
+            inner
+                .awards
+                .as_ref()
+                .filter(|a| a.log_id == log_id && a.version == version)
+                .map(|a| a.index.hints(q, counts))
+        };
+        if let Some(h) = fresh(&self.lock()) {
+            return Ok(h);
+        }
+        self.build_award_cells(log_id)?;
+        let inner = self.lock();
+        match inner.awards.as_ref().filter(|a| a.log_id == log_id) {
+            Some(a) => Ok(a.index.hints(q, counts)),
+            None => Ok(Vec::new()),
+        }
     }
 
     /// Records a newly logged QSO in the worked-before sets.
     pub fn note_qso(&self, log_id: i64, f: &Fields) {
+        // The award cells take the QSO only if it is the one change since they were
+        // counted; otherwise they are stale and get recounted when next asked.
+        if let Ok(version) = self.with_store(|st| st.qso_version()) {
+            let cty = self.cty();
+            let qso = AwardQso::from_fields(f, |call| cty.as_ref()?.lookup(call)?.dxcc);
+            if let Some(a) = self.lock().awards.as_mut() {
+                if a.log_id == log_id && a.version + 1 == version {
+                    a.index.add(&qso);
+                    a.version = version;
+                }
+            }
+        }
         if let Some((id, idx)) = self.lock().worked.as_mut() {
             if *id == log_id {
                 let mode = f.get("SUBMODE").or(f.get("MODE"));

@@ -15,7 +15,7 @@ use crate::adif::{self, Fields};
 use crate::band;
 use crate::error::{Error, Result};
 use crate::model::*;
-use crate::awards::AwardQso;
+use crate::awards::{AwardIndex, AwardQso};
 use crate::worked::WorkedIndex;
 
 /// Migrations in order; migration N brings the schema to user_version N.
@@ -525,6 +525,15 @@ impl Store {
             f(&q);
         }
         Ok(())
+    }
+
+    /// The award cells of a log for "what would this QSO add?", with the QSO
+    /// version it reflects (see [`Store::qso_version`]).
+    pub fn award_index(&self, log_id: i64, resolve: impl Fn(&str) -> Option<u32>) -> Result<(i64, AwardIndex)> {
+        let version = self.qso_version()?;
+        let mut idx = AwardIndex::default();
+        self.for_each_award_qso(log_id, &[], resolve, |q| idx.add(q))?;
+        Ok((version, idx))
     }
 
     /// QSOs waiting for a paper QSL card (QSL_SENT is R "requested" or Q "queued"),

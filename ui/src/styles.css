@@ -171,6 +171,12 @@ kbd { font: 11px var(--mono); opacity: 0.75; margin-left: 4px; }
 .flag.new { color: var(--new); }
 .flag.dupe { color: var(--err); }
 .flag.info { color: var(--muted); font-weight: 400; }
+.award-hints { margin: 6px 0 2px; font-size: 12px; border-top: 1px solid var(--line); padding-top: 4px; }
+.award-hints .ah-title { color: var(--muted); font-size: 11px; margin-bottom: 1px; }
+.award-hints .ah-line { display: flex; gap: 6px; line-height: 1.45; }
+.award-hints .ah-award { flex: 0 0 34px; font-weight: 700; }
+.award-hints .ah-text { min-width: 0; }
+.award-hints .ah-new { color: var(--new); font-weight: 700; }
 
 /* Map */
 .map-box { flex: 1; min-height: 150px; position: relative; overflow: hidden; }
