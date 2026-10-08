@@ -46,6 +46,18 @@ jobs:
           cache-dependency-path: ui/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: Set the version from the tag
+        # QRZero-Alpha-v0.12 becomes 0.12.0, so file names and the installer version follow the tag.
+        # Windows installers need plain numbers, so any words in the tag are left out.
+        shell: bash
+        run: |
+          v=$(echo "$TAG" | grep -oE '[0-9]+(\.[0-9]+){0,2}' | tail -1)
+          IFS=. read -r major minor patch <<< "${v:-0.1.0}"
+          v="$major.${minor:-0}.${patch:-0}"
+          sed -i "0,/^version = \".*\"/s//version = \"$v\"/" Cargo.toml
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$v\"/" src-tauri/tauri.conf.json
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+          echo "Building version $v"
       - name: Build UI
         working-directory: ui
         run: npm ci && npm run build
@@ -54,11 +66,11 @@ jobs:
       - name: Attach to release
         shell: bash
         run: |
-          cp target/release/qrzero.exe "QRZero-portable.exe"
+          cp target/release/qrzero.exe "QRZero_${VERSION}_portable.exe"
           gh release upload "$TAG" --clobber \
             target/release/bundle/msi/*.msi \
             target/release/bundle/nsis/*.exe \
-            QRZero-portable.exe
+            "QRZero_${VERSION}_portable.exe"
 
   linux:
     name: Build Linux packages
@@ -83,6 +95,18 @@ jobs:
           cache-dependency-path: ui/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: Set the version from the tag
+        # QRZero-Alpha-v0.12 becomes 0.12.0, so file names and the installer version follow the tag.
+        # Windows installers need plain numbers, so any words in the tag are left out.
+        shell: bash
+        run: |
+          v=$(echo "$TAG" | grep -oE '[0-9]+(\.[0-9]+){0,2}' | tail -1)
+          IFS=. read -r major minor patch <<< "${v:-0.1.0}"
+          v="$major.${minor:-0}.${patch:-0}"
+          sed -i "0,/^version = \".*\"/s//version = \"$v\"/" Cargo.toml
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$v\"/" src-tauri/tauri.conf.json
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+          echo "Building version $v"
       - name: Build UI
         working-directory: ui
         run: npm ci && npm run build
@@ -92,9 +116,9 @@ jobs:
         run: cargo build --release -p qrzero-server
       - name: Attach to release
         run: |
-          tar -czf "QRZero-server-linux-x86_64.tar.gz" -C target/release qrzero-server
+          tar -czf "QRZero-server_${VERSION}_linux-x86_64.tar.gz" -C target/release qrzero-server
           gh release upload "$TAG" --clobber \
             target/release/bundle/deb/*.deb \
             target/release/bundle/rpm/*.rpm \
             target/release/bundle/appimage/*.AppImage \
-            QRZero-server-linux-x86_64.tar.gz
+            "QRZero-server_${VERSION}_linux-x86_64.tar.gz"
