@@ -38,6 +38,12 @@ CREATE INDEX qsos_pending_lotw ON qsos (log_id, station_callsign, time_on)
 const SCHEMA_V4: &str = r#"
 CREATE INDEX qsos_pending_eqsl ON qsos (log_id, station_callsign, time_on)
     WHERE IFNULL(json_extract(fields, '$.EQSL_QSL_SENT'), '') NOT IN ('Y', 'I');
+-- Bumped on every QSO change, so results computed from the whole log can be cached.
+CREATE TABLE qso_version (id INTEGER PRIMARY KEY CHECK (id = 1), version INTEGER NOT NULL);
+INSERT INTO qso_version VALUES (1, 0);
+CREATE TRIGGER qsos_version_ins AFTER INSERT ON qsos BEGIN UPDATE qso_version SET version = version + 1; END;
+CREATE TRIGGER qsos_version_upd AFTER UPDATE ON qsos BEGIN UPDATE qso_version SET version = version + 1; END;
+CREATE TRIGGER qsos_version_del AFTER DELETE ON qsos BEGIN UPDATE qso_version SET version = version + 1; END;
 "#;
 
 const SCHEMA_V1: &str = r#"
@@ -449,6 +455,11 @@ impl Store {
         Ok(stats)
     }
 
+    /// A number that changes whenever any QSO is added, edited or deleted.
+    pub fn qso_version(&self) -> Result<i64> {
+        Ok(self.conn.query_row("SELECT version FROM qso_version", [], |r| r.get(0))?)
+    }
+
     /// Calls `f` with the award facts of every QSO in the log, optionally only for
     /// some station callsigns. `resolve` supplies a DXCC entity for QSOs without one.
     pub fn for_each_award_qso(
@@ -461,16 +472,28 @@ impl Store {
         let marks = vec!["?"; callsigns.len()].join(", ");
         let calls = if callsigns.is_empty() { String::new() } else { format!(" AND station_callsign IN ({marks})") };
         let mut stmt = self.conn.prepare(&format!(
-            "SELECT id, call, band, IFNULL(submode, mode), dxcc,
-                    json_extract(fields, '$.STATE'), json_extract(fields, '$.CQZ'),
-                    json_extract(fields, '$.LOTW_QSL_RCVD'), json_extract(fields, '$.QSL_RCVD'),
-                    json_extract(fields, '$.EQSL_QSL_RCVD')
-             FROM qsos WHERE log_id = ?{calls}"
+            "SELECT id, call, band, IFNULL(submode, mode), dxcc, fields FROM qsos WHERE log_id = ?{calls}"
         ))?;
         let mut args: Vec<Value> = vec![log_id.into()];
         args.extend(callsigns.iter().map(|c| Value::from(c.to_ascii_uppercase())));
         let mut rows = stmt.query(params_from_iter(args))?;
-        let yes = |v: Option<String>| matches!(v.as_deref(), Some("Y") | Some("V"));
+        // Parsing the JSON once in Rust, keeping only these keys, is several times
+        // faster than one json_extract per key.
+        #[derive(serde::Deserialize)]
+        #[allow(non_snake_case)]
+        struct Facts<'a> {
+            #[serde(borrow)]
+            STATE: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            CQZ: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            LOTW_QSL_RCVD: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            QSL_RCVD: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            EQSL_QSL_RCVD: Option<std::borrow::Cow<'a, str>>,
+        }
+        let yes = |v: &Option<std::borrow::Cow<str>>| matches!(v.as_deref(), Some("Y") | Some("V"));
         let mut q = AwardQso::default();
         while let Some(r) = rows.next()? {
             q.id = r.get(0)?;
@@ -479,15 +502,13 @@ impl Store {
             q.mode = r.get(3)?;
             let dxcc: Option<i64> = r.get(4)?;
             q.dxcc = dxcc.and_then(|d| u32::try_from(d).ok()).or_else(|| resolve(&q.call));
-            q.state = r.get::<_, Option<String>>(5)?.map(|s| s.trim().to_ascii_uppercase()).filter(|s| !s.is_empty());
-            q.cq_zone = match r.get_ref(6)? {
-                rusqlite::types::ValueRef::Integer(n) => u32::try_from(n).ok(),
-                rusqlite::types::ValueRef::Text(t) => std::str::from_utf8(t).ok().and_then(|t| t.trim().parse().ok()),
-                _ => None,
-            };
-            q.lotw = yes(r.get(7)?);
-            q.paper = yes(r.get(8)?);
-            q.eqsl = yes(r.get(9)?);
+            let raw = r.get_ref(5)?.as_str().map_err(rusqlite::Error::from)?;
+            let facts: Facts = serde_json::from_str(raw)?;
+            q.state = facts.STATE.map(|s| s.trim().to_ascii_uppercase()).filter(|s| !s.is_empty());
+            q.cq_zone = facts.CQZ.and_then(|z| z.trim().parse().ok());
+            q.lotw = yes(&facts.LOTW_QSL_RCVD);
+            q.paper = yes(&facts.QSL_RCVD);
+            q.eqsl = yes(&facts.EQSL_QSL_RCVD);
             f(&q);
         }
         Ok(())

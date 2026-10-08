@@ -93,7 +93,11 @@ struct AppState {
     hub: Arc<Hub>,
     cluster: Arc<Cluster>,
     qsl: Arc<Qsl>,
+    /// Award tables by request, with the QSO version they were counted at.
+    award_cache: AwardCache,
 }
+
+type AwardCache = Arc<Mutex<std::collections::HashMap<String, (i64, Arc<AwardTable>)>>>;
 
 type Shared = Arc<AppState>;
 
@@ -126,6 +130,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
         secret_service: cfg.secret_service,
         token: token.clone(),
         data_dir: cfg.data_dir,
+        award_cache: AwardCache::default(),
     });
     let listener = tokio::net::TcpListener::bind(cfg.addr).await?;
     let addr = listener.local_addr()?;
@@ -491,14 +496,25 @@ async fn award(State(s): State<Shared>, Path((id, award)): Path<(i64, Award)>, Q
     }
     let calls: Vec<String> = q.calls.split(',').map(|c| c.trim().to_ascii_uppercase()).filter(|c| !c.is_empty()).collect();
     let counts = Counts { lotw: q.lotw, paper: q.paper, eqsl: q.eqsl };
+    // Counting a big log takes a moment, so keep the last few tables until a QSO changes.
+    let key = format!("{id}|{award:?}|{}|{}{}{}|{}|{}", calls.join(","), q.lotw, q.paper, q.eqsl, q.unworked, cty.as_ref().map_or(0, |c| c.len()));
+    let cache = s.award_cache.clone();
     let table = db(&s, move |st| {
+        let version = st.qso_version()?;
+        if let Some(t) = cache.lock().unwrap_or_else(|p| p.into_inner()).get(&key).filter(|(v, _)| *v == version) {
+            return Ok(t.1.clone());
+        }
         let mut tally = Tally::new(award, counts, names);
         let resolve = |c: &str| cty.as_ref().and_then(|db| db.lookup(c)).and_then(|e| e.dxcc);
         st.for_each_award_qso(id, &calls, resolve, |qso| tally.add(qso))?;
-        Ok(tally.finish(q.unworked))
+        let table = Arc::new(tally.finish(q.unworked));
+        let mut c = cache.lock().unwrap_or_else(|p| p.into_inner());
+        c.retain(|_, (v, _)| *v == version);
+        c.insert(key, (version, table.clone()));
+        Ok(table)
     })
     .await?;
-    Ok(Json(table))
+    Ok(Json(table.as_ref().clone()))
 }
 
 async fn paper_queue(State(s): State<Shared>, Path(id): Path<i64>) -> ApiResult<Vec<Qso>> {

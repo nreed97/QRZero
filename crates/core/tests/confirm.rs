@@ -67,7 +67,7 @@ async fn lotw_report() {
     assert_eq!(r.records.len(), 2);
     assert_eq!(r.records[0]["CALL"], "W1AW");
     assert_eq!(r.records[1]["MODE"], "FT8");
-    let q = &seen.lock().unwrap()[0];
+    let q = seen.lock().unwrap()[0].clone();
     for (k, v) in [
         ("login", "k1abc"),
         ("qso_query", "1"),
@@ -86,7 +86,7 @@ async fn lotw_omits_empty_params_and_rejects_bad_login() {
     let (url, seen) = mock_get("/lotw", lotw_reply).await;
     let err = lotw_confirmations(&url, "k1abc", "wrong", None, "").await.unwrap_err();
     assert_eq!(err, QslError::Auth("LoTW refused the username or password".into()));
-    let q = &seen.lock().unwrap()[0];
+    let q = seen.lock().unwrap()[0].clone();
     assert!(!q.contains_key("qso_qslsince") && !q.contains_key("qso_owncall"));
 }
 
@@ -119,7 +119,7 @@ async fn eqsl_inbox_two_step_download() {
     assert_eq!(recs.len(), 2);
     assert_eq!(recs[0]["CALL"], "JA1XX");
     assert_eq!(recs[1]["SUBMODE"], "FT4");
-    let q = &seen.lock().unwrap()[0];
+    let q = seen.lock().unwrap()[0].clone();
     assert_eq!((q["UserName"].as_str(), q["RcvdSince"].as_str(), q["QTHNickname"].as_str()), ("K1ABC", "20260901", "Home"));
 }
 
@@ -127,7 +127,7 @@ async fn eqsl_inbox_two_step_download() {
 async fn eqsl_inbox_failures() {
     let (url, seen) = mock_get("/qslcard/DownloadInBox.cfm", eqsl_reply).await;
     assert!(matches!(eqsl_confirmations(&url, "K1ABC", "bad", None, "").await, Err(QslError::Auth(_))));
-    let q = &seen.lock().unwrap()[0];
+    let q = seen.lock().unwrap()[0].clone();
     assert!(!q.contains_key("RcvdSince") && !q.contains_key("QTHNickname"));
     assert_eq!(eqsl_confirmations(&url, "K1ABC", "empty", Some(""), "").await, Ok(vec![]));
     assert_eq!(
