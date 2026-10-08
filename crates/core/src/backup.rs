@@ -155,7 +155,12 @@ pub fn list(data_dir: &Path) -> Result<Vec<Backup>> {
     for entry in entries {
         let entry = entry?;
         let name = entry.file_name().to_string_lossy().into_owned();
-        let meta = entry.metadata()?;
+        // A backup being written is renamed into place; if it vanishes between listing and stat, skip it.
+        let meta = match entry.metadata() {
+            Ok(m) => m,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => return Err(e.into()),
+        };
         if !meta.is_file() || !valid_name(&name) {
             continue;
         }
