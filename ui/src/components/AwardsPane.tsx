@@ -9,7 +9,33 @@ const AWARDS: { key: AwardKind; name: string; what: string; row: string }[] = [
   { key: "was", name: "WAS", what: "states", row: "State" },
   { key: "waz", name: "WAZ", what: "CQ zones", row: "Zone" },
   { key: "wpx", name: "WPX", what: "prefixes", row: "Prefix" },
+  { key: "wac", name: "WAC", what: "continents", row: "Continent" },
+  { key: "itu", name: "ITU", what: "ITU zones", row: "Zone" },
+  { key: "vucc", name: "VUCC", what: "grid squares", row: "Grid" },
+  { key: "iota", name: "IOTA", what: "island groups", row: "Reference" },
+  { key: "counties", name: "Counties", what: "US counties", row: "County" },
 ];
+
+/** Awards with a fixed list, so unworked rows are shown (the rest only list what you have worked). */
+const FIXED = new Set<AwardKind>(["dxcc", "was", "waz", "wac", "itu"]);
+
+/** The DXCC Challenge counts entity-band slots on these 10 bands; 5BDXCC wants 100 entities on these 5. */
+const CHALLENGE_BANDS = ["160m", "80m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m"];
+const FIVE_BANDS = ["80m", "40m", "20m", "15m", "10m"];
+
+function dxccSummary(t: AwardTable) {
+  const slots = { worked: 0, confirmed: 0 };
+  let five = 0;
+  for (const r of t.rows) {
+    for (const b of CHALLENGE_BANDS) {
+      const c = r.cells[b];
+      if (c) slots.worked++;
+      if (c === "confirmed") slots.confirmed++;
+    }
+    if (FIVE_BANDS.every((b) => r.cells[b] === "confirmed")) five++;
+  }
+  return { slots, five };
+}
 
 const COL_NAMES: Record<string, string> = { mixed: "Mixed", cw: "CW", phone: "Phone", digital: "Digital" };
 
@@ -32,7 +58,7 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
     let live = true;
     setErr("");
     api
-      .award(logId, opts.award, { calls: opts.call ? [opts.call] : [], lotw: opts.lotw, paper: opts.paper, eqsl: opts.eqsl, unworked: opts.award !== "wpx" })
+      .award(logId, opts.award, { calls: opts.call ? [opts.call] : [], lotw: opts.lotw, paper: opts.paper, eqsl: opts.eqsl, unworked: FIXED.has(opts.award) })
       .then((t) => live && setTable(t))
       .catch((e) => live && setErr(e.message));
     return () => {
@@ -54,12 +80,18 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
 
   const rows = useMemo(() => (table ? (opts.needed ? table.rows.filter((r) => r.cells.mixed !== "confirmed") : table.rows) : []), [table, opts.needed]);
   const award = AWARDS.find((a) => a.key === opts.award)!;
+  const summary = useMemo(() => (table && opts.award === "dxcc" ? dxccSummary(table) : null), [table, opts.award]);
   const mixed = table?.columns.find((c) => c.key === "mixed");
 
   const show = (key: string) => {
     if (opts.award === "dxcc") onShowQsos({ dxcc: Number(key) });
     else if (opts.award === "was") onShowQsos({ fields: { STATE: key } });
     else if (opts.award === "waz") onShowQsos({ fields: { CQZ: key } });
+    else if (opts.award === "wac") onShowQsos({ fields: { CONT: key } });
+    else if (opts.award === "itu") onShowQsos({ fields: { ITUZ: key } });
+    else if (opts.award === "vucc") onShowQsos({ fields: { GRIDSQUARE: key } });
+    else if (opts.award === "iota") onShowQsos({ fields: { IOTA: key } });
+    else if (opts.award === "counties") onShowQsos({ fields: { CNTY: key } });
     else onShowQsos({ call: key });
   };
 
@@ -87,6 +119,12 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
           </span>
         )}
       </div>
+      {summary && (
+        <div className="ftx-msg small">
+          <b>DXCC Challenge:</b> {summary.slots.confirmed} confirmed, {summary.slots.worked} worked band slots (160 to 6 m; 1000 for the award).{" "}
+          <b>5BDXCC:</b> {summary.five} of 100 entities confirmed on 80, 40, 20, 15 and 10 m.
+        </div>
+      )}
       {err && <div className="ftx-msg small err">{err}</div>}
       {table && (
         <div className="award-scroll">
@@ -130,7 +168,7 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
         </div>
       )}
       <div className="ftx-msg small muted">
-        C confirmed, W worked but not confirmed. Click a row to see its QSOs in the log. Get confirmations with QSL, Download confirmations.
+        {opts.award === "vucc" && "VUCC counts 4-character grid squares on 6 m and up. "}{opts.award === "counties" && "Counties come from the County field (like OH,Franklin), which LoTW and QRZ fill in. "}C confirmed, W worked but not confirmed. Click a row to see its QSOs in the log. Get confirmations with QSL, Download confirmations.
       </div>
     </div>
   );

@@ -65,7 +65,7 @@ fn large_log_speed() {
     let batch = timed("next QRZ upload batch", &|| st.pending_uploads(log, "QRZCOM_QSO_UPLOAD_STATUS", &calls, None, 0, 50).unwrap().len() as i64);
     let t = Instant::now();
     let mut tally = qrzero_core::awards::Tally::new(qrzero_core::awards::Award::Dxcc, Default::default(), Default::default());
-    st.for_each_award_qso(log, &[], |c| Some(c.len() as u32), |q| tally.add(q)).unwrap();
+    st.for_each_award_qso(log, &[], |c| qrzero_core::awards::CtyFacts { dxcc: Some(c.len() as u32), ..Default::default() }, |q| tally.add(q)).unwrap();
     let rows = tally.finish(false).rows.len();
     let award = t.elapsed();
     println!("DXCC award table ({rows} rows): {award:?}");
@@ -75,7 +75,7 @@ fn large_log_speed() {
     println!("worked index of {} calls: {:?}", idx.len(), t.elapsed());
     assert!(t.elapsed().as_millis() < 2000, "worked index is built in the background, but shouldn't take long");
     let t = Instant::now();
-    let (_, mut awards) = st.award_index(log, |c| Some(c.len() as u32)).unwrap();
+    let (_, mut awards) = st.award_index(log, |c| qrzero_core::awards::CtyFacts { dxcc: Some(c.len() as u32), ..Default::default() }).unwrap();
     println!("award index of {} QSOs: {:?}", awards.len(), t.elapsed());
     assert!(t.elapsed().as_millis() < 1000, "the award index is recounted after edits, so it must stay quick");
     let t = Instant::now();

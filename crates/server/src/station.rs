@@ -10,7 +10,7 @@ use std::time::Duration;
 use qrzero_core::adif::{self, Fields};
 use qrzero_core::band::band_for_freq;
 use qrzero_core::cty::{CtyDb, Entity};
-use qrzero_core::awards::{AwardHint, AwardIndex, AwardQso, Counts};
+use qrzero_core::awards::{AwardHint, AwardIndex, AwardQso, Counts, CtyFacts};
 use qrzero_core::worked::{Needed, WorkedIndex};
 use qrzero_core::Store;
 use qrzero_radio::rig::{self, RigCommand, RigConfig, RigHandle, RigState};
@@ -335,6 +335,14 @@ impl Drop for RigConn {
     }
 }
 
+/// What the country file says about a call, for award facts.
+pub(crate) fn cty_facts(cty: Option<&qrzero_core::cty::CtyDb>, call: &str) -> CtyFacts {
+    match cty.and_then(|db| db.lookup(call)) {
+        Some(e) => CtyFacts { dxcc: e.dxcc, cont: Some(e.cont.clone()).filter(|c| !c.is_empty()), itu: Some(u32::from(e.itu)).filter(|&z| z > 0) },
+        None => CtyFacts::default(),
+    }
+}
+
 struct AwardCells {
     log_id: i64,
     version: i64,
@@ -541,7 +549,7 @@ impl Hub {
     /// Counts a log's award cells and keeps them, unless newer ones are already kept.
     fn build_award_cells(&self, log_id: i64) -> qrzero_core::Result<()> {
         let cty = self.cty();
-        let (version, index) = self.with_store(|st| st.award_index(log_id, |call| cty.as_ref()?.lookup(call)?.dxcc))?;
+        let (version, index) = self.with_store(|st| st.award_index(log_id, |call| cty_facts(cty.as_deref(), call)))?;
         let mut inner = self.lock();
         if inner.awards.as_ref().is_none_or(|a| a.log_id != log_id || a.version <= version) {
             inner.awards = Some(AwardCells { log_id, version, index });
@@ -578,7 +586,7 @@ impl Hub {
         // counted; otherwise they are stale and get recounted when next asked.
         if let Ok(version) = self.with_store(|st| st.qso_version()) {
             let cty = self.cty();
-            let qso = AwardQso::from_fields(f, |call| cty.as_ref()?.lookup(call)?.dxcc);
+            let qso = AwardQso::from_fields(f, |call| cty_facts(cty.as_deref(), call));
             if let Some(a) = self.lock().awards.as_mut() {
                 if a.log_id == log_id && a.version + 1 == version {
                     a.index.add(&qso);

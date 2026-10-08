@@ -73,7 +73,7 @@ export const api = {
     const q = new URLSearchParams({ calls: o.calls.join(","), lotw: String(o.lotw), paper: String(o.paper), eqsl: String(o.eqsl), unworked: String(o.unworked) });
     return json<AwardTable>("GET", `/logs/${logId}/awards/${award}?${q}`);
   },
-  awardHints: (logId: number, o: { call: string; band: string; mode: string; state: string; cqz: string; dxcc: string; lotw: boolean; paper: boolean; eqsl: boolean }) => {
+  awardHints: (logId: number, o: { call: string; band: string; mode: string; state: string; cqz: string; dxcc: string; grid?: string; iota?: string; cnty?: string; lotw: boolean; paper: boolean; eqsl: boolean }) => {
     const q = new URLSearchParams(Object.entries(o).map(([k, v]) => [k, String(v)]));
     return json<AwardHint[]>("GET", `/logs/${logId}/award-hints?${q}`);
   },
