@@ -10,7 +10,10 @@ const port = 8099;
 
 export default defineConfig({
   testDir: "e2e",
-  timeout: 30_000,
+  // The smoke test is one long walk through the app; CI runners are slower than a desktop.
+  timeout: 90_000,
+  // On CI, failures are also posted as annotations so they show without downloading logs.
+  reporter: process.env.CI ? [["github"], ["list"]] : "list",
   use: {
     baseURL: `http://127.0.0.1:${port}`,
     launchOptions: process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {},
