@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { onLive } from "../live";
-import { BANDS } from "../modes";
+import { BANDS, MODE_GROUP_NAME, modeGroup } from "../modes";
 import { localGet, localSet } from "../prefs";
 import type { Spot } from "../types";
 import type { DecodePick } from "./FtxMonitor";
 import "../watch.css";
+import ModeKey from "./ModeKey";
 
 const KEEP = 500;
-const DIGITAL = ["FT8", "FT4", "RTTY", "PSK31", "JS8", "Q65", "MSK144", "SSTV"];
-const PHONE = ["SSB", "AM", "FM"];
 
 interface Filters { band: string; modes: "" | "cw" | "phone" | "digital"; needed: boolean; hideWorked: boolean; maxAge: number }
 
@@ -26,13 +25,6 @@ function flagsOf(s: Spot): { text: string; cls: string }[] {
 }
 
 const isNeeded = (s: Spot) => !!s.needed && (s.needed.new_dxcc || s.needed.new_band || s.needed.new_mode);
-
-function modeGroup(m: string): Filters["modes"] {
-  if (m === "CW") return "cw";
-  if (PHONE.includes(m)) return "phone";
-  if (DIGITAL.includes(m)) return "digital";
-  return "";
-}
 
 export default function ClusterPane({ onPick, onSettings }: { onPick: (p: DecodePick) => void; onSettings: () => void }) {
   const [spots, setSpots] = useState<Spot[]>([]);
@@ -137,6 +129,7 @@ export default function ClusterPane({ onPick, onSettings }: { onPick: (p: Decode
         <label className="check"><input type="checkbox" checked={filters.needed} onChange={(e) => setFilter({ needed: e.target.checked })} /> Needed only</label>
         <label className="check"><input type="checkbox" checked={filters.hideWorked} onChange={(e) => setFilter({ hideWorked: e.target.checked })} /> Hide worked</label>
         <span className="spacer" />
+        <ModeKey />
         <button className={console_ ? "on" : ""} onClick={() => setConsole(!console_)}>Console</button>
       </div>
       {err && <div className="ftx-msg small err">{err}</div>}
@@ -147,10 +140,11 @@ export default function ClusterPane({ onPick, onSettings }: { onPick: (p: Decode
         {shown.length === 0 && <div className="empty muted">No spots{spots.length ? " match the filters" : state.connected ? " yet" : ". Connect to a cluster to see spots"}.</div>}
         {shown.map((s) => {
           const flags = flagsOf(s);
+          const group = modeGroup(s.mode);
           return (
             <div
               key={s.seq}
-              className={`spot-row ${flags[0]?.cls === "new" ? "needed" : ""} ${flags.some((f) => f.cls === "dupe") ? "worked" : ""}`}
+              className={`spot-row ${group ? `mode-${group}` : ""} ${flags[0]?.cls === "new" ? "needed" : ""} ${flags.some((f) => f.cls === "dupe") ? "worked" : ""}`}
               role="row"
               onClick={() => onPick({ call: s.call, grid: null, band: s.band, mode: s.mode, freq_hz: s.freq_hz })}
               title={`Click to tune to ${s.call}`}
@@ -159,7 +153,7 @@ export default function ClusterPane({ onPick, onSettings }: { onPick: (p: Decode
               <span className="mono num">{(s.freq_hz / 1000).toFixed(1)}</span>
               <span className={`mono call ${s.watched ? "watched" : ""}`}>{s.call}</span>
               <span>{s.entity?.name ?? ""}</span>
-              <span className="mono">{s.mode}</span>
+              <span className="mono mode" title={group ? MODE_GROUP_NAME[group] : "Mode not known"}>{s.mode}</span>
               <span className="mono">{s.spotter}</span>
               <span className="comment">{s.comment}</span>
               <span className="flags">{s.watched ? <span className="flag watched" title="On your watch list">Watched</span> : null}{flags.map((f) => <span key={f.text} className={`flag ${f.cls}`}>{f.text}</span>)}</span>

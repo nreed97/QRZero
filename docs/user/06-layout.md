@@ -33,6 +33,6 @@ Save arrangements you switch between, such as **Laptop** and **Shack, 2 screens*
 1. Arrange the panes.
 2. Choose **Layout**, **Save layout as…** and give it a name.
 
-Pick a saved layout from **Layout** to switch to it, popped-out windows included. **Reset to default** goes back to the starting arrangement.
+Pick a saved layout from **Layout** to switch to it, popped-out windows included. **Reset to default** goes back to the starting arrangement. Layouts, like your column choices, filters and other window settings, are kept in your log database, so they survive restarts and updates and come back with a restored backup.
 
 **Lock panes** stops tabs being dragged or hidden by accident. You can still resize panes while they are locked.

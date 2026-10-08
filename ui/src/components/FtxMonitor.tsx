@@ -1,8 +1,10 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { api } from "../api";
 import { onLive, useInstances } from "../live";
 import { localGet, localSet } from "../prefs";
+import { ALERTS, activeAlerts, isWorked, passes, useFtxAlerts, type AlertKind, type FtxAlertConfig } from "../ftxAlerts";
 import type { FtxDecode, FtxInstance } from "../types";
+import FtxAlertsDialog from "./FtxAlertsDialog";
 import "../watch.css";
 
 const KEEP = 600;
@@ -42,18 +44,23 @@ function cyclesOf(list: FtxDecode[]): Cycle[] {
 
 const hms = (t: string) => `${t.slice(0, 2)}:${t.slice(2, 4)}:${t.slice(4)}`;
 
-/** Flags in order of importance; the first one colours the row. */
-function flagsOf(d: FtxDecode): { text: string; cls: string }[] {
-  const n = d.needed;
-  if (!n || !d.call) return [];
-  const out: { text: string; cls: string }[] = [];
-  if (n.new_dxcc) out.push({ text: "New DXCC", cls: "new" });
-  if (n.new_band) out.push({ text: "New band", cls: "new" });
-  if (n.new_mode) out.push({ text: "New mode", cls: "new" });
-  if (n.new_call && !n.new_dxcc) out.push({ text: "New call", cls: "info" });
-  else if (!n.new_call && n.new_call_band) out.push({ text: "New on band", cls: "info" });
-  if (!n.new_call_band) out.push({ text: "Worked", cls: "dupe" });
-  return out;
+const ALERT = Object.fromEntries(ALERTS.map((a) => [a.kind, a])) as Record<AlertKind, (typeof ALERTS)[number]>;
+
+/** The alert that colours a decode: the most important switched-on one other than CQ. */
+function mainAlert(alerts: AlertKind[]): AlertKind | undefined {
+  return alerts.find((k) => k !== "cq");
+}
+
+/** The flags column: each switched-on alert in its colour, then "Worked". */
+function Flags({ d, cfg }: { d: FtxDecode; cfg: FtxAlertConfig }) {
+  return (
+    <span className="flags">
+      {activeAlerts(d, cfg)
+        .filter((k) => k !== "cq" && k !== "toMe")
+        .map((k) => <span key={k} className="flag" style={{ color: cfg.alerts[k].color }} title={ALERT[k].help}>{ALERT[k].name}</span>)}
+      {isWorked(d) && <span className="flag dupe">Worked</span>}
+    </span>
+  );
 }
 
 /** A 1-3 character tag for the source column: the slice letter, else the --rig-name part of the id. */
@@ -76,13 +83,13 @@ function describe(id: string, inst: FtxInstance | undefined): string {
   return lines.join("\n");
 }
 
-const isNeeded = (d: FtxDecode) => !!d.needed && (d.needed.new_dxcc || d.needed.new_band || d.needed.new_mode || d.needed.new_call_band);
-
 export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick) => void; mycall: string }) {
   const [decodes, setDecodes] = useState<FtxDecode[]>([]);
   const [filters, setFilters] = useState<Filters>(() => localGet("qrzero.ftx", DEFAULTS));
   const [selected, setSelected] = useState<number | null>(null);
   const [msg, setMsg] = useState("");
+  const [cfg, setCfg] = useFtxAlerts();
+  const [editing, setEditing] = useState(false);
   const instances = useInstances();
   const byId = useMemo(() => new Map(instances.map((i) => [i.id, i])), [instances]);
   const label = (i: FtxInstance) => (instances.some((o) => o !== i && o.source === i.source) ? `${i.source} (${i.id})` : i.source);
@@ -106,10 +113,11 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
       decodes.filter(
         (d) =>
           (!filters.cq || d.cq || d.to_me) &&
-          (!filters.needed || isNeeded(d) || d.to_me) &&
+          (!filters.needed || !!mainAlert(activeAlerts(d, cfg))) &&
+          passes(d, cfg) &&
           (!filters.instance || d.instance === filters.instance),
       ),
-    [decodes, filters],
+    [decodes, filters, cfg],
   );
 
   const pick = (d: FtxDecode) => {
@@ -131,12 +139,12 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
   const cycles = useMemo(() => cyclesOf(shown), [shown]);
 
   const row = (d: FtxDecode) => {
-    const flags = flagsOf(d);
+    const alerts = activeAlerts(d, cfg);
+    const main = mainAlert(alerts);
     const cls = [
       "ftx-row",
-      d.to_me ? "to-me" : "",
+      main ? "alerted" : "",
       d.cq ? "cq" : "",
-      flags[0]?.cls === "new" ? "needed" : "",
       selected === d.seq ? "selected" : "",
       d.low_confidence ? "low" : "",
       `src-${d.color_index % 8}`,
@@ -145,6 +153,7 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
       <div
         key={d.seq}
         className={cls}
+        style={main ? ({ "--alert": cfg.alerts[main].color } as CSSProperties) : undefined}
         role="row"
         onClick={() => pick(d)}
         onDoubleClick={() => void answer(d)}
@@ -158,7 +167,7 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
         <span className="mono msg">{highlight(d.message, mycall, d.watched ? d.call : null)}</span>
         <span>{d.entity?.name ?? ""}</span>
         <span className="mono">{d.band ?? ""}</span>
-        <span className="flags">{d.watched ? <span className="flag watched" title="On your watch list">Watched</span> : null}{flags.map((f) => <span key={f.text} className={`flag ${f.cls}`}>{f.text}</span>)}</span>
+        <Flags d={d} cfg={cfg} />
       </div>
     );
   };
@@ -197,14 +206,16 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
         </label>
         <label className="check"><input type="checkbox" checked={filters.cq} onChange={(e) => setFilter({ cq: e.target.checked })} /> CQ only</label>
         <label className="check"><input type="checkbox" checked={filters.needed} onChange={(e) => setFilter({ needed: e.target.checked })} /> Needed only</label>
+        <button onClick={() => setEditing(true)} title="Choose which stations stand out, their colours, and which to hide">Alerts and filters…</button>
         <button onClick={() => setDecodes([])}>Clear</button>
       </div>
+      {editing && <FtxAlertsDialog cfg={cfg} onChange={setCfg} onClose={() => setEditing(false)} />}
       {msg && <div className="ftx-msg small">{msg}</div>}
       {filters.view === "calls" ? (
         <div className="ftx-calls" aria-label="Stations heard">
           {shown.length === 0 && <div className="empty muted">No decodes{decodes.length ? " match the filters" : " yet"}.</div>}
           {cycles.map((c) => (
-            <CallCycle key={c.time + c.decodes[0].seq} cycle={c} breaks={filters.cycles} selected={selected} onPick={pick} onAnswer={(d) => void answer(d)} />
+            <CallCycle key={c.time + c.decodes[0].seq} cycle={c} cfg={cfg} breaks={filters.cycles} selected={selected} onPick={pick} onAnswer={(d) => void answer(d)} />
           ))}
         </div>
       ) : (
@@ -252,13 +263,15 @@ function CycleBreak({ cycle }: { cycle: Cycle }) {
 }
 
 /** One period of the call box view: one box per station heard, most important first. */
-function CallCycle({ cycle, breaks, selected, onPick, onAnswer }: {
+function CallCycle({ cycle, cfg, breaks, selected, onPick, onAnswer }: {
   cycle: Cycle;
+  cfg: FtxAlertConfig;
   breaks: boolean;
   selected: number | null;
   onPick: (d: FtxDecode) => void;
   onAnswer: (d: FtxDecode) => void;
 }) {
+  const rank = (d: FtxDecode) => rankOf(d, cfg);
   // Keep one decode per station and source; one calling us or calling CQ wins over the rest.
   const byCall = new Map<string, FtxDecode>();
   for (const d of cycle.decodes) {
@@ -274,26 +287,32 @@ function CallCycle({ cycle, breaks, selected, onPick, onAnswer }: {
       {breaks && <CycleBreak cycle={cycle} />}
       <div className="ftx-boxes">
         {boxes.map((d) => {
-          const flags = flagsOf(d);
+          const alerts = activeAlerts(d, cfg);
+          const main = mainAlert(alerts);
+          const cq = alerts.includes("cq");
           const cls = [
             "ftx-box",
-            d.to_me ? "to-me" : flags[0]?.cls === "new" ? "needed" : flags.some((f) => f.cls === "dupe") ? "worked" : "",
-            d.cq ? "cq" : "",
-            d.watched ? "watched" : "",
+            main ? "alerted" : isWorked(d) ? "worked" : "",
+            cq ? "cq" : "",
             selected === d.seq ? "selected" : "",
             d.low_confidence ? "low" : "",
             `src-${d.color_index % 8}`,
           ].join(" ");
+          const style = {
+            ...(main ? { "--alert": cfg.alerts[main].color } : {}),
+            ...(cq ? { "--cq": cfg.alerts.cq.color } : {}),
+          } as CSSProperties;
           const title = [
             d.message,
             `${d.snr} dB, ${d.df} Hz, ${d.source || d.instance}`,
             d.entity?.name,
-            [d.watched ? "Watched" : "", ...flags.map((f) => f.text)].filter(Boolean).join(", "),
+            [...alerts.filter((k) => k !== "cq").map((k) => ALERT[k].name), isWorked(d) ? "Worked on this band" : ""].filter(Boolean).join(", "),
             "Click to fill in; double-click to call them",
           ].filter(Boolean).join("\n");
           return (
-            <button key={d.seq} className={cls} onClick={() => onPick(d)} onDoubleClick={() => onAnswer(d)} title={title}>
+            <button key={d.seq} className={cls} style={style} onClick={() => onPick(d)} onDoubleClick={() => onAnswer(d)} title={title}>
               <span className="call">{d.call}</span>
+              {main && <span className="tag">{ALERT[main].tag}</span>}
               <span className="snr">{d.snr > 0 ? `+${d.snr}` : d.snr}</span>
             </button>
           );
@@ -303,12 +322,10 @@ function CallCycle({ cycle, breaks, selected, onPick, onAnswer }: {
   );
 }
 
-/** Lower comes first: calling us, then needed, then CQ, then the rest; worked stations last. */
-function rank(d: FtxDecode): number {
-  const flags = flagsOf(d);
-  if (d.to_me) return 0;
-  if (flags[0]?.cls === "new") return d.cq ? 1 : 2;
-  if (d.watched) return 3;
-  if (flags.some((f) => f.cls === "dupe")) return d.cq ? 6 : 7;
-  return d.cq ? 4 : 5;
+/** Lower comes first: by the most important switched-on alert, CQs ahead of the rest, worked stations last. */
+function rankOf(d: FtxDecode, cfg: FtxAlertConfig): number {
+  const alerts = activeAlerts(d, cfg);
+  const main = mainAlert(alerts);
+  const base = main ? ALERTS.findIndex((a) => a.kind === main) * 2 : isWorked(d) ? 40 : 20;
+  return base + (alerts.includes("cq") ? 0 : 1);
 }
