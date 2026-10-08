@@ -281,7 +281,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // The WSJT-X fed in above may still be listed, so look for the monitor itself.
   await expect(popup.getByLabel("Period breaks")).toBeVisible();
   await expect(page.getByRole("tab", { name: "FTx monitor" })).toHaveCount(0);
-  await popup.getByRole("button", { name: "Dock back" }).click();
+  await closeWindow(popup.getByRole("button", { name: "Dock back" }));
   await expect(page.getByRole("tab", { name: "FTx monitor" })).toBeVisible();
 
   // Backups: back up now, download it, then stage a restore and cancel it.
