@@ -157,6 +157,23 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
         award_cache: AwardCache::default(),
         last_restore,
     });
+    // QSOs logged by WSJT-X, JTDX or N1MM are looked up on QRZ in the background.
+    let (lookup_tx, mut lookup_rx) = tokio::sync::mpsc::unbounded_channel::<(i64, i64, String)>();
+    state.hub.set_auto_lookup(lookup_tx);
+    // Weak, so this task doesn't keep the database open after the server stops (Windows can't then replace the file on restore).
+    let weak = Arc::downgrade(&state);
+    tokio::spawn(async move {
+        while let Some((log_id, id, call)) = lookup_rx.recv().await {
+            let Some(s2) = weak.upgrade() else { break };
+            match lookup_into_qso(&s2, id, &call).await {
+                Ok(filled) if !filled.is_empty() => {
+                    s2.hub.emit(json!({"type": "qso_logged", "log_id": log_id, "call": "", "source": "QRZ", "added": false}));
+                }
+                Ok(_) => {}
+                Err(e) => tracing::info!("QRZ lookup for auto-logged {call}: {e}"),
+            }
+        }
+    });
     let listener = tokio::net::TcpListener::bind(cfg.addr).await?;
     let addr = listener.local_addr()?;
     let app = router(state);
@@ -190,6 +207,8 @@ fn router(state: Shared) -> Router {
         .route("/qsos/{id}", get(get_qso).put(update_qso))
         .route("/qsos/delete", post(delete_qsos))
         .route("/qsos/mark", post(mark_qsos))
+        .route("/qsos/lookup", post(lookup_qsos))
+        .route("/qsos/send", post(send_qsos))
         .route("/logs/{id}/paper-queue", get(paper_queue))
         .route("/logs/{id}/awards/{award}", get(award))
         .route("/logs/{id}/lookup/{call}", get(lookup))
@@ -608,6 +627,93 @@ async fn award_hints(State(s): State<Shared>, Path(log_id): Path<i64>, Query(q):
 
 async fn paper_queue(State(s): State<Shared>, Path(id): Path<i64>) -> ApiResult<Vec<Qso>> {
     Ok(Json(db(&s, move |st| st.paper_queue(id)).await?))
+}
+
+/// Fields a callsign lookup may fill in on a logged QSO: never the call, the operator's own
+/// MY_ fields, or anything the QSO already has.
+fn fill_blanks(fields: &mut Fields, station: &Fields) -> Vec<String> {
+    let mut filled = Vec::new();
+    for (k, v) in station {
+        if k == "CALL" || k.starts_with("MY_") || v.trim().is_empty() {
+            continue;
+        }
+        if fields.get(k).is_none_or(|old| old.trim().is_empty()) {
+            fields.insert(k.clone(), v.clone());
+            filled.push(k.clone());
+        }
+    }
+    filled
+}
+
+/// Looks up a logged QSO's call on QRZ and fills in its blank fields. Returns the fields filled.
+async fn lookup_into_qso(s: &Shared, id: i64, call: &str) -> Result<Vec<String>, String> {
+    let Some((station, _)) = qrz_lookup(s, call).await? else {
+        let settings = db(s, |st| load_settings(st)).await.map_err(|e| e.1)?;
+        if !settings.qrz_enabled || settings.qrz_username.is_empty() {
+            return Err("QRZ lookups are off: add your QRZ login in Settings".into());
+        }
+        return Err("not found on QRZ".into());
+    };
+    let filled = db(s, move |st| {
+        let qso = st.get_qso(id)?;
+        let mut fields = qso.fields.clone();
+        let filled = fill_blanks(&mut fields, &station);
+        if !filled.is_empty() {
+            st.update_qso(id, qso.location_id, &fields)?;
+        }
+        Ok(filled)
+    })
+    .await
+    .map_err(|e| e.1)?;
+    if !filled.is_empty() {
+        s.hub.rebuild_worked();
+    }
+    Ok(filled)
+}
+
+#[derive(Serialize)]
+struct LookupQsosResult {
+    /// QSOs that gained at least one field.
+    updated: usize,
+    /// One line per QSO that couldn't be looked up.
+    errors: Vec<String>,
+}
+
+/// Looks up the chosen QSOs on QRZ and fills in what they're missing.
+async fn lookup_qsos(State(s): State<Shared>, Json(b): Json<IdsBody>) -> ApiResult<LookupQsosResult> {
+    let mut out = LookupQsosResult { updated: 0, errors: Vec::new() };
+    for id in b.ids {
+        let qso = db(&s, move |st| st.get_qso(id)).await?;
+        let call = qso.fields.get("CALL").cloned().unwrap_or_default();
+        match lookup_into_qso(&s, id, &call).await {
+            Ok(f) if !f.is_empty() => out.updated += 1,
+            Ok(_) => {}
+            Err(e) => {
+                let off = e.starts_with("QRZ lookups are off");
+                out.errors.push(if off { e } else { format!("{call}: {e}") });
+                if off {
+                    break;
+                }
+            }
+        }
+    }
+    if out.updated > 0 {
+        s.hub.emit(json!({"type": "qso_logged", "log_id": null, "call": "", "source": "QRZ", "added": false}));
+    }
+    Ok(Json(out))
+}
+
+/// Sends the chosen QSOs out through the user's "QSO logged" UDP connections, as if just logged.
+async fn send_qsos(State(s): State<Shared>, Json(b): Json<IdsBody>) -> ApiResult<usize> {
+    if !s.hub.udp.wants(udp_out::Event::QsoLogged) {
+        return Err(ApiError(StatusCode::BAD_REQUEST, "No UDP connection is set up for QSO logged. Add one in Settings, UDP connections.".into()));
+    }
+    let ids = b.ids;
+    let qsos = db(&s, move |st| ids.iter().map(|&id| st.get_qso(id)).collect::<Result<Vec<_>, _>>()).await?;
+    for q in &qsos {
+        s.hub.send_qso(&q.fields, q.id);
+    }
+    Ok(Json(qsos.len()))
 }
 
 async fn delete_qsos(State(s): State<Shared>, Json(b): Json<IdsBody>) -> ApiResult<usize> {

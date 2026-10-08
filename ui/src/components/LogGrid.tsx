@@ -6,6 +6,7 @@ import { BANDS, MODES } from "../modes";
 import { COLUMNS, DEFAULT_COLUMNS } from "../fields";
 import { localGet, localSet } from "../prefs";
 import type { Location, Qso, QsoFilter } from "../types";
+import "../worked.css";
 
 const PAGE = 200;
 const ROW = 26;
@@ -40,6 +41,22 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
   const template = `28px ${cols.map((c) => (widths[c.key] ? `${widths[c.key]}px` : c.width)).join(" ")}`;
   const head = useRef<HTMLDivElement>(null);
   const [moving, setMoving] = useState<{ key: string; to: number } | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; q: Qso } | null>(null);
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    if (!menu) return;
+    const away = () => setMenu(null);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
+    window.addEventListener("pointerdown", away);
+    window.addEventListener("keydown", esc);
+    window.addEventListener("blur", away);
+    return () => {
+      window.removeEventListener("pointerdown", away);
+      window.removeEventListener("keydown", esc);
+      window.removeEventListener("blur", away);
+    };
+  }, [menu]);
   const ctx = { locationName: (id: number | null) => locations.find((l) => l.id === id)?.name ?? "" };
   const pages = useRef(new Map<number, Qso[]>());
   const loading = useRef(new Set<number>());
@@ -180,6 +197,35 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
     }
   };
 
+  /** The QSOs a right-click acts on: the selection when the clicked row is in it, else that row. */
+  const menuIds = (q: Qso) => (selection.has(q.id) ? [...selection] : [q.id]);
+  const plural = (n: number) => `${n} QSO${n === 1 ? "" : "s"}`;
+
+  const lookupQsos = async (ids: number[]) => {
+    setError("");
+    setNotice(`Looking up ${plural(ids.length)} on QRZ…`);
+    try {
+      const r = await api.lookupQsos(ids);
+      setNotice(r.updated ? `Filled in ${plural(r.updated)} from QRZ.` : "Nothing to fill in from QRZ.");
+      if (r.errors.length) setError(r.errors.slice(0, 3).join("; ") + (r.errors.length > 3 ? ` and ${r.errors.length - 3} more` : ""));
+      if (r.updated) onDeleted();
+    } catch (e) {
+      setNotice("");
+      setError((e as Error).message);
+    }
+  };
+
+  const sendQsos = async (ids: number[]) => {
+    setError("");
+    try {
+      const n = await api.sendQsos(ids);
+      setNotice(`Sent ${plural(n)} through your UDP connections.`);
+    } catch (e) {
+      setNotice("");
+      setError((e as Error).message);
+    }
+  };
+
   const markPaper = async (key: string) => {
     const action = PAPER_ACTIONS.find((a) => a.key === key);
     if (!action || !selection.size) return;
@@ -280,6 +326,7 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
           {selection.size > 0 && ` · ${selection.size} selected`}
         </span>
         <span className="spacer" />
+        {notice && !error && <span className="muted">{notice}</span>}
         {error && <span className="err">{error}</span>}
         <button onClick={() => setPicking(!picking)}>Columns</button>
         <button disabled={!selection.size} onClick={() => onSelection(new Set())}>Clear selection</button>
@@ -348,7 +395,13 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
                 style={{ transform: `translateY(${v.start}px)`, height: ROW, gridTemplateColumns: template }}
                 onClick={(e) => q && click(e, v.index, q)}
                 onDoubleClick={() => q && onEdit(q)}
-                title={q ? "Double-click or Enter to edit" : undefined}
+                onContextMenu={(e) => {
+                  if (!q) return;
+                  e.preventDefault();
+                  if (!selection.has(q.id)) onSelection(new Set([q.id]));
+                  setMenu({ x: e.clientX, y: e.clientY, q });
+                }}
+                title={q ? "Double-click or Enter to edit; right-click for more" : undefined}
               >
                 <span className="sel">
                   {q && <input type="checkbox" checked={selection.has(q.id)} onChange={() => toggle(q)} onClick={(e) => e.stopPropagation()} />}
@@ -360,6 +413,24 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
             );
           })}
         </div>
+        {menu && (() => {
+          const ids = menuIds(menu.q);
+          const what = ids.length === 1 ? (menu.q.fields.CALL ?? "this QSO") : plural(ids.length);
+          const act = (f: () => void) => () => {
+            setMenu(null);
+            f();
+          };
+          return (
+            <div className="wb-menu" role="menu" style={{ left: menu.x, top: menu.y }} onPointerDown={(e) => e.stopPropagation()}>
+              <button role="menuitem" onClick={act(() => onEdit(menu.q))}>Edit {menu.q.fields.CALL ?? "QSO"}</button>
+              <button role="menuitem" onClick={act(() => void lookupQsos(ids))}>Look up {what} on QRZ and fill in blanks</button>
+              <button role="menuitem" onClick={act(() => void sendQsos(ids))}>Send {what} through UDP connections</button>
+              <hr />
+              <button role="menuitem" onClick={act(onExportSelected)}>Export {what}…</button>
+              <button role="menuitem" onClick={act(() => void deleteSelected())}>Delete {what}…</button>
+            </div>
+          );
+        })()}
         {total === 0 && <div className="grid-empty muted">No QSOs{filter.call || filter.bands || filter.modes || filter.dxcc !== undefined || filter.fields ? " match the search" : " yet"}.</div>}
       </div>
     </section>

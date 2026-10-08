@@ -130,6 +130,8 @@ export interface Integrations {
   n1mm_enabled: boolean;
   n1mm_listen: string;
   n1mm_auto_log: boolean;
+  /** Look up auto-logged QSOs on QRZ and fill in what they left blank. */
+  auto_log_lookup: boolean;
   rotator_enabled: boolean;
   rotator_addr: string;
 }

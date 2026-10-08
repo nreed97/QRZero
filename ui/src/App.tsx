@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import VfoBar from "./components/VfoBar";
 import type { Equipment, Fields, Location, Log, LookupResult, Qso, QsoFilter, StationCallsign } from "./types";
 import { utcClock } from "./util";
 import { DEFAULT_COLUMNS, DEFAULT_LAYOUT, type EntryLayout } from "./fields";
@@ -374,6 +375,7 @@ export default function App() {
             ))}
           </select>
         </label>
+        <VfoBar radios={radios} radioKey={radioKey} onRadio={chooseRadio} />
         <span className="spacer" />
         {notice && <span className="notice" role="status">{notice}</span>}
         <span className="muted">{currentLog?.qso_count.toLocaleString() ?? 0} QSOs</span>

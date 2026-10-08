@@ -134,6 +134,7 @@ export default function QsoEditor({ qso, locations, equipment, callsigns, onClos
   const [newKey, setNewKey] = useState("");
   const [newVal, setNewVal] = useState("");
   const [rawOpen, setRawOpen] = useState(false);
+  const [notice, setNotice] = useState("");
   const [layout] = usePref<EntryLayout>("entry_layout", DEFAULT_LAYOUT);
 
   const changed = useMemo(() => changedKeys(base.fields, draft.fields), [base, draft.fields]);
@@ -151,6 +152,7 @@ export default function QsoEditor({ qso, locations, equipment, callsigns, onClos
       setBase(qso);
       setDraft(toDraft(qso));
       setError("");
+      setNotice("");
       setTried(false);
       setNewKey("");
       setNewVal("");
@@ -205,7 +207,36 @@ export default function QsoEditor({ qso, locations, equipment, callsigns, onClos
     }
   };
 
+  // Fills only the blank fields from QRZ; nothing is saved until Save.
+  const lookup = async () => {
+    const call = get("CALL").trim();
+    if (!call) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const r = await api.lookup(base.log_id, call);
+      if (!r.station) {
+        setError(r.error ?? "QRZ has nothing for " + call.toUpperCase() + ". Add your QRZ login in Settings if lookups are off.");
+        return;
+      }
+      const patch: Fields = {};
+      for (const [k, v] of Object.entries(r.station)) {
+        if (k === "CALL" || k.startsWith("MY_") || !v || (f[k] ?? "").trim()) continue;
+        patch[k] = v;
+      }
+      const keys = Object.keys(patch);
+      if (keys.length) setMany(patch);
+      setNotice(keys.length ? `Filled in from ${r.source ?? "QRZ"}: ${keys.map((k) => LABELS[k] ?? k).join(", ")}. Save to keep them.` : "Nothing to fill in: those fields already have values.");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const revert = () => {
+    setNotice("");
     setDraft(toDraft(base));
     setError("");
     setTried(false);
@@ -523,9 +554,11 @@ export default function QsoEditor({ qso, locations, equipment, callsigns, onClos
       </div>
 
       {error && <p className="qe-error" role="alert">{error}</p>}
+      {!error && notice && <p className="qe-notice" role="status">{notice}</p>}
       <footer className="qe-foot">
         <button className="danger" onClick={remove}>Delete QSO</button>
         <span className="spacer" />
+        <button onClick={() => void lookup()} disabled={busy || !get("CALL").trim()} title="Look the call up on QRZ and fill in the fields that are blank">QRZ lookup</button>
         <button onClick={revert} disabled={!dirty}>Revert</button>
         <button className="primary" onClick={() => void save()} disabled={!dirty || busy} title="Save (Ctrl+S)">Save</button>
       </footer>

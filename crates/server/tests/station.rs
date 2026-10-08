@@ -22,8 +22,13 @@ struct Api {
 
 impl Api {
     async fn new() -> Self {
+        Self::with_qrz(String::new()).await
+    }
+
+    async fn with_qrz(qrz_endpoint: String) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let mut cfg = Config::local(dir.path().to_path_buf());
+        cfg.qrz_endpoint = qrz_endpoint;
         cfg.secret_service = format!("QRZero-test-{}", std::process::id());
         cfg.update_cty = false;
         let running = start(cfg).await.unwrap();
@@ -397,4 +402,52 @@ async fn auto_logged_qsos_get_the_antenna_for_their_band() {
     assert_eq!(ant("K2ABC").as_deref(), Some("Vertical"));
     assert_eq!(ant("K3ABC"), None, "no antenna covers 6m");
     assert_eq!(ant("K4ABC").as_deref(), Some("Loop"), "the program's own antenna is kept");
+}
+
+/// A stand-in for xmldata.qrz.com that knows one call.
+async fn mock_qrz() -> String {
+    use axum::{extract::Query, routing::get, Router};
+    use std::collections::HashMap;
+    let app = Router::new().route(
+        "/xml/",
+        get(|Query(q): Query<HashMap<String, String>>| async move {
+            if q.contains_key("username") {
+                return "<QRZDatabase><Session><Key>abc</Key></Session></QRZDatabase>".to_string();
+            }
+            match q.get("callsign").map(String::as_str) {
+                Some("K1ABC") => "<QRZDatabase><Callsign><call>K1ABC</call><fname>Ann</fname><name>Smith</name><addr2>Boston</addr2><state>MA</state><grid>FN42aa</grid></Callsign><Session><Key>abc</Key></Session></QRZDatabase>".to_string(),
+                Some(c) => format!("<QRZDatabase><Session><Key>abc</Key><Error>Not found: {c}</Error></Session></QRZDatabase>"),
+                None => String::new(),
+            }
+        }),
+    );
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    format!("http://{addr}/xml/")
+}
+
+#[tokio::test]
+async fn auto_logged_qsos_are_looked_up_on_qrz() {
+    let api = Api::with_qrz(mock_qrz().await).await;
+    let (log, _) = setup(&api).await;
+    api.send(reqwest::Method::PUT, "/settings", Some(json!({"qrz_enabled": true, "qrz_username": "me", "qrz_password": "pw"})), None).await;
+    let port = free_udp_port();
+    let mut cfg = api.get("/integrations").await["config"].clone();
+    assert_eq!(cfg["auto_log_lookup"], true, "on by default");
+    cfg["wsjtx_listen"] = json!(format!("127.0.0.1:{port}"));
+    api.send(reqwest::Method::PUT, "/integrations", Some(cfg), None).await;
+
+    let wsjtx = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    // WSJT-X sent a grid of its own: that one is kept.
+    let adif = "<call:5>K1ABC<gridsquare:4>FN41<mode:3>FT8<qso_date:8>20240102<time_on:6>123015<band:3>20m<eor>";
+    wsjtx.send_to(&logged_adif(adif), format!("127.0.0.1:{port}")).await.unwrap();
+    let found = api
+        .wait_for(&format!("/logs/{log}/qsos/search"), Some(json!({"filter": {}})), |v| v["rows"][0]["fields"]["NAME"].is_string())
+        .await;
+    let f = &found["rows"][0]["fields"];
+    assert_eq!(f["NAME"], "Ann Smith");
+    assert_eq!(f["QTH"], "Boston");
+    assert_eq!(f["STATE"], "MA");
+    assert_eq!(f["GRIDSQUARE"], "FN41", "what WSJT-X sent is not overwritten");
 }

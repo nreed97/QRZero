@@ -49,7 +49,9 @@ impl Api {
         let mut cfg = Config::local(dir.path().to_path_buf());
         cfg.qrz_endpoint = qrz_endpoint;
         // Keep test passwords away from the real credential store entries.
-        cfg.secret_service = format!("QRZero-test-{}", std::process::id());
+        // Tests run in parallel and the Windows credential store is shared, so each server gets its own entries.
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        cfg.secret_service = format!("QRZero-test-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::SeqCst));
         cfg.update_cty = false;
         let running = start(cfg).await.unwrap();
         Api {
@@ -181,4 +183,32 @@ async fn qrz_lookup_and_cache() {
     // Clearing the password removes it from the credential store.
     let (_, s) = api.call(reqwest::Method::PUT, "/settings", Some(json!({"qrz_password": ""}))).await;
     assert_eq!(s["qrz_password_set"], false);
+}
+
+#[tokio::test]
+async fn logged_qsos_are_filled_in_from_qrz() {
+    let api = Api::new(mock_qrz(Arc::new(AtomicUsize::new(0))).await).await;
+    let log = api.get("/logs").await[0]["id"].as_i64().unwrap();
+    let qso = |call: &str, extra: Value| {
+        let mut f = json!({"CALL": call, "QSO_DATE": "20240101", "TIME_ON": "1200", "BAND": "20m", "MODE": "CW"});
+        f.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        json!({"fields": f})
+    };
+    let a = api.post(&format!("/logs/{log}/qsos"), qso("W1AW", json!({"QTH": "Hartford"}))).await["id"].as_i64().unwrap();
+    let b = api.post(&format!("/logs/{log}/qsos"), qso("ZZ9ZZ", json!({}))).await["id"].as_i64().unwrap();
+
+    // With lookups off it says so rather than doing nothing.
+    let r = api.post("/qsos/lookup", json!({"ids": [a]})).await;
+    assert_eq!(r["updated"], 0);
+    assert!(r["errors"][0].as_str().unwrap().contains("QRZ login"), "{r}");
+
+    api.call(reqwest::Method::PUT, "/settings", Some(json!({"qrz_enabled": true, "qrz_username": "me", "qrz_password": "good"}))).await;
+    let r = api.post("/qsos/lookup", json!({"ids": [a, b]})).await;
+    assert_eq!(r["updated"], 1, "{r}");
+    assert!(r["errors"][0].as_str().unwrap().starts_with("ZZ9ZZ"), "{r}");
+    let rows = api.post(&format!("/logs/{log}/qsos/search"), json!({"filter": {"call": "W1AW"}})).await;
+    let f = &rows["rows"][0]["fields"];
+    assert_eq!(f["NAME"], "Hiram Maxim");
+    assert_eq!(f["QTH"], "Hartford", "a filled field is kept");
+    assert_eq!(f["CALL"], "W1AW");
 }

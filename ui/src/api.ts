@@ -65,6 +65,10 @@ export const api = {
     json<Qso>("PUT", `/qsos/${id}`, { location_id: locationId, fields }),
   deleteQsos: (ids: number[]) => json<number>("POST", "/qsos/delete", { ids }),
   markQsos: (ids: number[], fields: Fields) => json<number>("POST", "/qsos/mark", { ids, fields }),
+  /** Looks the QSOs up on QRZ and fills in their blank fields. */
+  lookupQsos: (ids: number[]) => json<{ updated: number; errors: string[] }>("POST", "/qsos/lookup", { ids }),
+  /** Sends the QSOs out through the "QSO logged" UDP connections. */
+  sendQsos: (ids: number[]) => json<number>("POST", "/qsos/send", { ids }),
   award: (logId: number, award: AwardKind, o: { calls: string[]; lotw: boolean; paper: boolean; eqsl: boolean; unworked: boolean }) => {
     const q = new URLSearchParams({ calls: o.calls.join(","), lotw: String(o.lotw), paper: String(o.paper), eqsl: String(o.eqsl), unworked: String(o.unworked) });
     return json<AwardTable>("GET", `/logs/${logId}/awards/${award}?${q}`);

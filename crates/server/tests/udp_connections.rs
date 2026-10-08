@@ -26,7 +26,8 @@ impl Api {
     async fn call(&self, method: reqwest::Method, path: &str, body: Value) -> (u16, Value) {
         let resp = self.http.request(method, format!("{}{}", self.base, path)).header("x-qrzero-token", &self.token).json(&body).send().await.unwrap();
         let status = resp.status().as_u16();
-        (status, serde_json::from_str(&resp.text().await.unwrap()).unwrap_or(Value::Null))
+        let text = resp.text().await.unwrap();
+        (status, serde_json::from_str(&text).unwrap_or(Value::String(text)))
     }
 
     async fn ok(&self, method: reqwest::Method, path: &str, body: Value) -> Value {
@@ -210,4 +211,26 @@ async fn startup_programs_save_and_launch() {
     // Only with the session token.
     let resp = api.http.post(format!("{}/startup-apps/launch", api.base)).json(&apps[0]).send().await.unwrap();
     assert_eq!(resp.status(), 401);
+}
+
+#[tokio::test]
+async fn logged_qsos_can_be_sent_again() {
+    let api = Api::new().await;
+    let log = api.get("/logs").await[0]["id"].as_i64().unwrap();
+    let fields = json!({"CALL": "DL1ABC", "QSO_DATE": "20240101", "TIME_ON": "1200", "BAND": "20m", "MODE": "CW"});
+    let id = api.ok(reqwest::Method::POST, &format!("/logs/{log}/qsos"), json!({"fields": fields})).await["id"].as_i64().unwrap();
+
+    let (status, err) = api.call(reqwest::Method::POST, "/qsos/send", json!({"ids": [id]})).await;
+    assert_eq!(status, 400);
+    assert!(err.to_string().contains("QSO logged"), "{err}");
+
+    let (rx, port) = listener().await;
+    api.ok(
+        reqwest::Method::PUT,
+        "/udp-connections",
+        json!([{"name": "Logged", "host": "127.0.0.1", "port": port, "event": "qso_logged", "format": "template", "template": "{CALL} {BAND}"}]),
+    )
+    .await;
+    assert_eq!(api.ok(reqwest::Method::POST, "/qsos/send", json!({"ids": [id]})).await, 1);
+    assert_eq!(recv(&rx).await, b"DL1ABC 20m");
 }

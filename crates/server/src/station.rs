@@ -44,6 +44,8 @@ pub struct Integrations {
     pub n1mm_enabled: bool,
     pub n1mm_listen: String,
     pub n1mm_auto_log: bool,
+    /// Look up QSOs logged by WSJT-X, JTDX or N1MM on QRZ and fill in what they left blank.
+    pub auto_log_lookup: bool,
     pub rotator_enabled: bool,
     pub rotator_addr: String,
 }
@@ -72,6 +74,7 @@ impl Default for Integrations {
             n1mm_enabled: false,
             n1mm_listen: "127.0.0.1:12060".into(),
             n1mm_auto_log: true,
+            auto_log_lookup: true,
             rotator_enabled: false,
             rotator_addr: "127.0.0.1:12000".into(),
         }
@@ -343,6 +346,8 @@ pub struct Hub {
     pub(crate) watch: crate::watch::Watch,
     /// The user's own UDP connections and relays.
     pub(crate) udp: Arc<crate::udp_out::Outputs>,
+    /// Where auto-logged QSOs go to be looked up: (log id, QSO id, call).
+    auto_lookup: Mutex<Option<tokio::sync::mpsc::UnboundedSender<(i64, i64, String)>>>,
 }
 
 impl Hub {
@@ -366,7 +371,7 @@ impl Hub {
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
         let udp = crate::udp_out::Outputs::new(conns);
-        let hub = Arc::new(Hub { store, data_dir, events, inner: Mutex::default(), cty: RwLock::default(), watch, udp });
+        let hub = Arc::new(Hub { store, data_dir, events, inner: Mutex::default(), cty: RwLock::default(), watch, udp, auto_lookup: Mutex::default() });
         if let Err(e) = hub.load_cty_file() {
             tracing::info!("no country file yet: {e}");
         }
@@ -905,6 +910,11 @@ impl Hub {
         })
     }
 
+    /// Sets where auto-logged QSOs are sent to be looked up.
+    pub fn set_auto_lookup(&self, tx: tokio::sync::mpsc::UnboundedSender<(i64, i64, String)>) {
+        *self.auto_lookup.lock().unwrap_or_else(|p| p.into_inner()) = Some(tx);
+    }
+
     /// Logs a QSO that came from another program, unless it's already in the log.
     fn auto_log(&self, mut fields: Fields, source: &str, n1mm_id: Option<(&str, bool)>) {
         let active = self.active();
@@ -939,6 +949,11 @@ impl Hub {
                     Some(qso) => {
                         self.note_qso(log_id, &qso.fields);
                         self.send_qso(&qso.fields, qso.id);
+                        if self.lock().integrations.auto_log_lookup {
+                            if let (Some(tx), Some(call)) = (self.auto_lookup.lock().unwrap_or_else(|p| p.into_inner()).as_ref(), qso.fields.get("CALL")) {
+                                let _ = tx.send((log_id, qso.id, call.clone()));
+                            }
+                        }
                         true
                     }
                     None => false,
