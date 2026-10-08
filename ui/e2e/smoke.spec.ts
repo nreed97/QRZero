@@ -268,7 +268,8 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // A pane pops out into its own window and docks back when that window closes.
   await page.getByRole("tab", { name: "FTx monitor" }).click();
   const [popup] = await Promise.all([page.waitForEvent("popup"), page.getByRole("button", { name: "Pop out FTx monitor" }).click()]);
-  await expect(popup.getByText("Waiting for WSJT-X or JTDX")).toBeVisible();
+  // The WSJT-X fed in above may still be listed, so look for the monitor itself.
+  await expect(popup.getByLabel("Period breaks")).toBeVisible();
   await expect(page.getByRole("tab", { name: "FTx monitor" })).toHaveCount(0);
   await popup.getByRole("button", { name: "Dock back" }).click();
   await expect(page.getByRole("tab", { name: "FTx monitor" })).toBeVisible();
