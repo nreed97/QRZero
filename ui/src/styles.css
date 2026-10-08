@@ -277,6 +277,8 @@ table.fields .w-default { width: 90px; }
 .doc { flex: 1; min-width: 0; line-height: 1.5; }
 .doc h1 { font-size: 18px; margin-top: 0; }
 .doc h2 { font-size: 15px; margin-top: 18px; }
+.doc h3 { font-size: 13.5px; margin-top: 14px; }
+.doc h4 { font-size: 12.5px; margin: 12px 0 4px; }
 .doc code { font-family: var(--mono); background: var(--panel-2); padding: 0 3px; }
 .doc table { border-collapse: collapse; }
 .doc th, .doc td { border: 1px solid var(--line); padding: 3px 7px; text-align: left; }
@@ -308,10 +310,35 @@ table.list.fields input:not([type=checkbox]), table.list.fields select { width: 
 .notice { font-size: 12px; color: var(--accent); max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .ftx { background: var(--panel); border: 1px solid var(--line); border-top: none; border-radius: 0 0 3px 3px; display: flex; flex-direction: column; }
-.ftx .instance { font: 12px var(--mono); border: 1px solid var(--line); padding: 1px 6px; border-radius: 2px; }
-.ftx .instance.tx { border-color: var(--err); color: var(--err); }
-.ftx .instance, .ftx .instance.tx { border-left: 3px solid var(--src, var(--line)); }
-.ftx .instance .src-tag { color: var(--src); font-weight: 700; margin-right: 5px; }
+/* The WSJT-X control strip: one line per instance, the controls folded away under it. */
+.ftx-strip { border-bottom: 1px solid var(--line); }
+.ftx-inst { border-left: 3px solid var(--src, var(--line)); }
+.ftx-inst + .ftx-inst { border-top: 1px solid color-mix(in srgb, var(--line) 50%, transparent); }
+.ftx-inst.on-air { background: color-mix(in srgb, var(--err) 12%, transparent); }
+.ftx-inst-line { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; padding: 2px 6px; font-size: 12px; }
+.ftx-inst-line .src-tag { color: var(--src); font-weight: 700; }
+.ftx-inst-line .who { font-weight: 600; }
+.ftx-inst-line .state { font-weight: 600; min-width: 38px; color: var(--muted); }
+.ftx-inst-line .state.armed { color: var(--text); }
+.ftx-inst-line .state.tx { color: #fff; background: var(--err); padding: 0 5px; border-radius: 2px; }
+.ftx-inst-line .txmsg { min-width: 150px; }
+.ftx-inst.on-air .txmsg { color: var(--err); font-weight: 600; }
+.ftx-inst-line .stage { font-weight: 600; }
+.ftx-inst-line .stage-idle { font-weight: 400; color: var(--muted); }
+.ftx-inst-line .warn { color: var(--err); font-weight: 600; }
+.ftx-inst-line .spacer { flex: 1; }
+.ftx-inst-line button, .ftx-inst-ctl button { padding: 0 7px; font-size: 12px; }
+.ftx-inst-line button.halt { color: var(--err); font-weight: 600; }
+.ftx-inst-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 14px; padding: 2px 6px 4px 22px; font-size: 12px; }
+.ftx-inst-ctl form { display: flex; align-items: center; gap: 4px; }
+.ftx-inst-ctl input { width: 170px; padding: 1px 4px; }
+.ftx-inst-ctl input.narrow { width: 70px; }
+.ftx-inst-ctl select { padding: 0 2px; }
+/* Our own transmissions in the decode list. */
+.ftx-row.tx { background: color-mix(in srgb, var(--err) 10%, transparent); }
+.ftx-row.tx .txtag, .ftx-row.tx .msg { color: var(--err); font-weight: 700; }
+.ftx-row.tx .flags { color: var(--muted); }
+.ftx-txline { padding: 1px 6px; font-size: 12px; color: var(--err); font-weight: 600; border-left: 3px solid var(--src, var(--line)); background: color-mix(in srgb, var(--err) 10%, transparent); }
 .ftx .src-0 { --src: var(--src-0); } .ftx .src-1 { --src: var(--src-1); } .ftx .src-2 { --src: var(--src-2); } .ftx .src-3 { --src: var(--src-3); }
 .ftx .src-4 { --src: var(--src-4); } .ftx .src-5 { --src: var(--src-5); } .ftx .src-6 { --src: var(--src-6); } .ftx .src-7 { --src: var(--src-7); }
 .ftx-msg { padding: 2px 8px; border-bottom: 1px solid var(--line); }

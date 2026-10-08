@@ -126,6 +126,8 @@ pub struct FtxDecode {
     pub color_index: u8,
     /// The watch list entry this station matches.
     pub watched: Option<u64>,
+    /// Not a decode but what this instance transmitted in that period (`message`, at `df`).
+    pub tx: bool,
     #[serde(skip)]
     raw: wsjtx::Decode,
 }
@@ -137,9 +139,27 @@ pub struct FtxInstance {
     pub band: Option<String>,
     pub mode: String,
     pub de_call: String,
+    pub de_grid: String,
     pub dx_call: String,
+    pub dx_grid: String,
+    /// The report WSJT-X will send.
+    pub report: String,
     pub transmitting: bool,
     pub tx_enabled: bool,
+    pub decoding: bool,
+    /// The message being sent, or to be sent next (WSJT-X 2.1 and later; empty from older ones).
+    pub tx_message: String,
+    /// Rx and Tx audio offsets, Hz.
+    pub rx_df: u32,
+    pub tx_df: u32,
+    /// The Tx watchdog has stopped transmitting.
+    pub tx_watchdog: bool,
+    /// Seconds; 0 when the program doesn't say.
+    pub tr_period: u32,
+    pub sub_mode: String,
+    pub fast_mode: bool,
+    /// 0 none, 1 NA VHF, 2 EU VHF, 3 Field Day, 4 RTTY RU, 5 WW Digi, 6 Fox, 7 Hound.
+    pub special_op_mode: u8,
     /// "WSJT-X", "JTDX" or "MSHV", from the instance id.
     pub program: &'static str,
     /// WSJT-X's configuration name (File, Settings, Configurations), when it sends one.
@@ -155,6 +175,23 @@ pub struct FtxInstance {
     pub color_index: u8,
     #[serde(skip)]
     addr: SocketAddr,
+    /// The transmission period (ms since midnight UTC) last listed as a TX line.
+    #[serde(skip)]
+    tx_listed: Option<u32>,
+}
+
+/// Start of the T/R period holding `ms` (ms since midnight UTC). FT4's 7.5 s period is sent
+/// as 7, so the mode wins over `tr_period`; with neither, FT8's 15 s.
+pub fn tx_period_start(ms: u32, mode: &str, tr_period: u32) -> u32 {
+    let period = match (mode, tr_period) {
+        ("FT4", _) => 7_500,
+        (_, 0) if mode.starts_with("JT") || mode.starts_with("Q65") => 60_000,
+        (_, 0) => 15_000,
+        (_, s) => s * 1000,
+    };
+    // A transmission starts just after the boundary; a status sent a moment early still counts.
+    let ms = (ms + 500) % 86_400_000;
+    ms - ms % period
 }
 
 /// Where an instance's decodes come from: built once per Status, copied onto each decode.
@@ -740,12 +777,107 @@ impl Hub {
         let (socket, addr, packet) = {
             let inner = self.lock();
             let d = inner.decodes.iter().find(|d| d.seq == seq).ok_or("that decode is no longer listed")?;
+            if d.tx {
+                return Err("that's your own transmission".into());
+            }
             let inst = inner.instances.get(&d.instance).ok_or("that WSJT-X is no longer running")?;
             let socket = inner.wsjtx_sockets.get(&inst.addr).cloned().ok_or("WSJT-X listening is off")?;
             (socket, inst.addr, wsjtx::encode_reply(&d.raw, 0))
         };
         socket.send_to(&packet, addr).await.map_err(|e| e.to_string())?;
         Ok(())
+    }
+
+    /// Sends a request to a WSJT-X instance, from the socket and to the address its packets come
+    /// from. `make` builds the datagram from the instance's id and state.
+    pub async fn ftx_send(&self, instance: &str, make: impl FnOnce(&FtxInstance) -> Vec<u8>) -> Result<(), String> {
+        let (socket, addr, packet) = {
+            let inner = self.lock();
+            let inst = inner.instances.get(instance).ok_or("that WSJT-X is no longer running")?;
+            let socket = inner.wsjtx_sockets.get(&inst.addr).cloned().ok_or("WSJT-X listening is off")?;
+            (socket, inst.addr, make(inst))
+        };
+        socket.send_to(&packet, addr).await.map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    /// Asks WSJT-X to clear its Band Activity (0), Rx Frequency (1) or both (2) windows, and
+    /// drops the instance's decodes here too when Band Activity is cleared.
+    pub async fn ftx_clear(&self, instance: &str, window: u8) -> Result<(), String> {
+        self.ftx_send(instance, |i| wsjtx::encode_clear(&i.id, window)).await?;
+        if window != 1 {
+            self.clear_decodes(instance);
+        }
+        Ok(())
+    }
+
+    fn clear_decodes(&self, id: &str) {
+        self.lock().decodes.retain(|d| d.instance != id);
+        self.emit(json!({"type": "ftx_clear", "instance": id}));
+    }
+
+    /// The TX line for an instance that is transmitting, once per transmission period.
+    fn tx_line(inner: &mut Inner, id: &str, now_ms: u32) -> Option<FtxDecode> {
+        let inst = inner.instances.get_mut(id)?;
+        let msg = inst.tx_message.trim();
+        if !inst.transmitting || msg.is_empty() {
+            return None;
+        }
+        let start = tx_period_start(now_ms, &inst.mode, inst.tr_period);
+        if inst.tx_listed == Some(start) {
+            return None;
+        }
+        inst.tx_listed = Some(start);
+        let ft = wsjtx::parse_ft_message(msg);
+        let time = start / 1000;
+        let d = FtxDecode {
+            seq: 0,
+            instance: id.to_string(),
+            time: format!("{:02}{:02}{:02}", time / 3600, time / 60 % 60, time % 60),
+            snr: 0,
+            dt: 0.0,
+            df: inst.tx_df,
+            mode: inst.mode.clone(),
+            message: msg.to_string(),
+            call: None,
+            to: ft.to,
+            grid: ft.grid,
+            cq: false,
+            cq_target: None,
+            to_me: false,
+            band: inst.band.clone(),
+            freq_hz: inst.dial_freq + u64::from(inst.tx_df),
+            entity: None,
+            needed: None,
+            low_confidence: false,
+            source: inst.source.clone(),
+            slice: inst.slice.clone(),
+            color_index: inst.color_index,
+            watched: None,
+            tx: true,
+            raw: wsjtx::Decode {
+                id: id.to_string(),
+                new: true,
+                time_ms: start,
+                snr: 0,
+                dt: 0.0,
+                df: inst.tx_df,
+                mode: String::new(),
+                message: msg.to_string(),
+                low_confidence: false,
+                off_air: false,
+            },
+        };
+        inner.seq += 1;
+        Some(FtxDecode { seq: inner.seq, ..d })
+    }
+
+    fn push_decode(&self, decode: FtxDecode) {
+        let mut inner = self.lock();
+        inner.decodes.push_back(decode);
+        while inner.decodes.len() > MAX_DECODES {
+            inner.decodes.pop_front();
+        }
     }
 
     fn on_wsjtx(&self, msg: wsjtx::Message, from: SocketAddr) {
@@ -757,20 +889,55 @@ impl Hub {
                     i.addr = from;
                 }
             }
-            M::Status { id, dial_freq, mode, dx_call, de_call, transmitting, tx_enabled, configuration_name, .. } => {
-                let (changed, instances) = {
+            M::Status {
+                id,
+                dial_freq,
+                mode,
+                dx_call,
+                report,
+                transmitting,
+                tx_enabled,
+                decoding,
+                rx_df,
+                tx_df,
+                de_call,
+                de_grid,
+                dx_grid,
+                tx_watchdog,
+                sub_mode,
+                fast_mode,
+                special_op_mode,
+                tr_period,
+                configuration_name,
+                tx_message,
+                ..
+            } => {
+                let (changed, instances, tx) = {
                     let mut inner = self.lock();
                     let src = ftx_source(&id, &configuration_name, dial_freq, inner.radios.values());
                     let color_index = inner.ftx_color(&id);
+                    let tx_listed = inner.instances.get(&id).and_then(|i| i.tx_listed);
                     let inst = FtxInstance {
                         id: id.clone(),
                         dial_freq,
                         band: band_for_freq(dial_freq as f64 / 1e6).map(str::to_string),
                         mode: mode.clone(),
                         de_call,
+                        de_grid,
                         dx_call,
+                        dx_grid,
+                        report,
                         transmitting,
                         tx_enabled,
+                        decoding,
+                        tx_message,
+                        rx_df,
+                        tx_df,
+                        tx_watchdog,
+                        tr_period,
+                        sub_mode,
+                        fast_mode,
+                        special_op_mode,
                         program: src.program,
                         configuration_name: configuration_name.trim().to_string(),
                         slice: src.slice,
@@ -779,13 +946,15 @@ impl Hub {
                         source: src.source,
                         color_index,
                         addr: from,
+                        tx_listed,
                     };
-                    let key = |i: &FtxInstance| {
-                        (i.dial_freq, i.mode.clone(), i.dx_call.clone(), i.transmitting, i.tx_enabled, i.source.clone(), i.rig_key.clone(), i.configuration_name.clone())
-                    };
+                    // Everything the UI sees; the address and TX bookkeeping don't count.
+                    let key = |i: &FtxInstance| serde_json::to_value(i).ok();
                     let old = inner.instances.insert(id.clone(), inst.clone());
                     let changed = old.is_none_or(|o| key(&o) != key(&inst));
-                    (changed, inner.instances.values().cloned().collect::<Vec<_>>())
+                    let now = chrono::Utc::now().timestamp_millis().rem_euclid(86_400_000) as u32;
+                    let tx = Self::tx_line(&mut inner, &id, now);
+                    (changed, inner.instances.values().cloned().collect::<Vec<_>>(), tx)
                 };
                 if changed {
                     self.emit(json!({"type": "ftx_instances", "instances": instances}));
@@ -800,8 +969,21 @@ impl Hub {
                     };
                     self.set_radio(Radio { key: format!("wsjtx:{id}"), name: id, source: "wsjtx", can_tune: false, state });
                 }
+                if let Some(tx) = tx {
+                    self.emit(json!({"type": "ftx_tx", "decode": &tx}));
+                    self.push_decode(tx);
+                }
             }
             M::Decode(d) => {
+                // A replay (or JTDX re-sending its window) repeats decodes already listed.
+                if !d.new {
+                    let time = d.time_ms / 1000;
+                    let hms = format!("{:02}{:02}{:02}", time / 3600, time / 60 % 60, time % 60);
+                    let inner = self.lock();
+                    if inner.decodes.iter().any(|x| !x.tx && x.instance == d.id && x.time == hms && x.message == d.message) {
+                        return;
+                    }
+                }
                 if let Some(decode) = self.make_decode(d) {
                     self.emit(json!({"type": "decode", "decode": &decode}));
                     if let (Some(id), Some(call)) = (decode.watched, &decode.call) {
@@ -818,17 +1000,12 @@ impl Hub {
                         };
                         self.watch_hit(id, &s);
                     }
-                    let mut inner = self.lock();
-                    inner.decodes.push_back(decode);
-                    while inner.decodes.len() > MAX_DECODES {
-                        inner.decodes.pop_front();
-                    }
+                    self.push_decode(decode);
                 }
             }
             M::Clear { id, window } => {
                 if window != 1 {
-                    self.lock().decodes.retain(|d| d.instance != id);
-                    self.emit(json!({"type": "ftx_clear", "instance": id}));
+                    self.clear_decodes(&id);
                 }
             }
             M::Close { id } => {
@@ -901,6 +1078,7 @@ impl Hub {
             slice,
             color_index,
             watched,
+            tx: false,
             raw: d,
         })
     }
@@ -1435,5 +1613,18 @@ mod tests {
         assert_eq!((one.source.as_str(), one.slice.as_deref()), ("FLEX-6600 A · WSJT-X", Some("A")));
         let none = ftx_source("WSJT-X", "Home", 21_074_000, &radios);
         assert_eq!(none.source, "Home · WSJT-X");
+    }
+
+    #[test]
+    fn tx_periods() {
+        let at = |h: u32, m: u32, s: f64| h * 3_600_000 + m * 60_000 + (s * 1000.0) as u32;
+        assert_eq!(tx_period_start(at(12, 0, 15.2), "FT8", 15), at(12, 0, 15.0));
+        assert_eq!(tx_period_start(at(12, 0, 29.0), "FT8", 15), at(12, 0, 15.0));
+        // A status a moment before the boundary belongs to the period starting.
+        assert_eq!(tx_period_start(at(12, 0, 29.7), "FT8", 15), at(12, 0, 30.0));
+        assert_eq!(tx_period_start(at(12, 0, 8.0), "FT4", 7), at(12, 0, 7.5));
+        assert_eq!(tx_period_start(at(12, 0, 8.0), "FT8", 0), at(12, 0, 0.0));
+        assert_eq!(tx_period_start(at(12, 0, 59.0), "JT65", 0), at(12, 0, 0.0));
+        assert_eq!(tx_period_start(at(23, 59, 59.8), "FT8", 15), 0);
     }
 }

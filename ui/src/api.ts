@@ -1,5 +1,5 @@
 import type { PropagationReport } from "./types";
-import type { QslService, QslDownload, AwardHint, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
+import type { QslService, QslDownload, AwardHint, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
 function sessionToken(): string {
@@ -124,6 +124,12 @@ export const api = {
   launchStartupApp: (a: StartupApp) => json<RunStatus>("POST", "/startup-apps/launch", a),
   ftx: () => json<{ instances: FtxInstance[]; decodes: FtxDecode[] }>("GET", "/ftx"),
   ftxReply: (seq: number) => json<null>("POST", "/ftx/reply", { seq }),
+  ftxHalt: (instance: string, auto_only: boolean) => json<null>("POST", "/ftx/halt", { instance, auto_only }),
+  ftxFreeText: (instance: string, text: string, send: boolean) => json<null>("POST", "/ftx/free-text", { instance, text, send }),
+  ftxConfigure: (instance: string, c: FtxConfigure) => json<null>("POST", "/ftx/configure", { instance, ...c }),
+  ftxReplay: (instance: string) => json<null>("POST", "/ftx/replay", { instance }),
+  ftxClear: (instance: string, window: 0 | 1 | 2) => json<null>("POST", "/ftx/clear", { instance, window }),
+  ftxSwitchConfiguration: (instance: string, name: string) => json<null>("POST", "/ftx/switch-configuration", { instance, name }),
   rotate: (azimuth: number) => json<null>("POST", "/rotator", { azimuth }),
   cty: () => json<CtyStatus>("GET", "/cty"),
   updateCty: () => json<CtyStatus>("POST", "/cty/update"),

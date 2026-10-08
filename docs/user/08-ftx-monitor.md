@@ -9,7 +9,7 @@ In WSJT-X open **File → Settings → Reporting** and set:
 - **UDP Server**: 127.0.0.1, port **2237** (or the address shown in QRZero's settings).
 
 If you run several copies of WSJT-X or JTDX and each sends to its own port, list them all in Settings, **Radios and programs**, **Listen on**, separated by commas: for example `127.0.0.1:2237, 127.0.0.1:2238`. QRZero listens on every one. (Copies that share one port with a multicast group work too: fill in **Multicast group** instead.)
-- Tick **Accept UDP requests**, so QRZero can ask WSJT-X to call a station.
+- Tick **Accept UDP requests**, so QRZero can ask WSJT-X to call a station and use the controls in the FTx monitor. Without it WSJT-X ignores every request.
 
 QSOs you log in WSJT-X are added to the open log at the selected location, unless the same QSO is already there. If WSJT-X didn't fill in `MY_ANTENNA`, QRZero adds the antenna whose bands include the QSO's band (see **Equipment**). Turn this off with **Log QSOs that WSJT-X / JTDX log** if another logger already does it.
 
@@ -33,6 +33,68 @@ Rows calling you are highlighted, and needed stations are shaded. Stations on yo
 - **Double-click** to have that WSJT-X call the station, as if you'd double-clicked it in WSJT-X.
 - **CQ only** and **Needed only** narrow the list; the source box (**All sources**) shows one WSJT-X or JTDX at a time.
 - **Period breaks** draws a line between decode periods (every 15 seconds for FT8), with the period's time and how many decodes and calls it had.
+
+### Running WSJT-X from the monitor
+
+Above the decodes there is one line for each WSJT-X or JTDX, in its colour. It shows what that program is doing right now:
+
+- Its source, band, mode and dial frequency.
+- **TX** in red while it is on the air (the whole line turns red too), **Tx on** when Enable Tx is ticked and it is waiting for its period, **Tx off** otherwise. **Decoding** shows while it decodes.
+- **Tx:** the message it is sending, or will send next.
+- Where the QSO has got to (see below).
+- **DX** call and grid, **Rpt** the report it will send, **Rx** and **Tx** audio offsets in Hz, and the T/R period.
+- **Tx watchdog** in red when WSJT-X's watchdog has stopped transmitting. Tick Enable Tx in WSJT-X, or answer a station, to carry on.
+
+With the source box set to one program, only its line shows.
+
+#### Where the QSO is
+
+QRZero works this out from the message being sent, compared with your call:
+
+| Shown | Message being sent |
+| --- | --- |
+| **Calling CQ** | CQ N0CALL EN34 |
+| **Calling K1ABC** | K1ABC N0CALL EN34 |
+| **Sending report** | K1ABC N0CALL -12 |
+| **Sending R+report** | K1ABC N0CALL R-08 (**Sending R+grid** for the contest R EN34) |
+| **Sending RRR** / **Sending RR73** | K1ABC N0CALL RR73 |
+| **Sending 73** | K1ABC N0CALL 73 |
+| **Sending free text** | anything else |
+| **Idle** | Enable Tx is off and nothing is being sent |
+
+WSJT-X doesn't report its QSO state, only the message, so a free-text QSO or a message from someone else's call shows as free text.
+
+#### Controls
+
+- **Halt TX** stops transmitting at once, as WSJT-X's Halt Tx button does.
+- **Stop after this** unticks Enable Tx, so the current transmission finishes and no more follow.
+- **Call CQ** puts "CQ *your call* *grid*" (from WSJT-X's own settings) in Tx5 and sends it next.
+- **More controls** opens a second line:
+  - **Message**, **Send**: puts any text in Tx5 and sends it next; **Set Tx5** only puts it there. Free text is up to 13 characters.
+  - **DX call**, **Grid**, **Set DX**: fills in WSJT-X's DX call and grid and generates the standard messages, ready to call that station.
+  - **Rx offset**, **Set Rx**: moves WSJT-X's Rx frequency.
+  - **Mode**: switches between FT8 and FT4.
+  - **Configuration**, **Switch**: switches WSJT-X to another of its configurations, by its exact name.
+  - **Replay**: WSJT-X sends everything in its Band Activity window again, for example after QRZero was restarted. Decodes already listed aren't repeated.
+  - **Clear windows**: clears WSJT-X's Band Activity and Rx Frequency windows, and that program's decodes here.
+- **Double-click** a decode to answer it, as before.
+
+Send and Call CQ only go out while Enable Tx is on in WSJT-X. Answering a decode by double-clicking it ticks Enable Tx too, if WSJT-X's **Double-click on call sets Tx enable** setting is on.
+
+#### What can't be done from here
+
+WSJT-X's UDP interface only accepts a short list of requests, so some things still need WSJT-X itself:
+
+- **Ticking Enable Tx.** There is no request for it. Answering a decode (double-click) can tick it, as above; Halt TX and Stop after this can untick it.
+- **Choosing Tx1 to Tx6.** WSJT-X moves through them by itself; QRZero can only set and send Tx5 (free text).
+- **The Tx offset.** Only the Rx offset can be set. Set the Tx offset in WSJT-X (Shift+click the waterfall, or the Rx to Tx button).
+- **Clearing the DX call.** An empty DX call means "leave it as it is", so it can be changed but not emptied.
+- **The dial frequency, band and power**, Hold Tx Freq, auto sequencing and the other settings.
+- **JTDX** accepts fewer requests than WSJT-X: it ignores switching configuration, and may ignore other requests depending on its version.
+
+### Your transmissions in the list
+
+Each time a program transmits, the message is added to the list once for that period, marked **TX** in red with the Tx offset in the Freq column and **Sent** in the Flags column. In **Call boxes** it is a red **TX:** line at the top of that period. These lines always show, whatever the filters; click and double-click do nothing on them. They need WSJT-X 2.1 or later, which sends the Tx message.
 
 ### Call boxes
 
@@ -59,7 +121,7 @@ Stations calling you always show, whatever the filters. **Reset** puts everythin
 
 ### Where each decode came from
 
-Every decode has a short tag in the **Src** column and a coloured left edge; each WSJT-X or JTDX gets its own colour, the same one as its box above the list. Hover over the tag for the full story: the program, its instance name, its configuration, the radio it's on and the dial frequency. The boxes above the list show each instance with its source, band, mode and frequency, and **TX** while it transmits (**TX on** when Enable TX is ticked).
+Every decode has a short tag in the **Src** column and a coloured left edge; each WSJT-X or JTDX gets its own colour, the same one as its line in the control strip above the list. Hover over the tag for the full story: the program, its instance name, its configuration, the radio it's on and the dial frequency.
 
 QRZero works the source out from what the program sends, in this order:
 
