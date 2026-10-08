@@ -160,9 +160,11 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
     // QSOs logged by WSJT-X, JTDX or N1MM are looked up on QRZ in the background.
     let (lookup_tx, mut lookup_rx) = tokio::sync::mpsc::unbounded_channel::<(i64, i64, String)>();
     state.hub.set_auto_lookup(lookup_tx);
-    let s2 = state.clone();
+    // Weak, so this task doesn't keep the database open after the server stops (Windows can't then replace the file on restore).
+    let weak = Arc::downgrade(&state);
     tokio::spawn(async move {
         while let Some((log_id, id, call)) = lookup_rx.recv().await {
+            let Some(s2) = weak.upgrade() else { break };
             match lookup_into_qso(&s2, id, &call).await {
                 Ok(filled) if !filled.is_empty() => {
                     s2.hub.emit(json!({"type": "qso_logged", "log_id": log_id, "call": "", "source": "QRZ", "added": false}));
