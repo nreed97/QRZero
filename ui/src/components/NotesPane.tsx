@@ -4,6 +4,7 @@ import type { PopContext } from "../bus";
 import { baseCall, onNoteChange, publishNote, saveNoteOnExit } from "../notes";
 import type { Note } from "../types";
 import type { PaneActions } from "./SharedPanes";
+import { confirmDelete } from "../display";
 import "../notes.css";
 
 const SAVE_DELAY = 800;
@@ -139,7 +140,7 @@ function NoteEditor({ logId, call, typed, onBack }: { logId: number; call: strin
   };
 
   const remove = () => {
-    if (!confirm(`Delete the note for ${call}? This can't be undone.`)) return;
+    if (!confirmDelete(`Delete the note for ${call}? This can't be undone.`)) return;
     window.clearTimeout(timer.current);
     textRef.current = savedRef.current = "";
     setText("");

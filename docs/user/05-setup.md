@@ -5,7 +5,7 @@ Open **Settings…** from the **☰** menu at the right of the top bar. Its sect
 - **Station**: Callsigns, Locations, Equipment, Logs
 - **Logging**: Entry fields, Callsign lookup
 - **Connections**: Radios and programs (WSJT-X, JTDX, N1MM, PstRotatorAz, country file), UDP connections, DX cluster, Startup programs
-- **Program**: Backups, General (distance units, setup wizard)
+- **Program**: Backups, General (colours, text size, units, formats, reports, setup wizard)
 
 Click a section to show it on the right.
 
@@ -52,7 +52,17 @@ The **Entry fields** tab chooses what you type for each QSO. Call, reports, freq
 
 ## General
 
-Distances in kilometres or miles, and **Run the setup wizard**.
+The options people change most. They apply at once and are kept with your other window settings; pop-out windows follow them.
+
+- **Colours**: follow Windows, or always dark or light.
+- **Text size**: 11 to 18 px.
+- **Distances**: kilometres or miles.
+- **Dates in the log**: 2026-10-08, 08/10/2026 or 10/08/2026. Frequencies in the log can read in MHz (14.074) or kHz (14074). Stored QSOs are not changed, and exports stay ADIF.
+- **Local time**: show the computer's time next to the UTC clock in the top bar.
+- **Reports filled in for each mode**: change the report the QSO panel starts with for CW, SSB, FM, AM, RTTY, PSK31, FT8 or FT4 (for example 59 for CW). An empty box means the usual report.
+- **Ask before deleting** QSOs, notes, equipment and layouts. Turn it off if the prompts slow you down; deleting a whole log, restoring a backup and discarding edits always ask.
+- **Beep when a QSO is logged**.
+- **Run the setup wizard** again (it never removes anything), and **Reset these options**.
 
 ## Logs
 

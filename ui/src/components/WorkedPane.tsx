@@ -5,6 +5,7 @@ import { localGet, localSet } from "../prefs";
 import type { Fields, LookupResult, Qso } from "../types";
 import { adifDateTime, fmtDate, fmtTime } from "../util";
 import type { EntryContext } from "./EntryPanel";
+import { useDisplay } from "../display";
 import "../worked.css";
 
 export interface WorkedPaneProps {
@@ -58,6 +59,7 @@ function QslCell({ v }: { v: Qsl }) {
 interface Menu { x: number; y: number; q: Qso }
 
 export default function WorkedPane({ logId, call, lookup, entry, refreshKey, selectedId, onEdit, onCopy, onShowInLog }: WorkedPaneProps) {
+  useDisplay();
   const target = call.trim().toUpperCase();
   const [rows, setRows] = useState<Qso[] | null>(null);
   const [loadedFor, setLoadedFor] = useState("");

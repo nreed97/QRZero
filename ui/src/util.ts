@@ -1,4 +1,5 @@
 import type { Fields } from "./types";
+import { getDisplay } from "./display";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -12,12 +13,20 @@ export function adifDateTime(d: Date): { date: string; time: string } {
 
 export function fmtDate(f: Fields): string {
   const d = f.QSO_DATE ?? "";
-  return d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}` : d;
+  if (d.length !== 8) return d;
+  const [y, m, day] = [d.slice(0, 4), d.slice(4, 6), d.slice(6)];
+  const fmt = getDisplay().dateFormat;
+  return fmt === "dmy" ? `${day}/${m}/${y}` : fmt === "mdy" ? `${m}/${day}/${y}` : `${y}-${m}-${day}`;
 }
 
 export function fmtTime(f: Fields): string {
   const t = f.TIME_ON ?? "";
   return t.length >= 4 ? `${t.slice(0, 2)}:${t.slice(2, 4)}` : t;
+}
+
+/** The computer's own time, for the header clock. */
+export function localClock(d: Date): string {
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export function utcClock(d: Date): string {

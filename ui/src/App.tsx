@@ -3,7 +3,8 @@ import { api } from "./api";
 import MainMenu from "./components/MainMenu";
 import VfoBar from "./components/VfoBar";
 import type { Equipment, Fields, Location, Log, LookupResult, Qso, QsoFilter, StationCallsign } from "./types";
-import { utcClock } from "./util";
+import { localClock, utcClock } from "./util";
+import { useDisplay } from "./display";
 import { DEFAULT_COLUMNS, DEFAULT_LAYOUT, type EntryLayout } from "./fields";
 import { gridToLatLon, positionOf } from "./geo";
 import { localGet, localSet, usePref } from "./prefs";
@@ -72,6 +73,7 @@ export default function App() {
   const [layout, setLayout, layoutLoaded] = usePref<EntryLayout>("entry_layout", DEFAULT_LAYOUT);
   const [columns, setColumns] = usePref<string[]>("grid_columns", DEFAULT_COLUMNS);
   const [general, setGeneral] = usePref<GeneralPrefs>("general", { units: "km" });
+  const display = useDisplay();
   const radios = useRadios();
   const [radioKey, setRadioKey] = useState(localGet("qrzero.radio", { key: "" }).key);
   const [prefill, setPrefill] = useState<Prefill | null>(null);
@@ -380,7 +382,7 @@ export default function App() {
         <span className="spacer" />
         {notice && <span className="notice" role="status">{notice}</span>}
         <span className="muted">{currentLog?.qso_count.toLocaleString() ?? 0} QSOs</span>
-        <span className="clock" title="UTC">{utcClock(now)}</span>
+        <span className="clock" title={display.localTime ? "UTC, then your computer's time" : "UTC"}>{utcClock(now)}{display.localTime && <span className="muted"> ({localClock(now)} local)</span>}</span>
         <LayoutMenu ws={ws} onChange={setWs} onShow={(id) => setWs({ ...wsRef.current, root: dockBack(wsRef.current.root, id) })} onFocusWindow={focusWindow} />
         <MainMenu onPick={setDialog} />
       </header>

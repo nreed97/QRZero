@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api";
 import type { Equipment, EquipmentKind, Fields, Location } from "../types";
+import { confirmDelete } from "../display";
 import { ANTENNA_BANDS, formatBands, parseBands, shortBands } from "../antennas";
 
 export const KINDS: { kind: EquipmentKind; label: string; plural: string }[] = [
@@ -140,7 +141,7 @@ export default function EquipmentTree({ locations, equipment, onChanged }: { loc
                                   <button className="tiny" disabled={i === 0} onClick={() => run(() => api.moveEquipment(e.id, -1))} title="Move up">↑</button>
                                   <button className="tiny" disabled={i === list.length - 1} onClick={() => run(() => api.moveEquipment(e.id, 1))} title="Move down">↓</button>
                                   <button className="tiny" onClick={() => setDraft({ id: e.id, location_id: e.location_id, kind: e.kind, name: e.name, fields: { ...e.fields } })}>Edit</button>
-                                  <button className="tiny danger" onClick={() => confirm(`Remove ${e.name}?`) && run(() => api.deleteEquipment(e.id))}>Remove</button>
+                                  <button className="tiny danger" onClick={() => confirmDelete(`Remove ${e.name}?`) && run(() => api.deleteEquipment(e.id))}>Remove</button>
                                 </span>
                               </li>
                             ))}

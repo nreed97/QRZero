@@ -243,6 +243,18 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByLabel("Program", { exact: true }).fill("/no/such/program");
   await page.getByRole("button", { name: "Launch now" }).click();
   await expect(page.locator("table.startup-apps")).toContainText("couldn't start");
+
+  // General: colours and text size apply at once; a changed report is used for the mode.
+  await page.getByRole("button", { name: "General", exact: true }).click();
+  await page.getByLabel("Colours").selectOption("light");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.getByLabel("Text size").selectOption("16");
+  await expect(page.locator("body")).toHaveCSS("font-size", "16px");
+  await page.getByLabel("Colours").selectOption("system");
+  await page.getByLabel("Text size").selectOption("13");
+  await page.getByRole("textbox", { name: "CW" }).fill("579");
+  await page.getByRole("button", { name: "Reset these options" }).click();
+  await expect(page.getByRole("textbox", { name: "CW" })).toHaveValue("");
   await page.getByRole("button", { name: "Close" }).click();
 
   // With no cluster set up, the Cluster pane sends you to Settings to add one.
