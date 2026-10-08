@@ -1,6 +1,13 @@
 # Callsigns, locations and logs
 
-Open **Settings…** from the **☰** menu at the right of the top bar.
+Open **Settings…** from the **☰** menu at the right of the top bar. Its sections are listed down the left, in four groups:
+
+- **Station**: Callsigns, Locations, Equipment, Logs
+- **Logging**: Entry fields, Callsign lookup
+- **Connections**: Radios and programs (WSJT-X, JTDX, N1MM, PstRotatorAz, country file), UDP connections, DX cluster, Startup programs
+- **Program**: Backups, General (distance units, setup wizard)
+
+Click a section to show it on the right.
 
 ## Station callsigns
 

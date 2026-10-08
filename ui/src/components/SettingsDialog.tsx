@@ -29,6 +29,14 @@ interface Props {
 
 type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "udp" | "startup" | "cluster" | "logs" | "lookup" | "backups" | "general";
 
+/** The sections down the left of Settings, grouped. */
+const GROUPS: { name: string; tabs: Tab[] }[] = [
+  { name: "Station", tabs: ["station", "locations", "equipment", "logs"] },
+  { name: "Logging", tabs: ["fields", "lookup"] },
+  { name: "Connections", tabs: ["radios", "udp", "cluster", "startup"] },
+  { name: "Program", tabs: ["backups", "general"] },
+];
+
 const TAB_NAMES: Record<Tab, string> = {
   station: "Callsigns",
   locations: "Locations",
@@ -58,12 +66,19 @@ export default function SettingsDialog(props: Props) {
   };
 
   return (
-    <Modal title="Settings" onClose={props.onClose} wide>
-      <nav className="tabs">
-        {(Object.keys(TAB_NAMES) as Tab[]).map((t) => (
-          <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{TAB_NAMES[t]}</button>
+    <Modal title="Settings" onClose={props.onClose} wide className="settings">
+      <nav className="settings-nav" aria-label="Settings sections">
+        {GROUPS.map((g) => (
+          <div key={g.name} className="group">
+            <div className="head">{g.name}</div>
+            {g.tabs.map((t) => (
+              <button key={t} className={tab === t ? "active" : ""} aria-current={tab === t ? "page" : undefined} onClick={() => { setTab(t); setError(""); }}>{TAB_NAMES[t]}</button>
+            ))}
+          </div>
         ))}
       </nav>
+      <div className="settings-page">
+      <h3 className="settings-title">{TAB_NAMES[tab]}</h3>
       {error && <p className="err">{error}</p>}
       {tab === "station" && <StationTab {...props} guard={guard} />}
       {tab === "locations" && <LocationsTab {...props} guard={guard} />}
@@ -94,6 +109,7 @@ export default function SettingsDialog(props: Props) {
           <button onClick={props.onWizard}>Run the setup wizard</button>
         </div>
       )}
+      </div>
     </Modal>
   );
 }
@@ -313,10 +329,7 @@ function RadiosTab() {
 
   return (
     <div className="radios-tab">
-      <p className="muted">
-        Rigs are set up under <b>Equipment</b>: edit a radio and choose how QRZero talks to it (Hamlib, TCI, CAT or CI-V).
-        Here are the programs QRZero listens to.
-      </p>
+      <p className="small muted">Programs QRZero listens to. Rig control (Hamlib, TCI, CAT, CI-V) is set on each radio under <b>Equipment</b>.</p>
 
       <fieldset>
         <legend>WSJT-X and JTDX</legend>
@@ -356,7 +369,7 @@ function RadiosTab() {
       <fieldset>
         <legend>PstRotatorAz</legend>
         {check("rotator_enabled", "Turn the rotator with PstRotatorAz")}
-        <div className="row">{text("rotator_addr", "PstRotatorAz UDP address", "w-m", "127.0.0.1:12000")}</div>
+        <div className="row">{text("rotator_addr", "PstRotatorAz UDP address", "w-l", "127.0.0.1:12000")}</div>
         <p className="small muted">In PstRotatorAz: Setup, UDP Control, port 12000. The map gets Turn SP / LP buttons.</p>
         {status?.rotator && <p className="small">Status: {status.rotator}</p>}
       </fieldset>
