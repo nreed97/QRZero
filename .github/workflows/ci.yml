@@ -27,7 +27,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev
       - name: Rust tests
-        run: cargo test
+        # Failing tests are also posted as annotations, so they show without the full log.
+        run: |
+          set +e
+          cargo test 2>&1 | tee test.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -A2 -E "panicked at|^test .* FAILED|^error" test.log | grep -v "^--$" | head -40 | sed 's/^/::error::/'
+          fi
+          exit "$status"
       - name: Linux desktop app builds
         run: cargo check -p qrzero
       - name: Large-log speed check
