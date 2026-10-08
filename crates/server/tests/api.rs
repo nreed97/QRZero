@@ -129,6 +129,9 @@ async fn log_import_search_export() {
     let found = api.post(&format!("/logs/{log}/qsos/search"), json!({"filter": {"bands": ["20m"]}})).await;
     assert_eq!(found["total"], 1);
     assert_eq!(found["rows"][0]["fields"]["CALL"], "K1AB");
+    let exact = api.post(&format!("/logs/{log}/qsos/search"), json!({"filter": {"exact_call": "k1ab/p"}, "limit": 10000})).await;
+    assert_eq!(exact["total"], 1);
+    assert_eq!(api.post(&format!("/logs/{log}/qsos/search"), json!({"filter": {"exact_call": "K1A"}})).await["total"], 0);
 
     let resp = api
         .http

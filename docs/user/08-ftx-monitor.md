@@ -17,7 +17,7 @@ Only one program can listen on a UDP port. If you also use GridTracker or JTAler
 
 ## The FTx monitor
 
-Click **FTx monitor** above the log (or **Both** to see it next to the log). It collects the decodes from every running WSJT-X and JTDX, so several radios and bands appear in one list, newest at the top.
+Click the **FTx monitor** tab (next to the Log tab to start with). Drag the tab beside the log to see both, or pop it out to its own window. It collects the decodes from every running WSJT-X and JTDX, so several radios and bands appear in one list, newest at the top.
 
 | Flag | Meaning |
 | --- | --- |

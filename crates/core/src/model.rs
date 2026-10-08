@@ -54,6 +54,10 @@ pub struct Qso {
 pub struct QsoFilter {
     /// Callsign search. Plain text matches the start of the call; `*` is a wildcard.
     pub call: Option<String>,
+    /// Exact callsign, for a station's history. Also matches portable forms of
+    /// the base call (DL1ABC finds DL1ABC/P and DL1ABC/M; EA8/DL1ABC finds itself,
+    /// DL1ABC and DL1ABC/P). Uses the call index.
+    pub exact_call: Option<String>,
     pub bands: Vec<String>,
     /// Matches either MODE or SUBMODE, so "FT4" and "MFSK" both work.
     pub modes: Vec<String>,

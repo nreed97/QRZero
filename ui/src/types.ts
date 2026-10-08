@@ -7,6 +7,8 @@ export interface Qso { id: number; log_id: number; location_id: number | null; f
 
 export interface QsoFilter {
   call?: string;
+  /** Exact call, plus portable forms of its base call (DL1ABC finds DL1ABC/P). */
+  exact_call?: string;
   bands?: string[];
   modes?: string[];
   from?: number;

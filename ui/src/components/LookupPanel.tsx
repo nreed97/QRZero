@@ -1,6 +1,4 @@
 import type { LookupResult } from "../types";
-import { modeLabel } from "../modes";
-import { fmtDate, fmtTime } from "../util";
 import type { EntryContext } from "./EntryPanel";
 
 export default function LookupPanel({ result, entry }: { result: LookupResult | null; entry: EntryContext }) {
@@ -9,7 +7,7 @@ export default function LookupPanel({ result, entry }: { result: LookupResult | 
       <section className="panel lookup">
         <div className="panel-title"><span>Station</span></div>
         <div className="panel-body">
-          <p className="muted">Type a call and leave the field (Tab or Space) to see station details and your history with it.</p>
+          <p className="muted">Type a call and leave the field (Tab or Space) to see station details.</p>
         </div>
       </section>
     );
@@ -58,24 +56,6 @@ export default function LookupPanel({ result, entry }: { result: LookupResult | 
           <span key={f.text} className={`flag ${f.cls}`}>{f.text}</span>
         ))}
       </div>
-      {w.call_count > 0 && (
-        <div className="history">
-          <div className="small muted">Worked {w.call_count} time{w.call_count === 1 ? "" : "s"}</div>
-          <table>
-            <tbody>
-              {w.recent.slice(0, 6).map((q) => (
-                <tr key={q.id}>
-                  <td>{fmtDate(q.fields)}</td>
-                  <td>{fmtTime(q.fields)}</td>
-                  <td>{q.fields.BAND}</td>
-                  <td>{modeLabel(q.fields)}</td>
-                  <td>{q.fields.RST_SENT}/{q.fields.RST_RCVD}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
       </div>
     </section>
   );

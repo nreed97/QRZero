@@ -1,0 +1,112 @@
+/* QSO editor: docked beside the log, fills its parent and scrolls inside. */
+
+.qso-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-family: var(--ui);
+  color: var(--text);
+}
+
+/* Header */
+.qe-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 2px 6px;
+  min-height: 26px;
+  background: var(--title);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.qe-step { display: flex; gap: 2px; }
+.qe-step button { padding: 0 5px; font-size: 10px; line-height: 18px; }
+.qe-call { font: 700 15px var(--mono); }
+.qe-sub { font: 12px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.qe-changes { color: var(--new); font-size: 12px; font-weight: 600; }
+.qe-close { padding: 0 6px; color: var(--muted); }
+.qe-close:hover { color: var(--text); }
+
+/* Body */
+.qe-body { flex: 1; min-height: 0; overflow: auto; padding: 0 8px 8px; }
+.qe-sec { margin-top: 8px; }
+.qe-sec h3 {
+  margin: 0 0 4px;
+  padding-bottom: 1px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+
+.qe-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px 6px; }
+.qe-grid + .qe-grid, .qe-qsl + .qe-grid { margin-top: 6px; }
+.qe-f { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.qe-f > span { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qe-f input, .qe-f select, .qe-f textarea { width: 100%; }
+.s1 { grid-column: span 1; }
+.s2 { grid-column: span 2; }
+.s3 { grid-column: span 3; }
+.s4 { grid-column: span 4; }
+.s6 { grid-column: span 6; }
+
+.qso-editor textarea {
+  font: inherit;
+  color: inherit;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 3px 5px;
+  resize: vertical;
+  min-height: 38px;
+}
+.qso-editor textarea:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.qso-editor input.mono { font-family: var(--mono); }
+
+/* Changed since the last save, and values that will not save */
+.qe-f.changed > span, .qe-kv-row.changed > span { color: var(--new); }
+.qso-editor [aria-invalid="true"] { border-color: var(--err); outline: 1px solid var(--err); }
+.qe-qsl td.changed select, .qe-qsl td.changed input { border-color: var(--new); }
+
+.qe-adds { display: flex; gap: 8px; }
+.qe-adds button.link { padding: 0; font-size: 12px; }
+
+/* QSL table */
+.qe-qsl { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.qe-qsl th { font-size: 11px; font-weight: 400; color: var(--muted); text-align: left; padding: 0 4px 1px 0; }
+.qe-qsl th:first-child { width: 58px; }
+.qe-qsl tbody th { font-size: 12px; color: var(--text); font-weight: 600; }
+.qe-qsl td { padding: 1px 4px 1px 0; }
+.qe-qsl td:last-child { padding-right: 0; }
+.qe-qsl select, .qe-qsl input { width: 100%; padding: 1px 3px; }
+.qe-qsl tbody tr + tr th, .qe-qsl tbody tr + tr td { border-top: 1px solid color-mix(in srgb, var(--line) 40%, transparent); }
+
+/* Label/value rows (other fields and the raw view) */
+.qe-kv { display: flex; flex-direction: column; gap: 2px; }
+.qe-kv-row { display: grid; grid-template-columns: minmax(90px, 38%) 1fr; gap: 6px; align-items: center; }
+.qe-kv-row > span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qe-kv-row.raw > span { font-size: 11.5px; }
+.qe-kv-row input { width: 100%; padding: 1px 4px; }
+
+.qe-raw { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 4px; }
+.qe-raw summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--muted); padding: 2px 0; }
+.qe-raw summary:hover { color: var(--text); }
+.qe-raw p { margin: 2px 0 6px; }
+.qe-add { display: grid; grid-template-columns: minmax(90px, 38%) 1fr auto; gap: 6px; margin-top: 6px; }
+.qe-add input { width: 100%; }
+
+/* Footer */
+.qe-error { margin: 0; padding: 4px 8px; color: var(--err); font-size: 12px; border-top: 1px solid var(--line); }
+.qe-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}

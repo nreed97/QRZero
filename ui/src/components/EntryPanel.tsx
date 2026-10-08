@@ -30,6 +30,8 @@ interface Props {
   onRadio: (key: string) => void;
   /** A station picked from the FTx monitor or a spot. */
   prefill: Prefill | null;
+  /** Fields copied from an earlier QSO (Worked before, Copy): fill them in. */
+  copy?: { nonce: number; fields: Fields } | null;
 }
 
 export interface Prefill {
@@ -61,7 +63,7 @@ const CARRIED = ["CQZ", "ITUZ", "CONT", "LAT", "LON", "IOTA", "EMAIL", "QSL_VIA"
 // Picked equipment ids; -1 is "none", and antenna 0 is "Auto (by band)".
 interface Gear { rig?: number; antenna?: number; amplifier?: number }
 
-export default function EntryPanel({ logId, stationCall, location, layout, equipment, onLogged, onLookup, onContext, onHelp, radios, radioKey, onRadio, prefill }: Props) {
+export default function EntryPanel({ logId, stationCall, location, layout, equipment, onLogged, onLookup, onContext, onHelp, radios, radioKey, onRadio, prefill, copy }: Props) {
   const prefs = useRef(localGet("qrzero.entry", { freq: "", band: "20m", mode: "CW", last: {} as Fields })).current;
   const [freq, setFreq] = useState(prefs.freq);
   const [band, setBand] = useState(prefs.band);
@@ -235,6 +237,12 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
     void runLookup(prefill.call);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill?.nonce]);
+
+  useEffect(() => {
+    if (!copy) return;
+    setForm((f) => ({ ...f, ...copy.fields }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [copy?.nonce]);
 
   const log = async (found: Found | null = null) => {
     const c = call.trim().toUpperCase();

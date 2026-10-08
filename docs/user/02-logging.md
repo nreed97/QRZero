@@ -38,9 +38,31 @@ After a lookup the panel shows:
 
 - **Station details** from QRZ.com (when lookups are on), or from your last QSO with that call.
 - **Flags**: *New DXCC* when you have never worked that entity, *New band* or *New mode* when you haven't worked the entity on the band or mode set in the entry panel, and *Already worked on …* when this would be a duplicate on the same band and mode.
-- **History**: your most recent QSOs with the call.
 
-DXCC flags need the DXCC entity number, which comes from the QRZ lookup. Without lookups, only the per-call history is shown.
+DXCC flags need the DXCC entity number, which comes from the QRZ lookup. Without lookups, only the per-call flags are shown. Your full history with the call is in the Worked before pane.
+
+## Worked before
+
+As soon as you type a call, the **Worked before** pane lists every QSO you have had with that station in this log, newest first. The title shows the call and how many QSOs you have with it. QSOs the station made while portable count too: typing DL1ABC also finds DL1ABC/P and DL1ABC/M (marked "as DL1ABC/P" in the Comment column), and typing EA8/DL1ABC finds that and the home call.
+
+Each row shows the date, time (UTC), band, mode, the reports you sent and received, the QSL status for LoTW, paper card and eQSL, the name and your comment. In the QSL columns **C** (in green) means confirmed and **sent** means you sent yours but haven't had one back yet. A red mark at the left of a row means it is on the same band and mode as the entry panel, so logging again would be a duplicate in that slot.
+
+The buttons in the title bar narrow the list. Each one stays on until you click it again, even after a restart:
+
+- **This band**: only QSOs on the band set in the entry panel.
+- **This mode**: only QSOs in the mode set in the entry panel.
+- **Unconfirmed**: only QSOs not yet confirmed by LoTW, card or eQSL. Handy when deciding whether to send a card.
+
+Working with the rows:
+
+- Click a row to select it. With the list selected, the <kbd>Up</kbd> and <kbd>Down</kbd> arrows move through it.
+- Double-click a row, or press <kbd>Enter</kbd>, to open that QSO in the editor.
+- Hover over a row for two quick buttons: **Edit** opens the QSO, and **Copy** puts the name, QTH, grid, state, county and QSL manager from that QSO into the entry panel. Useful when the lookup is off or found nothing.
+- Right-click a row for more: *Edit QSO*, *Copy name and QTH to entry*, *Show all with CALL in log* (filters the log grid to that call), *Mark card received* (sets the paper card as received today) and *Queue a card* (adds the QSO to the paper QSL queue, see the QSL chapter). Press <kbd>Esc</kbd> or click elsewhere to close the menu.
+
+The line under the list sums up the station: the bands and modes you have worked it on, the date of your first QSO, and which band and mode slots are confirmed.
+
+The pane updates by itself when you log or edit a QSO.
 
 ## The map
 

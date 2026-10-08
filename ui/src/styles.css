@@ -171,8 +171,6 @@ kbd { font: 11px var(--mono); opacity: 0.75; margin-left: 4px; }
 .flag.new { color: var(--new); }
 .flag.dupe { color: var(--err); }
 .flag.info { color: var(--muted); font-weight: 400; }
-.history table { width: 100%; border-collapse: collapse; font: 12px var(--mono); }
-.history td { padding: 0 6px 0 0; }
 
 /* Map */
 .map-box { flex: 1; min-height: 150px; position: relative; overflow: hidden; }
@@ -203,7 +201,7 @@ kbd { font: 11px var(--mono); opacity: 0.75; margin-left: 4px; }
 .grid-row.selected { background: var(--row-sel); }
 .grid-row .call { font-weight: 700; }
 .grid-empty { padding: 16px; }
-.sel { display: flex; justify-content: center; }
+.grid-head .sel, .grid-row .sel { display: flex; justify-content: center; }
 
 /* Dialogs */
 .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); display: flex; align-items: flex-start; justify-content: center; padding-top: 5vh; z-index: 10; }
