@@ -3,6 +3,7 @@
 import type { Fields, Qso } from "./types";
 import { fmtDate, fmtTime } from "./util";
 import { modeLabel } from "./modes";
+import { confirmedShort, OQRS } from "./confirmations";
 
 export type Width = "s" | "m" | "l" | "xl";
 
@@ -170,6 +171,9 @@ export const COLUMNS: ColumnDef[] = [
   { key: "CLUBLOG_QSO_UPLOAD_STATUS", label: "Club Log", width: "60px", get: f("CLUBLOG_QSO_UPLOAD_STATUS") },
   { key: "QSL_SENT", label: "QSL S", width: "46px", get: f("QSL_SENT") },
   { key: "QSL_RCVD", label: "QSL R", width: "46px", get: f("QSL_RCVD") },
+  { key: "QRZCOM_QSO_DOWNLOAD_STATUS", label: "QRZ R", width: "46px", get: f("QRZCOM_QSO_DOWNLOAD_STATUS") },
+  { key: OQRS, label: "OQRS", width: "46px", get: f(OQRS) },
+  { key: "confirmed", label: "Confirmed", width: "70px", get: (q) => confirmedShort(q.fields) },
   { key: "COMMENT", label: "Comment", width: "minmax(100px,2fr)", get: f("COMMENT") },
   { key: "NOTES", label: "Notes", width: "minmax(100px,2fr)", get: f("NOTES") },
 ];

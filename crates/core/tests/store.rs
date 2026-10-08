@@ -277,6 +277,7 @@ fn pending_uploads_and_marking() {
     st.mark_qsos(&[a.id], &f(&[(key, "Y"), ("QRZCOM_QSO_UPLOAD_DATE", "20240102")])).unwrap();
     assert_eq!(st.count_pending(log, key, &calls, None, since).unwrap(), 0);
     assert!(st.mark_qsos(&[a.id], &f(&[("CALL", "X")])).is_err());
+    st.mark_qsos(&[a.id], &f(&[("APP_QRZERO_OQRS", "Y"), ("QRZCOM_QSO_DOWNLOAD_STATUS", "Y")])).unwrap();
 
     // Editing an uploaded QSO marks it modified, so it goes up again.
     let mut changed = b.fields.clone();

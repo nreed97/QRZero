@@ -270,6 +270,15 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Print 1 label" })).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
 
+  // OQRS: mark from the right-click menu, then see it in the editor.
+  await page.locator(".grid-row", { hasText: "K1ABC" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: /Mark OQRS requested/ }).click();
+  const [oqrsWin] = await Promise.all([page.waitForEvent("popup"), page.locator(".grid-row", { hasText: "K1ABC" }).dblclick()]);
+  const oqrs = oqrsWin.locator(".qso-editor");
+  await expect(oqrs.getByLabel("Club Log OQRS")).toHaveValue("Y");
+  await expect(oqrs.getByText("Not confirmed yet. OQRS requested on Club Log.")).toBeVisible();
+  await Promise.all([oqrsWin.waitForEvent("close"), closeWindow(oqrs.getByRole("button", { name: "Close editor" }))]);
+
   // Awards: everything worked so far, nothing confirmed.
   await page.getByRole("tab", { name: "Awards" }).click();
   await page.getByRole("button", { name: "WAZ" }).click();

@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { api } from "../api";
-import { PAPER_ACTIONS } from "../paper";
+import { OQRS_ACTIONS, PAPER_ACTIONS } from "../paper";
 import { BANDS, MODES } from "../modes";
 import { COLUMNS, DEFAULT_COLUMNS } from "../fields";
 import { localGet, localSet } from "../prefs";
@@ -226,11 +226,11 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
     }
   };
 
-  const markPaper = async (key: string) => {
-    const action = PAPER_ACTIONS.find((a) => a.key === key);
-    if (!action || !selection.size) return;
+  const markPaper = async (key: string, ids: number[] = [...selection]) => {
+    const action = [...PAPER_ACTIONS, ...OQRS_ACTIONS].find((a) => a.key === key);
+    if (!action || !ids.length) return;
     try {
-      await api.markQsos([...selection], action.fields());
+      await api.markQsos(ids, action.fields());
       onDeleted();
     } catch (e) {
       setError((e as Error).message);
@@ -333,6 +333,7 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
         <select value="" disabled={!selection.size} onChange={(e) => void markPaper(e.target.value)} aria-label="Paper QSL">
           <option value="">Paper QSL…</option>
           {PAPER_ACTIONS.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
+          {OQRS_ACTIONS.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
         </select>
         <button disabled={!selection.size} onClick={onExportSelected}>Export selected</button>
         <button disabled={!selection.size} className="danger" onClick={deleteSelected}>Delete</button>
@@ -425,6 +426,11 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
               <button role="menuitem" onClick={act(() => onEdit(menu.q))}>Edit {menu.q.fields.CALL ?? "QSO"}</button>
               <button role="menuitem" onClick={act(() => void lookupQsos(ids))}>Look up {what} on QRZ and fill in blanks</button>
               <button role="menuitem" onClick={act(() => void sendQsos(ids))}>Send {what} through UDP connections</button>
+              <hr />
+              <button role="menuitem" onClick={act(() => void markPaper("oqrs", ids))}>Mark OQRS requested ({what})</button>
+              <button role="menuitem" onClick={act(() => void markPaper("sent-b", ids))}>Card sent via bureau ({what})</button>
+              <button role="menuitem" onClick={act(() => void markPaper("sent-d", ids))}>Card sent direct ({what})</button>
+              <button role="menuitem" onClick={act(() => void markPaper("rcvd-b", ids))}>Card received ({what})</button>
               <hr />
               <button role="menuitem" onClick={act(onExportSelected)}>Export {what}…</button>
               <button role="menuitem" onClick={act(() => void deleteSelected())}>Delete {what}…</button>

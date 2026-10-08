@@ -1024,7 +1024,7 @@ const MODIFIED_STATUS: [&str; 2] = ["QRZCOM_QSO_UPLOAD_STATUS", "CLUBLOG_QSO_UPL
 
 /// QSL and upload bookkeeping, as opposed to what happened on the air.
 fn is_qsl_field(k: &str) -> bool {
-    k.contains("QSL") || k.contains("UPLOAD") || k.starts_with("EQSL_") || k.starts_with("LOTW_")
+    k.contains("QSL") || k.contains("UPLOAD") || k.contains("DOWNLOAD") || k.contains("OQRS") || k.starts_with("EQSL_") || k.starts_with("LOTW_")
 }
 
 fn pending_sql(select: &str, log_id: i64, status_key: &str, callsigns: &[String], location_id: Option<i64>, since: i64) -> Result<(String, Vec<Value>)> {
