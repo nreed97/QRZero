@@ -48,6 +48,28 @@ pub struct AwardQso {
     pub id: i64,
 }
 
+impl AwardQso {
+    /// The award facts of a QSO's ADIF fields. `resolve` supplies the DXCC
+    /// entity when the fields have none.
+    pub fn from_fields(f: &crate::adif::Fields, resolve: impl Fn(&str) -> Option<u32>) -> Self {
+        let get = |k: &str| f.get(k).map(|v| v.trim()).filter(|v| !v.is_empty());
+        let yes = |k: &str| matches!(get(k), Some("Y") | Some("V"));
+        let call = get("CALL").unwrap_or_default().to_ascii_uppercase();
+        AwardQso {
+            band: get("BAND").map(str::to_ascii_lowercase),
+            mode: get("SUBMODE").or(get("MODE")).map(str::to_ascii_uppercase),
+            dxcc: get("DXCC").and_then(|d| d.parse().ok()).or_else(|| resolve(&call)),
+            state: get("STATE").map(str::to_ascii_uppercase),
+            cq_zone: get("CQZ").and_then(|z| z.parse().ok()),
+            lotw: yes("LOTW_QSL_RCVD"),
+            paper: yes("QSL_RCVD"),
+            eqsl: yes("EQSL_QSL_RCVD"),
+            id: 0,
+            call,
+        }
+    }
+}
+
 /// Cell state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -441,6 +463,140 @@ impl Tally {
     }
 }
 
+/// Every award, in display order.
+pub const AWARDS: [Award; 4] = [Award::Dxcc, Award::Was, Award::Waz, Award::Wpx];
+
+// Cell bits in an [`AwardIndex`]: worked, and which sources confirmed it.
+const BIT_WORKED: u8 = 1;
+const BIT_LOTW: u8 = 2;
+const BIT_PAPER: u8 = 4;
+const BIT_EQSL: u8 = 8;
+
+fn qso_bits(q: &AwardQso) -> u8 {
+    BIT_WORKED
+        | if q.lotw { BIT_LOTW } else { 0 }
+        | if q.paper { BIT_PAPER } else { 0 }
+        | if q.eqsl { BIT_EQSL } else { 0 }
+}
+
+fn counts_mask(c: Counts) -> u8 {
+    (if c.lotw { BIT_LOTW } else { 0 }) | (if c.paper { BIT_PAPER } else { 0 }) | (if c.eqsl { BIT_EQSL } else { 0 })
+}
+
+/// Every award cell of one log, with the confirmation sources seen in it, so
+/// "what would this QSO add?" is a few hash lookups. Built once per log and
+/// added to as QSOs are logged.
+#[derive(Clone, Debug, Default)]
+pub struct AwardIndex {
+    /// DXCC, WAS and WAZ rows by number (WAS: index into `US_STATES`).
+    nums: [HashMap<u32, Cells>; 3],
+    /// WPX rows by prefix.
+    wpx: HashMap<String, Cells>,
+    qsos: usize,
+}
+
+/// Whether a QSO would fill an award cell for the first time.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum HintStatus {
+    /// Never worked.
+    New,
+    /// Worked, but not confirmed by a counted source.
+    Worked,
+    Confirmed,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct HintCell {
+    /// "mixed", "cw", "phone", "digital" or a band like "20m".
+    pub column: String,
+    pub status: HintStatus,
+}
+
+/// What a QSO would mean for one award.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct AwardHint {
+    pub award: Award,
+    /// Row key (DXCC number, state code, zone, prefix).
+    pub key: String,
+    pub name: String,
+    /// Mixed first, then the mode group and the band when they have a column.
+    pub cells: Vec<HintCell>,
+}
+
+impl AwardIndex {
+    fn slot(&mut self, award: Award, id: RowId) -> &mut Cells {
+        match (award, id) {
+            (_, RowId::Text(s)) => self.wpx.entry(s).or_insert([0; NCOLS]),
+            (a, RowId::Num(n)) => self.nums[a as usize].entry(n).or_insert([0; NCOLS]),
+        }
+    }
+
+    fn get(&self, award: Award, id: &RowId) -> Option<&Cells> {
+        match id {
+            RowId::Text(s) => self.wpx.get(s),
+            RowId::Num(n) => self.nums.get(award as usize)?.get(n),
+        }
+    }
+
+    pub fn add(&mut self, q: &AwardQso) {
+        self.qsos += 1;
+        let bits = qso_bits(q);
+        let mode = q.mode.as_deref().and_then(mode_col);
+        let band = q.band.as_deref().and_then(band_col);
+        for award in AWARDS {
+            let Some(id) = row_id(award, q) else { continue };
+            let cells = self.slot(award, id);
+            cells[0] |= bits;
+            for i in [mode, band].into_iter().flatten() {
+                cells[i] |= bits;
+            }
+        }
+    }
+
+    /// How many QSOs went in.
+    pub fn len(&self) -> usize {
+        self.qsos
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.qsos == 0
+    }
+
+    /// For each award the QSO counts toward: the mixed, mode-group and band
+    /// cells it falls in, and whether each is new, worked or already confirmed
+    /// (by the sources in `counts`).
+    pub fn hints(&self, q: &AwardQso, counts: Counts) -> Vec<AwardHint> {
+        let mask = counts_mask(counts);
+        let mut cols = vec![0];
+        cols.extend(q.mode.as_deref().and_then(mode_col));
+        cols.extend(q.band.as_deref().and_then(band_col));
+        AWARDS
+            .iter()
+            .filter_map(|&award| {
+                let id = row_id(award, q)?;
+                let cells = self.get(award, &id).copied().unwrap_or([0; NCOLS]);
+                let key = match id {
+                    RowId::Num(n) => num_key(award, n),
+                    RowId::Text(s) => s,
+                };
+                let cells = cols
+                    .iter()
+                    .map(|&i| HintCell {
+                        column: COLUMNS[i].to_string(),
+                        status: match cells[i] {
+                            0 => HintStatus::New,
+                            v if v & mask != 0 => HintStatus::Confirmed,
+                            _ => HintStatus::Worked,
+                        },
+                    })
+                    .collect();
+                Some(AwardHint { award, name: default_name(award, &key), key, cells })
+            })
+            .collect()
+    }
+}
+
 fn num_order(key: &str) -> u64 {
     key.parse().unwrap_or(u64::MAX)
 }
@@ -815,6 +971,90 @@ mod tests {
                 eqsl: false
             }
         );
+    }
+
+    fn hint(h: &[AwardHint], award: Award) -> Option<&AwardHint> {
+        h.iter().find(|x| x.award == award)
+    }
+
+    fn statuses(h: &AwardHint) -> Vec<(&str, HintStatus)> {
+        h.cells.iter().map(|c| (c.column.as_str(), c.status)).collect()
+    }
+
+    fn lotw_only() -> Counts {
+        Counts { lotw: true, paper: false, eqsl: false }
+    }
+
+    #[test]
+    fn hints_new_country_state_zone_prefix() {
+        let idx = AwardIndex::default();
+        let qso = AwardQso {
+            dxcc: Some(291),
+            state: Some("OH".into()),
+            cq_zone: Some(4),
+            ..q("W8ABC", "20m", "CW")
+        };
+        let h = idx.hints(&qso, lotw_only());
+        let keys: Vec<(Award, &str)> = h.iter().map(|x| (x.award, x.key.as_str())).collect();
+        assert_eq!(keys, [(Award::Dxcc, "291"), (Award::Was, "OH"), (Award::Waz, "4"), (Award::Wpx, "W8")]);
+        assert_eq!(hint(&h, Award::Was).unwrap().name, "Ohio");
+        for x in &h {
+            assert_eq!(statuses(x), [("mixed", HintStatus::New), ("cw", HintStatus::New), ("20m", HintStatus::New)]);
+        }
+    }
+
+    #[test]
+    fn hints_new_band_and_mode_slots() {
+        let mut idx = AwardIndex::default();
+        idx.add(&AwardQso { dxcc: Some(230), lotw: true, ..q("DL1ABC", "20m", "CW") });
+        idx.add(&AwardQso { dxcc: Some(230), ..q("DL2XYZ", "40m", "SSB") });
+        assert_eq!(idx.len(), 2);
+        // Germany on 40m FT8: entity confirmed (LoTW on 20m), 40m worked only, digital new.
+        let h = idx.hints(&AwardQso { dxcc: Some(230), ..q("DL3AA", "40m", "FT8") }, lotw_only());
+        assert_eq!(
+            statuses(hint(&h, Award::Dxcc).unwrap()),
+            [("mixed", HintStatus::Confirmed), ("digital", HintStatus::New), ("40m", HintStatus::Worked)]
+        );
+        // Germany on 15m CW: new band, CW confirmed.
+        let h = idx.hints(&AwardQso { dxcc: Some(230), ..q("DL3AA", "15m", "CW") }, lotw_only());
+        assert_eq!(
+            statuses(hint(&h, Award::Dxcc).unwrap()),
+            [("mixed", HintStatus::Confirmed), ("cw", HintStatus::Confirmed), ("15m", HintStatus::New)]
+        );
+        // Counting only paper cards, nothing is confirmed.
+        let h = idx.hints(&AwardQso { dxcc: Some(230), ..q("DL3AA", "20m", "CW") }, Counts { paper: true, ..Counts::default() });
+        assert!(hint(&h, Award::Dxcc).unwrap().cells.iter().all(|c| c.status == HintStatus::Worked));
+        // DL3 is a new prefix even though DL1 and DL2 are worked.
+        assert_eq!(hint(&h, Award::Wpx).unwrap().cells[0].status, HintStatus::New);
+    }
+
+    #[test]
+    fn hints_nothing_new_and_missing_facts() {
+        let mut idx = AwardIndex::default();
+        let qso = AwardQso { dxcc: Some(291), state: Some("oh".into()), cq_zone: Some(4), paper: true, ..q("W8ABC", "20m", "CW") };
+        idx.add(&qso);
+        let h = idx.hints(&AwardQso { state: Some("OH".into()), ..qso.clone() }, all_counts());
+        assert_eq!(h.len(), 4);
+        assert!(h.iter().all(|x| x.cells.iter().all(|c| c.status == HintStatus::Confirmed)));
+        // No band column for 2m, no mode: mixed only. No state, no zone: no WAS or WAZ.
+        let h = idx.hints(&AwardQso { dxcc: Some(291), call: "W8ABC".into(), band: Some("2m".into()), ..AwardQso::default() }, all_counts());
+        let awards: Vec<Award> = h.iter().map(|x| x.award).collect();
+        assert_eq!(awards, [Award::Dxcc, Award::Wpx]);
+        assert_eq!(statuses(&h[0]), [("mixed", HintStatus::Confirmed)]);
+    }
+
+    #[test]
+    fn award_qso_from_fields() {
+        let f: crate::adif::Fields = [("CALL", "w8abc"), ("BAND", "20M"), ("MODE", "MFSK"), ("SUBMODE", "FT4"), ("STATE", "oh"), ("CQZ", "4"), ("LOTW_QSL_RCVD", "Y")]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        let qso = AwardQso::from_fields(&f, |c| (c == "W8ABC").then_some(291));
+        assert_eq!(qso.call, "W8ABC");
+        assert_eq!(qso.band.as_deref(), Some("20m"));
+        assert_eq!(qso.mode.as_deref(), Some("FT4"));
+        assert_eq!((qso.dxcc, qso.cq_zone, qso.state.as_deref()), (Some(291), Some(4), Some("OH")));
+        assert!(qso.lotw && !qso.paper && !qso.eqsl);
     }
 
     #[test]

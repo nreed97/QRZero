@@ -66,6 +66,18 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "Done" }).click();
   await expect(page.locator(".grid-row", { hasText: "W1AW" })).toContainText("K3");
 
+  // Drag the Rig heading (added last) in front of Call.
+  const heads = page.locator(".grid > .grid-head .col-head");
+  const rig = await heads.filter({ hasText: /^Rig$/ }).boundingBox();
+  const callHead = await heads.filter({ hasText: /^Call$/ }).boundingBox();
+  await page.mouse.move(rig!.x + 10, rig!.y + rig!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(callHead!.x + 20, callHead!.y + 5, { steps: 8 });
+  await page.mouse.move(callHead!.x + 4, callHead!.y + 5, { steps: 4 });
+  await page.mouse.up();
+  const order = await heads.allInnerTexts();
+  expect(order.indexOf("Rig")).toBe(order.indexOf("Call") - 1);
+
   // Search by call prefix and by wildcard.
   await page.getByTestId("search").fill("K1");
   await expect(page.locator(".grid > .grid-tools")).toContainText("2 QSOs");
@@ -113,6 +125,26 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "Settings" }).click();
   await page.getByRole("button", { name: "Radios and programs" }).click();
   await expect(page.getByLabel("Listen to WSJT-X / JTDX")).toBeChecked();
+
+  // A UDP connection from a preset is saved and can send a test message.
+  await page.getByRole("button", { name: "UDP connections" }).click();
+  await page.getByRole("button", { name: "Rotator program" }).click();
+  await expect(page.locator("select[aria-label='Sends when']")).toHaveValue("rotator");
+  await expect(page.locator("select[aria-label=Format]")).toHaveValue("pst");
+  await page.getByRole("button", { name: "Send test" }).click();
+  await expect(page.locator("pre.udp-sent")).toHaveText("<PST><AZIMUTH>45</AZIMUTH></PST>");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Saved.")).toBeVisible();
+  await page.getByRole("button", { name: "Startup programs" }).click();
+  await page.getByRole("button", { name: "UDP connections" }).click();
+  await expect(page.locator("input[aria-label=Name]")).toHaveValue("Rotator");
+
+  // Startup programs: a missing program says why it didn't start.
+  await page.getByRole("button", { name: "Startup programs" }).click();
+  await page.getByRole("button", { name: "Add a program" }).click();
+  await page.getByLabel("Program", { exact: true }).fill("/no/such/program");
+  await page.getByRole("button", { name: "Launch now" }).click();
+  await expect(page.locator("table.startup-apps")).toContainText("couldn't start");
   await page.getByRole("button", { name: "Close" }).click();
 
   // With no cluster set up, the Cluster pane sends you to Settings to add one.
@@ -190,6 +222,8 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await call.fill("K1XYZ");
   await call.press("Tab");
   await expect(page.locator(".lookup-note")).toContainText("Runs 5 W / QSL direct only");
+  // The Station pane says what the QSO would add to awards (K1 is already worked).
+  await expect(page.getByLabel("Award hints", { exact: true })).toContainText("WPX");
   await page.getByRole("tab", { name: "Worked before" }).click();
 
   // Panes: drag the Cluster tab beside the Station pane, it gets its own group.
@@ -215,6 +249,26 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "FTx monitor" })).toHaveCount(0);
   await popup.getByRole("button", { name: "Dock back" }).click();
   await expect(page.getByRole("tab", { name: "FTx monitor" })).toBeVisible();
+
+  // Backups: back up now, download it, then stage a restore and cancel it.
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("button", { name: "Backups", exact: true }).click();
+  await page.getByRole("button", { name: "Back up now" }).click();
+  await expect(page.getByText(/^Saved qrzero-.*-manual\.db\.$/)).toBeVisible();
+  const backupRow = page.locator("table.backups tbody tr", { hasText: "Manual" });
+  await expect(backupRow).toHaveCount(1);
+  const [backupFile] = await Promise.all([page.waitForEvent("download"), backupRow.getByRole("button", { name: "Download" }).click()]);
+  expect(backupFile.suggestedFilename()).toMatch(/^qrzero-.*-manual\.db$/);
+  expect(readFileSync((await backupFile.path())!).subarray(0, 15).toString()).toBe("SQLite format 3");
+  await page.getByTestId("restore-file").setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("not a log") });
+  await expect(page.getByText(/isn't a QRZero log/)).toBeVisible();
+  page.once("dialog", (d) => d.accept());
+  await backupRow.getByRole("button", { name: "Restore" }).click();
+  await expect(page.getByText("Restart QRZero to finish restoring.")).toBeVisible();
+  await page.getByRole("button", { name: "Cancel restore" }).click();
+  await expect(page.getByText("Restore cancelled.")).toBeVisible();
+  await expect(page.getByText("Restart QRZero to finish restoring.")).toHaveCount(0);
+  await page.getByRole("button", { name: "Close" }).click();
 
   // The user guide opens from the top bar.
   await page.getByRole("button", { name: "Help" }).click();

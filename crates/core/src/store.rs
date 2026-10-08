@@ -15,12 +15,13 @@ use crate::adif::{self, Fields};
 use crate::band;
 use crate::error::{Error, Result};
 use crate::model::*;
-use crate::awards::AwardQso;
+use crate::awards::{AwardIndex, AwardQso};
 use crate::worked::WorkedIndex;
 
 /// Migrations in order; migration N brings the schema to user_version N.
 const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5];
-const SCHEMA_VERSION: i32 = MIGRATIONS.len() as i32;
+/// The newest schema this build knows (`PRAGMA user_version`).
+pub const SCHEMA_VERSION: i32 = MIGRATIONS.len() as i32;
 
 /// Small partial indexes over QSOs not yet uploaded, so counting what's waiting
 /// stays fast once most of a large log is uploaded. The WHERE clauses must match
@@ -525,6 +526,15 @@ impl Store {
             f(&q);
         }
         Ok(())
+    }
+
+    /// The award cells of a log for "what would this QSO add?", with the QSO
+    /// version it reflects (see [`Store::qso_version`]).
+    pub fn award_index(&self, log_id: i64, resolve: impl Fn(&str) -> Option<u32>) -> Result<(i64, AwardIndex)> {
+        let version = self.qso_version()?;
+        let mut idx = AwardIndex::default();
+        self.for_each_award_qso(log_id, &[], resolve, |q| idx.add(q))?;
+        Ok((version, idx))
     }
 
     /// QSOs waiting for a paper QSL card (QSL_SENT is R "requested" or Q "queued"),

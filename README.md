@@ -36,6 +36,8 @@ cd ui && npm ci && npm run build && cd ..   # UI first: the server embeds ui/dis
 cargo test                                   # core and server tests
 cargo run -p qrzero-server                   # browser version on http://127.0.0.1:8073
 npx @tauri-apps/cli@2 build                  # Windows installer (MSI and setup .exe)
+# On Linux first: apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev
+# then: npx @tauri-apps/cli@2 build --bundles deb,rpm,appimage
 ```
 
 UI development with live reload: run `cargo run -p qrzero-server -- --token dev`, then `npm run dev` in `ui/` and open `http://localhost:5173/?token=dev`.
@@ -51,4 +53,4 @@ CI runs all of these and attaches the Windows installer to each run.
 
 ## Releases
 
-Pushing a tag builds the Windows installers and attaches them to that tag's GitHub Release (creating a pre-release if none exists). For a tag that already exists, run **Actions → Release → Run workflow** and enter the tag name. Each release gets the MSI, the setup `.exe`, and `QRZero-portable.exe` (no install; needs the WebView2 runtime that ships with Windows 10 and 11).
+Pushing a tag builds the Windows and Linux packages and attaches them to that tag's GitHub Release (creating a pre-release if none exists). For a tag that already exists, run **Actions → Release → Run workflow** and enter the tag name. Each release gets the MSI, the setup `.exe`, and `QRZero-portable.exe` (no install; needs the WebView2 runtime that ships with Windows 10 and 11). For Linux it adds a `.deb`, an `.rpm`, an `.AppImage`, and `QRZero-server-linux-x86_64.tar.gz` (the browser version without the desktop window, for a shack PC or Raspberry Pi-class server reached from a browser).

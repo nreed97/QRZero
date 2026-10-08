@@ -13,7 +13,7 @@ If you run several copies of WSJT-X or JTDX and each sends to its own port, list
 
 QSOs you log in WSJT-X are added to the open log at the selected location, unless the same QSO is already there. If WSJT-X didn't fill in `MY_ANTENNA`, QRZero adds the antenna whose bands include the QSO's band (see **Equipment**). Turn this off with **Log QSOs that WSJT-X / JTDX log** if another logger already does it.
 
-Only one program can listen on a UDP port. If you also use GridTracker or JTAlert, either add their address under **Pass on to**, or set a **multicast group** (for example 224.0.0.1) in WSJT-X and in every program that listens.
+Only one program can listen on a UDP port. If you also use GridTracker or JTAlert, either add their address under **Pass on to** (or as a relay under **Settings → UDP connections**), or set a **multicast group** (for example 224.0.0.1) in WSJT-X and in every program that listens.
 
 ## The FTx monitor
 

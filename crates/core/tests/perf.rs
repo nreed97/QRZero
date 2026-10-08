@@ -75,6 +75,28 @@ fn large_log_speed() {
     println!("worked index of {} calls: {:?}", idx.len(), t.elapsed());
     assert!(t.elapsed().as_millis() < 2000, "worked index is built in the background, but shouldn't take long");
     let t = Instant::now();
+    let (_, mut awards) = st.award_index(log, |c| Some(c.len() as u32)).unwrap();
+    println!("award index of {} QSOs: {:?}", awards.len(), t.elapsed());
+    assert!(t.elapsed().as_millis() < 1000, "the award index is recounted after edits, so it must stay quick");
+    let t = Instant::now();
+    let probe = qrzero_core::awards::AwardQso {
+        call: "W8XYZ".into(),
+        band: Some("20m".into()),
+        mode: Some("CW".into()),
+        dxcc: Some(5),
+        state: Some("OH".into()),
+        cq_zone: Some(4),
+        ..Default::default()
+    };
+    let mut hints = 0;
+    for _ in 0..1000 {
+        hints += awards.hints(&probe, Default::default()).len();
+        awards.add(&probe);
+    }
+    let per = t.elapsed() / 1000;
+    println!("award hints plus one QSO added ({hints} hints over 1000 rounds): {per:?} each");
+    assert!(per.as_millis() < 5, "award hints run on every call entered: {per:?}");
+    let t = Instant::now();
     let (_, n) = st.export_adif(log, &QsoFilter::default(), ExportProfile::Full, "perf").unwrap();
     println!("export {n} QSOs: {:?}", t.elapsed());
 

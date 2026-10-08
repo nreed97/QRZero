@@ -20,7 +20,7 @@ The **×** at the top right of a pane hides it. Show it again from **Layout** in
 
 ## Popping a pane out to its own window
 
-The arrow button next to the **×** opens the pane in its own window, so you can put the FTx monitor, the cluster or the map on a second screen. Every pane except New QSO and Log can pop out. Clicking a decode, a spot or a QSO in a popped-out pane works just as it does in the main window.
+The arrow button next to the **×** opens the pane in its own window (or right-click the pane's tab and pick **Pop out**), so you can put the FTx monitor, the cluster or the map on a second screen. Every pane except New QSO and Log can pop out. Clicking a decode, a spot or a QSO in a popped-out pane works just as it does in the main window.
 
 Close the window, or click **Dock back**, to put the pane back. QRZero remembers where each window was and reopens it there next time. When you close QRZero, the popped-out windows close with it.
 

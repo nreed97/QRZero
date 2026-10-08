@@ -23,6 +23,16 @@ Tick the sources that count under **Confirmed by**:
 - Pick one of your callsigns to count only QSOs made with it. Most awards are issued to one callsign.
 - Click a row to see its QSOs in the log. Click the button above the log (for example **DXCC 291 ×**) to show everything again.
 
+## While you log
+
+You don't need to open this pane to see what a QSO would be worth. After a lookup, the **Station** pane has a short **Awards on 20m CW** block (with the band and mode from the entry panel). It has one line per award that the QSO would move:
+
+- **new country**, **new state**, **new zone** or **new prefix** when you have never worked it.
+- **new band** or **new mode** when you have worked it, but not on this band (160 m to 6 m) or in this mode group (CW, Phone or Digital).
+- **not confirmed: …** when you have worked that slot but it isn't confirmed yet, so this QSO is another chance at a confirmation.
+
+When none of that applies, it says *Nothing new for awards, all confirmed*. The block counts confirmations from the sources ticked under **Confirmed by** in this pane, and it updates when you change the band or mode. It always counts all your callsigns.
+
 ## Where the data comes from
 
 DXCC uses each QSO's DXCC field, or the country file if it has none. WAS uses the STATE field. QSOs with Alaska or Hawaii count for AK and HI even without a state. WAZ uses the CQZ field. Downloading LoTW confirmations fills in a blank state and zones from LoTW's records, which helps WAS and WAZ.

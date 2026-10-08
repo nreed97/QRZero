@@ -261,6 +261,12 @@ const BANDS: &[(f64, f64, f64, &str)] = &[
     (76000.0, 75500.0, 81000.0, "4mm"),
 ];
 
+/// N1MM's band label (MHz, as in its `<band>` element) for an ADIF band, e.g. "20m" gives "14".
+pub fn band_label(adif_band: &str) -> Option<String> {
+    let b = BANDS.iter().find(|b| b.3.eq_ignore_ascii_case(adif_band.trim()))?;
+    Some(format!("{}", b.0))
+}
+
 fn band_for_mhz(f: f64) -> Option<&'static str> {
     BANDS.iter().find(|b| (b.1..=b.2).contains(&f)).map(|b| b.3)
 }
@@ -443,6 +449,14 @@ mod tests {
         };
         assert_eq!(fields["BAND"], "30m");
         assert!(!fields.contains_key("FREQ"));
+    }
+
+    #[test]
+    fn band_labels() {
+        assert_eq!(band_label("20m").as_deref(), Some("14"));
+        assert_eq!(band_label("160M").as_deref(), Some("1.8"));
+        assert_eq!(band_label("2m").as_deref(), Some("144"));
+        assert_eq!(band_label("nope"), None);
     }
 
     #[test]

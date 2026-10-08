@@ -1,5 +1,5 @@
 import type { PropagationReport } from "./types";
-import type { QslService, QslDownload, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, Settings, StationCallsign, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
+import type { QslService, QslDownload, AwardHint, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
 function sessionToken(): string {
@@ -18,7 +18,7 @@ const token = sessionToken();
 
 export class ApiError extends Error {}
 
-async function request(method: string, path: string, body?: unknown, raw?: BodyInit): Promise<Response> {
+export async function request(method: string, path: string, body?: unknown, raw?: BodyInit): Promise<Response> {
   const headers: Record<string, string> = { "x-qrzero-token": token };
   let payload: BodyInit | undefined = raw;
   if (body !== undefined) {
@@ -69,6 +69,10 @@ export const api = {
     const q = new URLSearchParams({ calls: o.calls.join(","), lotw: String(o.lotw), paper: String(o.paper), eqsl: String(o.eqsl), unworked: String(o.unworked) });
     return json<AwardTable>("GET", `/logs/${logId}/awards/${award}?${q}`);
   },
+  awardHints: (logId: number, o: { call: string; band: string; mode: string; state: string; cqz: string; dxcc: string; lotw: boolean; paper: boolean; eqsl: boolean }) => {
+    const q = new URLSearchParams(Object.entries(o).map(([k, v]) => [k, String(v)]));
+    return json<AwardHint[]>("GET", `/logs/${logId}/award-hints?${q}`);
+  },
   paperQueue: (logId: number) => json<Qso[]>("GET", `/logs/${logId}/paper-queue`),
   search: (logId: number, filter: QsoFilter, offset: number, limit: number, sort = "newest") =>
     json<{ total: number; rows: Qso[] }>("POST", `/logs/${logId}/qsos/search`, { filter, offset, limit, sort }),
@@ -108,6 +112,12 @@ export const api = {
   tune: (key: string, freqHz?: number, mode?: string) => json<null>("POST", "/radios/tune", { key, freq_hz: freqHz, mode }),
   integrations: () => json<{ config: Integrations; status: IntegrationStatus }>("GET", "/integrations"),
   saveIntegrations: (c: Integrations) => json<{ config: Integrations; status: IntegrationStatus }>("PUT", "/integrations", c),
+  udpConnections: () => json<{ connections: UdpConnection[]; status: Record<string, RunStatus> }>("GET", "/udp-connections"),
+  saveUdpConnections: (c: UdpConnection[]) => json<{ connections: UdpConnection[]; status: Record<string, RunStatus> }>("PUT", "/udp-connections", c),
+  testUdpConnection: (c: UdpConnection) => json<{ sent: string }>("POST", "/udp-connections/test", c),
+  startupApps: () => json<{ apps: StartupApp[]; status: Record<string, RunStatus> }>("GET", "/startup-apps"),
+  saveStartupApps: (a: StartupApp[]) => json<{ apps: StartupApp[]; status: Record<string, RunStatus> }>("PUT", "/startup-apps", a),
+  launchStartupApp: (a: StartupApp) => json<RunStatus>("POST", "/startup-apps/launch", a),
   ftx: () => json<{ instances: FtxInstance[]; decodes: FtxDecode[] }>("GET", "/ftx"),
   ftxReply: (seq: number) => json<null>("POST", "/ftx/reply", { seq }),
   rotate: (azimuth: number) => json<null>("POST", "/rotator", { azimuth }),

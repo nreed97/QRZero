@@ -37,7 +37,14 @@ export default function RotatorPane({ ctx, act }: { ctx: PopContext; act: PaneAc
   const svgRef = useRef<SVGSVGElement>(null);
 
   const info = ctx.home && ctx.dx ? pathInfo(ctx.home, ctx.dx) : null;
-  const notSetUp = integrations !== null && !integrations.rotator_enabled;
+  // A UDP connection for rotator requests (Settings, UDP connections) also counts as set up.
+  const [udpRotator, setUdpRotator] = useState(false);
+  useEffect(() => {
+    if (integrations && !integrations.rotator_enabled) {
+      api.udpConnections().then((r) => setUdpRotator(r.connections.some((c) => c.enabled && c.event === "rotator"))).catch(() => {});
+    }
+  }, [integrations]);
+  const notSetUp = integrations !== null && !integrations.rotator_enabled && !udpRotator;
 
   // Clear "Turning to" once the heading is within 3 degrees, or after 90 s.
   useEffect(() => {
@@ -83,7 +90,7 @@ export default function RotatorPane({ ctx, act }: { ctx: PopContext; act: PaneAc
     return (
       <div className="rotator">
         <div className="rot-off">
-          <p>The rotator isn't set up yet. QRZero turns your antenna through PstRotatorAz.</p>
+          <p>The rotator isn't set up yet. QRZero turns your antenna through PstRotatorAz, or another rotator program through a UDP connection.</p>
           <button onClick={() => act.onSettings("radios")}>Set up PstRotatorAz…</button>
         </div>
       </div>

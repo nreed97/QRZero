@@ -171,6 +171,12 @@ kbd { font: 11px var(--mono); opacity: 0.75; margin-left: 4px; }
 .flag.new { color: var(--new); }
 .flag.dupe { color: var(--err); }
 .flag.info { color: var(--muted); font-weight: 400; }
+.award-hints { margin: 6px 0 2px; font-size: 12px; border-top: 1px solid var(--line); padding-top: 4px; }
+.award-hints .ah-title { color: var(--muted); font-size: 11px; margin-bottom: 1px; }
+.award-hints .ah-line { display: flex; gap: 6px; line-height: 1.45; }
+.award-hints .ah-award { flex: 0 0 34px; font-weight: 700; }
+.award-hints .ah-text { min-width: 0; }
+.award-hints .ah-new { color: var(--new); font-weight: 700; }
 
 /* Map */
 .map-box { flex: 1; min-height: 150px; position: relative; overflow: hidden; }
@@ -398,3 +404,18 @@ table.list th { text-align: left; font-size: 12px; font-weight: 600; padding: 2p
 .award-table td.worked { color: var(--new); }
 .awards { display: flex; flex-direction: column; min-height: 0; }
 button.chip { white-space: nowrap; }
+
+/* Log columns: drag a header to move it, its right edge to resize. */
+.grid-head .col-head { position: relative; cursor: grab; user-select: none; touch-action: none; }
+.grid-head .col-head.moving { opacity: 0.45; }
+.grid-head .col-head.drop-before { box-shadow: inset 2px 0 0 var(--accent); }
+.grid-head .col-head.drop-after { box-shadow: inset -2px 0 0 var(--accent); }
+.grid-head .col-resize { position: absolute; top: 0; right: 0; bottom: 0; width: 6px; padding: 0; cursor: col-resize; }
+.grid-head .col-resize:hover { background: var(--line); }
+
+/* Settings: UDP connections and startup programs */
+table.list.udp-conns select { width: 100%; box-sizing: border-box; }
+table.list.udp-conns tr.sub td { border-top: none; padding-top: 0; }
+table.list.udp-conns td:nth-child(7), table.list.startup-apps td:nth-child(5) { max-width: 220px; }
+table.list.startup-apps td:nth-child(2) { width: 45%; }
+pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px; padding: 4px 6px; max-height: 160px; overflow: auto; white-space: pre-wrap; word-break: break-all; margin: 4px 0; }

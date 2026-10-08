@@ -215,7 +215,22 @@ function zoneAt(e: React.DragEvent, el: HTMLElement): Zone {
 
 function TabGroup({ node, path, ctx }: { node: Tabs; path: Path; ctx: Ctx }) {
   const [zone, setZone] = useState<Zone | null>(null);
+  const [menu, setMenu] = useState<{ id: PaneId; x: number; y: number } | null>(null);
   const body = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menu) return;
+    const away = () => setMenu(null);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
+    window.addEventListener("pointerdown", away);
+    window.addEventListener("keydown", esc);
+    window.addEventListener("blur", away);
+    return () => {
+      window.removeEventListener("pointerdown", away);
+      window.removeEventListener("keydown", esc);
+      window.removeEventListener("blur", away);
+    };
+  }, [menu]);
   const own = ctx.drag !== null && node.panes.length === 1 && node.panes[0] === ctx.drag;
   const dropping = ctx.drag !== null && !own;
 
@@ -259,6 +274,11 @@ function TabGroup({ node, path, ctx }: { node: Tabs; path: Path; ctx: Ctx }) {
             className={`ws-tab ${node.active === id ? "on" : ""}`}
             draggable={!ctx.locked}
             onClick={() => ctx.onActivate(id)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              ctx.onActivate(id);
+              setMenu({ id, x: e.clientX, y: e.clientY });
+            }}
             onDragStart={(e) => {
               e.dataTransfer.setData(DRAG_TYPE, id);
               e.dataTransfer.effectAllowed = "move";
@@ -276,7 +296,7 @@ function TabGroup({ node, path, ctx }: { node: Tabs; path: Path; ctx: Ctx }) {
               if (moved !== id) ctx.onTabDrop(path, moved, id);
               ctx.setDrag(null);
             }}
-            title={ctx.locked ? paneTitle(id) : `${paneTitle(id)}: drag to move`}
+            title={ctx.locked ? `${paneTitle(id)} (right-click for more)` : `${paneTitle(id)}: drag to move, right-click for more`}
           >
             {paneTitle(id)}
           </button>
@@ -293,6 +313,16 @@ function TabGroup({ node, path, ctx }: { node: Tabs; path: Path; ctx: Ctx }) {
             </button>
           )}
         </span>
+        {menu && (
+          <div className="wb-menu ws-menu" role="menu" style={{ left: menu.x, top: menu.y }} onPointerDown={(e) => e.stopPropagation()}>
+            <button role="menuitem" disabled={!canPopOut(menu.id)} onClick={() => { setMenu(null); ctx.onPopOut(menu.id); }}>
+              Pop out {paneTitle(menu.id)} into its own window
+            </button>
+            <button role="menuitem" disabled={ctx.locked} onClick={() => { setMenu(null); ctx.onClosePane(menu.id); }}>
+              Hide {paneTitle(menu.id)}
+            </button>
+          </div>
+        )}
       </div>
       <div ref={body} className="ws-body" onDragOver={dragOver} onDragLeave={() => setZone(null)} onDrop={drop}>
         {node.panes.map((id) => (

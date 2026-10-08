@@ -210,3 +210,65 @@ async fn confirmations_awards_and_paper_cards() {
     let resp = api.http.post(format!("{}/qsos/mark", api.base)).header("x-qrzero-token", &api.token).json(&json!({"ids": [id], "fields": {"CALL": "X"}})).send().await.unwrap();
     assert_ne!(resp.status(), 200);
 }
+
+/// [(column, status)] of one award in an award-hints answer.
+fn hint_cells(hints: &Value, award: &str) -> Vec<(String, String)> {
+    let h = hints.as_array().unwrap().iter().find(|h| h["award"] == award).unwrap_or_else(|| panic!("no {award} in {hints}"));
+    h["cells"].as_array().unwrap().iter().map(|c| (c["column"].as_str().unwrap().to_string(), c["status"].as_str().unwrap().to_string())).collect()
+}
+
+fn cells(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+    pairs.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect()
+}
+
+#[tokio::test]
+async fn award_hints_follow_the_log() {
+    let api = Api::new(QslEndpoints::default()).await;
+    let (log, loc) = api.setup().await;
+    let hints = |q: &str| {
+        let path = format!("/logs/{log}/award-hints?lotw=true&paper=true&{q}");
+        let api = &api;
+        async move { api.get(&path).await }
+    };
+
+    // Empty log: everything is new; DXCC and zone come from the country file.
+    let h = hints("call=W8ABC&band=20m&mode=CW&state=OH").await;
+    let keys: Vec<(&str, &str)> = h.as_array().unwrap().iter().map(|h| (h["award"].as_str().unwrap(), h["key"].as_str().unwrap())).collect();
+    assert_eq!(keys, [("dxcc", "291"), ("was", "OH"), ("waz", "5"), ("wpx", "W8")], "{h}");
+    assert_eq!(h[0]["name"], "United States");
+    assert_eq!(hint_cells(&h, "dxcc"), cells(&[("mixed", "new"), ("cw", "new"), ("20m", "new")]));
+
+    // After a QSO on 20m CW: worked there, new on 40m and in phone.
+    let id = api.qso(log, loc, "JA1XYZ").await;
+    let h = hints("call=JA2AAA&band=20m&mode=CW").await;
+    assert_eq!(hint_cells(&h, "dxcc"), cells(&[("mixed", "worked"), ("cw", "worked"), ("20m", "worked")]), "{h}");
+    assert_eq!(hint_cells(&h, "wpx"), cells(&[("mixed", "new"), ("cw", "new"), ("20m", "new")]));
+    let h = hints("call=JA1XYZ&band=40m&mode=USB").await;
+    assert_eq!(hint_cells(&h, "dxcc"), cells(&[("mixed", "worked"), ("phone", "new"), ("40m", "new")]));
+    assert_eq!(hint_cells(&h, "waz"), cells(&[("mixed", "worked"), ("phone", "new"), ("40m", "new")]));
+
+    // A paper card received confirms it, but only when cards are counted.
+    api.post("/qsos/mark", json!({"ids": [id], "fields": {"QSL_RCVD": "Y"}})).await;
+    let h = hints("call=JA1XYZ&band=20m&mode=CW").await;
+    assert_eq!(hint_cells(&h, "dxcc"), cells(&[("mixed", "confirmed"), ("cw", "confirmed"), ("20m", "confirmed")]), "{h}");
+    let h = api.get(&format!("/logs/{log}/award-hints?lotw=true&call=JA1XYZ&band=20m&mode=CW")).await;
+    assert_eq!(hint_cells(&h, "dxcc")[0].1, "worked");
+
+    // Edits count: the QSO moved to 15m frees up 20m.
+    let mut f = api.fields(log, "JA1XYZ").await;
+    f["BAND"] = json!("15m");
+    f["FREQ"] = json!("21.025");
+    api.put(&format!("/qsos/{id}"), json!({"location_id": loc, "fields": f})).await;
+    let h = hints("call=JA1XYZ&band=20m&mode=CW").await;
+    assert_eq!(hint_cells(&h, "dxcc"), cells(&[("mixed", "confirmed"), ("cw", "confirmed"), ("20m", "new")]), "{h}");
+
+    // Logging keeps the kept cells current.
+    api.qso(log, loc, "DL1ABC").await;
+    let h = hints("call=DL2XX&band=20m&mode=CW").await;
+    assert_eq!(h[0]["name"], "Germany");
+    assert_eq!(hint_cells(&h, "dxcc"), cells(&[("mixed", "worked"), ("cw", "worked"), ("20m", "worked")]), "{h}");
+    assert_eq!(hint_cells(&h, "waz")[0].1, "worked");
+    // No band column (2m) and no mode: just the mixed cell.
+    let h = hints("call=DL2XX&band=2m").await;
+    assert_eq!(hint_cells(&h, "dxcc"), cells(&[("mixed", "worked")]));
+}

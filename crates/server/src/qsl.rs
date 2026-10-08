@@ -459,6 +459,9 @@ impl Qsl {
                     }
                 }
             }
+            if !changed_logs.is_empty() {
+                self.hub.refresh_awards();
+            }
             for log_id in changed_logs {
                 self.hub.emit(json!({"type": "qso_logged", "log_id": log_id, "call": "", "source": svc.name, "added": false}));
             }
@@ -556,6 +559,7 @@ impl Qsl {
             self.lock().config = c;
         }
         if d.confirmed > 0 {
+            self.hub.refresh_awards();
             self.hub.emit(json!({"type": "qso_logged", "log_id": null, "call": "", "source": name, "added": false}));
         }
         d
@@ -640,6 +644,7 @@ impl Qsl {
                 run.duplicates += ids.len();
             }
             if let Some(q) = pending.first() {
+                self.hub.refresh_awards();
                 self.hub.emit(json!({"type": "qso_logged", "log_id": q.log_id, "call": "", "source": "LoTW", "added": false}));
             }
         }

@@ -36,8 +36,8 @@ export function dayEnd(s: string): number | undefined {
   return start === undefined ? undefined : start + 86399;
 }
 
-export function download(name: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+export function download(name: string, text: string | Blob) {
+  const url = URL.createObjectURL(text instanceof Blob ? text : new Blob([text], { type: "text/plain" }));
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
