@@ -26,6 +26,10 @@ Choose **manual** to type frequency and mode yourself.
 
 WSJT-X and N1MM radios are listed too (when those programs are connected), so the panel can follow them, but they can't be tuned from QRZero.
 
+## VFO readout
+
+The top bar shows a readout for each radio: its name, frequency (for example `14.074.000`), band, mode and **RX** or **TX**. The readout turns red while the radio transmits, and shows `off` when the radio isn't connected (hover over it to see why). The radio the QSO panel follows has a blue outline; click another readout to follow that radio instead.
+
 ## Several radios (SO2R)
 
 With two or more radios, switch the radio the QSO panel follows:

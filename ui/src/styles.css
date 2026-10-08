@@ -128,6 +128,27 @@ kbd { font: 11px var(--mono); opacity: 0.75; margin-left: 4px; }
 .clock { font: 600 14px var(--mono); }
 .menu { display: flex; gap: 4px; }
 
+/* VFO readouts in the top bar */
+.vfo-bar { display: flex; gap: 4px; flex-wrap: wrap; }
+.vfo {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 1px 7px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font: 12px var(--mono);
+  color: var(--muted);
+}
+.vfo.followed { border-color: var(--accent); color: var(--text); }
+.vfo .vfo-name { font-family: var(--ui); }
+.vfo .vfo-freq { font-size: 16px; font-weight: 600; color: var(--text); letter-spacing: 0.5px; }
+.vfo.offline .vfo-freq { color: var(--muted); }
+.vfo .vfo-state { min-width: 2.2em; text-align: center; }
+.vfo.tx { border-color: var(--err); }
+.vfo.tx .vfo-state { background: var(--err); color: var(--bg); font-weight: 700; }
+
 /* Panels */
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; display: flex; flex-direction: column; min-width: 0; }
 .panel-title {

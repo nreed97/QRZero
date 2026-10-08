@@ -20,7 +20,7 @@ The **or add** buttons start a connection with sensible settings for common jobs
 
 | Sends when | What happens |
 | --- | --- |
-| **QSO logged** | A QSO is logged, from the QSO panel or from WSJT-X, JTDX or N1MM. Duplicates that QRZero skips aren't sent. |
+| **QSO logged** | A QSO is logged, from the QSO panel or from WSJT-X, JTDX or N1MM. Duplicates that QRZero skips aren't sent. To send QSOs already in the log, select them, right-click and choose **Send through UDP connections**. |
 | **Radio frequency / mode change** | A radio QRZero follows (a rig under Equipment, WSJT-X or N1MM) changes frequency, mode or transmit state. It sends only when something changed, and at most four times a second per radio; while you spin the VFO the last frequency always follows. Give a radio name under **Only this radio** (as the QSO panel shows it, for example `FLEX-6600 A`) to send for that radio only. |
 | **Rotator turn request** | You ask the rotator to turn, from the Rotator pane (or the map's **Turn SP** / **LP**, which show when PstRotatorAz is on). This works whether or not PstRotatorAz is turned on under Radios and programs, so you can drive another rotator program, or both. |
 | **Call entered** | A callsign is entered in the QSO panel and looked up. The message carries the call, the grid from the lookup, and the short-path heading from your location's grid (or the country's centre when there's no grid). |

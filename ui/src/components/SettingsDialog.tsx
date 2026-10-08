@@ -348,6 +348,12 @@ function RadiosTab() {
       </fieldset>
 
       <fieldset>
+        <legend>QSOs logged by other programs</legend>
+        {check("auto_log_lookup", "Look them up on QRZ and fill in name, QTH, state, grid and the rest when left blank")}
+        <p className="small muted">Needs your QRZ login (Callsign lookup tab). What WSJT-X, JTDX or N1MM sent is never overwritten.</p>
+      </fieldset>
+
+      <fieldset>
         <legend>PstRotatorAz</legend>
         {check("rotator_enabled", "Turn the rotator with PstRotatorAz")}
         <div className="row">{text("rotator_addr", "PstRotatorAz UDP address", "w-m", "127.0.0.1:12000")}</div>

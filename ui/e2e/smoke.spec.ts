@@ -101,7 +101,18 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // The QSO above it in the log, from the editor's arrows.
   await editor.getByRole("button", { name: "Previous QSO" }).click();
   await expect(editor.getByLabel("Call", { exact: true })).not.toHaveValue("K1ABC");
+  // QRZ lookup with no QRZ login says how to turn it on.
+  await editor.getByRole("button", { name: "QRZ lookup" }).click();
+  await expect(editor.getByRole("alert")).toContainText("QRZ login");
   await Promise.all([editWin.waitForEvent("close"), closeWindow(editor.getByRole("button", { name: "Close editor" }))]);
+
+  // Right-click a logged QSO for its menu; sending needs a UDP connection first.
+  await page.locator(".grid-row", { hasText: "K1ABC" }).click({ button: "right" });
+  const menu = page.getByRole("menu");
+  await expect(menu.getByRole("menuitem", { name: /Look up .* on QRZ/ })).toBeVisible();
+  await menu.getByRole("menuitem", { name: /Send .* through UDP connections/ }).click();
+  await expect(menu).toBeHidden();
+  await expect(page.locator(".grid > .grid-tools")).toContainText("No UDP connection is set up");
 
   // Export 40m only, full fields.
   await page.getByRole("button", { name: "Export", exact: true }).click();
@@ -133,6 +144,8 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   ]);
   const ftx = page.locator(".ftx").first();
   await expect(ftx.locator(".ftx-row:not(.head)")).toHaveCount(4);
+  // The radio's VFO shows in the top bar.
+  await expect(page.locator(".topbar").getByTestId("vfo")).toContainText(/14\.074\.000\s*20m\s*FT8\s*RX/);
   await ftx.getByLabel("Period breaks").check();
   await expect(ftx.locator(".ftx-break")).toHaveCount(2);
   await expect(ftx.locator(".ftx-break").first()).toContainText("00:01:00 2 decodes, 2 calls");
