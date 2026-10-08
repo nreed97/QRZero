@@ -25,6 +25,7 @@ Click the **FTx monitor** tab (next to the Log tab to start with). Drag the tab 
 | --- | --- |
 | **New DXCC** | You have never worked this entity |
 | **New band** / **New mode** | You've worked the entity, but not on this band or mode |
+| **New grid** | A four-character grid square you haven't worked on this band. Only on 6 m and up (VHF, UHF, microwave), where grids are chased; on HF it isn't flagged. Spots in the DX cluster don't carry a grid, so this flag is FTx only. Switch it off under **Alerts and filters…** |
 | **New call** | A station you've never worked |
 | **New on band** | You've worked the station, but not on this band |
 | **Worked** | Already worked on this band |
@@ -114,7 +115,7 @@ Both choices are remembered.
 
 **Alerts and filters…** in the toolbar chooses which stations stand out and which are hidden. Changes apply straight away, in the main window and any popped-out monitor.
 
-- **Alerts**: tick the ones you want and pick a colour for each. A station gets the colour of the first ticked alert that fits it, from the top of the list down. The same colours shade the rows in the line view and name the alerts in its Flags column. **Needed only** shows just the stations with a ticked alert. New call and New call on band are off to start with.
+- **Alerts**: tick the ones you want and pick a colour for each. A station gets the colour of the first ticked alert that fits it, from the top of the list down. The same colours shade the rows in the line view and name the alerts in its Flags column. **Needed only** shows just the stations with a ticked alert. New call and New call on band are off to start with. New grid applies on 6 m and up only.
 - **Hide stations already worked on this band.**
 - **Weakest signal to show**: hides decodes below that many dB. Leave it empty to show all.
 - **Continents to show**: tick the ones you want; with none ticked, all are shown.

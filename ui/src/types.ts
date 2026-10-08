@@ -75,7 +75,7 @@ export interface Radio {
   error: string | null;
 }
 
-export interface Needed { new_call: boolean; new_call_band: boolean; new_dxcc: boolean; new_band: boolean; new_mode: boolean }
+export interface Needed { new_call: boolean; new_call_band: boolean; new_dxcc: boolean; new_band: boolean; new_mode: boolean; new_grid?: boolean }
 
 export interface FtxDecode {
   seq: number;

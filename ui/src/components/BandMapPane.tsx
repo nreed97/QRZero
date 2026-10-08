@@ -84,7 +84,7 @@ function ageText(s: number): string {
 }
 
 const fmtKhz = (khz: number, step: number) => (step < 1 ? khz.toFixed(1) : khz.toFixed(0));
-const isNeeded = (n: Spot["needed"]) => !!n && (n.new_dxcc || n.new_band || n.new_mode);
+const isNeeded = (n: Spot["needed"]) => !!n && (n.new_dxcc || n.new_band || n.new_mode || !!n.new_grid);
 
 function needText(n: Spot["needed"]): string {
   if (!n) return "";
@@ -92,6 +92,7 @@ function needText(n: Spot["needed"]): string {
   if (n.new_dxcc) out.push("DXCC");
   if (n.new_band) out.push("band");
   if (n.new_mode) out.push("mode");
+  if (n.new_grid) out.push("grid");
   return out.join(" ");
 }
 

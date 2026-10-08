@@ -1068,7 +1068,7 @@ impl Hub {
         let mine = [inst.map(|i| i.de_call.clone()).unwrap_or_default(), inner.active.station_callsign.clone()];
         let to_me = ft.to.as_ref().is_some_and(|t| mine.iter().any(|m| !m.is_empty() && m.eq_ignore_ascii_case(t)));
         let needed = match (&inner.worked, &ft.from) {
-            (Some((_, idx)), Some(call)) => Some(idx.needed(call, entity.as_ref().and_then(|e| e.dxcc), band.as_deref(), Some(&mode))),
+            (Some((_, idx)), Some(call)) => Some(idx.needed_in(call, entity.as_ref().and_then(|e| e.dxcc), band.as_deref(), Some(&mode), ft.grid.as_deref())),
             _ => None,
         };
         let watched = ft.from.as_deref().and_then(|call| {
