@@ -1,6 +1,6 @@
 # Arranging the window
 
-Every part of the window is a pane: New QSO, Worked before, Station, Map, Log, FTx monitor, Cluster and Awards. Put them wherever suits your screen, and QRZero remembers the arrangement on this computer.
+Every part of the window is a pane: New QSO, Worked before, Station, Map, Log, FTx monitor, Cluster, Awards, Band map, Watch list, Propagation, Rotator and Notes. Some start as tabs behind others; click a tab to bring it to the front. Put them wherever suits your screen, and QRZero remembers the arrangement on this computer.
 
 ## Resizing
 
@@ -20,7 +20,7 @@ The **×** at the top right of a pane hides it. Show it again from **Layout** in
 
 ## Popping a pane out to its own window
 
-The arrow button next to the **×** opens the pane in its own window, so you can put the FTx monitor, the cluster or the map on a second screen. The Station, Worked before, Map, FTx monitor, Cluster and Awards panes can pop out. Clicking a decode, a spot or a QSO in a popped-out pane works just as it does in the main window.
+The arrow button next to the **×** opens the pane in its own window, so you can put the FTx monitor, the cluster or the map on a second screen. Every pane except New QSO and Log can pop out. Clicking a decode, a spot or a QSO in a popped-out pane works just as it does in the main window.
 
 Close the window, or click **Dock back**, to put the pane back. QRZero remembers where each window was and reopens it there next time. When you close QRZero, the popped-out windows close with it.
 

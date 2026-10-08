@@ -19,7 +19,7 @@ use crate::awards::AwardQso;
 use crate::worked::WorkedIndex;
 
 /// Migrations in order; migration N brings the schema to user_version N.
-const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4];
+const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5];
 const SCHEMA_VERSION: i32 = MIGRATIONS.len() as i32;
 
 /// Small partial indexes over QSOs not yet uploaded, so counting what's waiting
@@ -44,6 +44,19 @@ INSERT INTO qso_version VALUES (1, 0);
 CREATE TRIGGER qsos_version_ins AFTER INSERT ON qsos BEGIN UPDATE qso_version SET version = version + 1; END;
 CREATE TRIGGER qsos_version_upd AFTER UPDATE ON qsos BEGIN UPDATE qso_version SET version = version + 1; END;
 CREATE TRIGGER qsos_version_del AFTER DELETE ON qsos BEGIN UPDATE qso_version SET version = version + 1; END;
+"#;
+
+/// Station notes: one note per log and base call (DL1ABC/P shares DL1ABC's).
+const SCHEMA_V5: &str = r#"
+CREATE TABLE notes (
+    log_id INTEGER NOT NULL REFERENCES logs(id) ON DELETE CASCADE,
+    call TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (log_id, call)
+) WITHOUT ROWID;
+CREATE INDEX notes_log_updated ON notes (log_id, updated_at);
 "#;
 
 const SCHEMA_V1: &str = r#"
@@ -873,6 +886,71 @@ impl Store {
         self.expect_changed(self.conn.execute("DELETE FROM equipment WHERE id = ?1", [id])?, "equipment")
     }
 
+    // ---- station notes -------------------------------------------------
+
+    /// The note for a call (its base call: DL1ABC/P reads DL1ABC's note).
+    pub fn get_note(&self, log_id: i64, call: &str) -> Result<Option<Note>> {
+        let call = note_call(call)?;
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT call, text, created_at, updated_at FROM notes WHERE log_id = ?1 AND call = ?2",
+                params![log_id, call],
+                row_to_note,
+            )
+            .optional()?)
+    }
+
+    /// Saves the note for a call; blank text deletes it (and gives None).
+    pub fn set_note(&self, log_id: i64, call: &str, text: &str) -> Result<Option<Note>> {
+        let call = note_call(call)?;
+        if text.trim().is_empty() {
+            self.conn.execute("DELETE FROM notes WHERE log_id = ?1 AND call = ?2", params![log_id, call])?;
+            return Ok(None);
+        }
+        let text = text.replace("\r\n", "\n");
+        let t = now();
+        Ok(Some(self.conn.query_row(
+            "INSERT INTO notes (log_id, call, text, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4)
+             ON CONFLICT (log_id, call) DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at
+             RETURNING call, text, created_at, updated_at",
+            params![log_id, call, text, t],
+            row_to_note,
+        )?))
+    }
+
+    /// Deletes a call's note; false when there was none.
+    pub fn delete_note(&self, log_id: i64, call: &str) -> Result<bool> {
+        let call = note_call(call)?;
+        Ok(self.conn.execute("DELETE FROM notes WHERE log_id = ?1 AND call = ?2", params![log_id, call])? > 0)
+    }
+
+    pub fn has_note(&self, log_id: i64, call: &str) -> Result<bool> {
+        let call = note_call(call)?;
+        Ok(self
+            .conn
+            .query_row("SELECT 1 FROM notes WHERE log_id = ?1 AND call = ?2", params![log_id, call], |_| Ok(()))
+            .optional()?
+            .is_some())
+    }
+
+    /// Notes whose call contains `query` (all when empty), newest first, with the total.
+    pub fn list_notes(&self, log_id: i64, query: &str, offset: i64, limit: i64) -> Result<(i64, Vec<Note>)> {
+        let q = query.trim().to_ascii_uppercase();
+        let filter = "log_id = ?1 AND (?2 = '' OR instr(call, ?2) > 0)";
+        let total = self.conn.query_row(
+            &format!("SELECT COUNT(*) FROM notes WHERE {filter}"),
+            params![log_id, q],
+            |r| r.get(0),
+        )?;
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT call, text, created_at, updated_at FROM notes WHERE {filter}
+             ORDER BY updated_at DESC, call LIMIT ?3 OFFSET ?4"
+        ))?;
+        let rows = stmt.query_map(params![log_id, q, limit.clamp(0, 10_000), offset.max(0)], row_to_note)?;
+        Ok((total, rows.collect::<std::result::Result<_, _>>()?))
+    }
+
     // ---- settings and lookup cache -------------------------------------
 
     pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
@@ -1213,6 +1291,20 @@ fn build_where(log_id: i64, f: &QsoFilter) -> (String, Vec<Value>) {
 /// ("EA8/DL1ABC/P" gives "DL1ABC"); the first part wins a tie.
 pub fn base_call(call: &str) -> &str {
     call.split('/').fold("", |best, p| if p.len() > best.len() { p } else { best })
+}
+
+/// The key a note is stored under: the upper-case base call.
+fn note_call(call: &str) -> Result<String> {
+    let c = call.trim().to_ascii_uppercase();
+    let base = base_call(&c);
+    if base.is_empty() {
+        return Err(Error::Invalid("a note needs a callsign".into()));
+    }
+    Ok(base.to_string())
+}
+
+fn row_to_note(r: &rusqlite::Row) -> rusqlite::Result<Note> {
+    Ok(Note { call: r.get(0)?, text: r.get(1)?, created_at: r.get(2)?, updated_at: r.get(3)? })
 }
 
 fn row_to_qso(r: &rusqlite::Row) -> rusqlite::Result<Qso> {

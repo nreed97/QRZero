@@ -27,7 +27,7 @@ Click the **FTx monitor** tab (next to the Log tab to start with). Drag the tab 
 | **New on band** | You've worked the station, but not on this band |
 | **Worked** | Already worked on this band |
 
-Rows calling you are highlighted, and needed stations are shaded.
+Rows calling you are highlighted, and needed stations are shaded. Stations on your watch list (see **Watch list**) are marked **Watched**, with their call in colour in the message.
 
 - **Click** a decode to put the call, grid, band and mode into the QSO panel and look it up.
 - **Double-click** to have that WSJT-X call the station, as if you'd double-clicked it in WSJT-X.

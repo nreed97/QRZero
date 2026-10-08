@@ -39,6 +39,8 @@ pub struct SpotInfo {
     pub comment: String,
     pub entity: Option<Entity>,
     pub needed: Option<Needed>,
+    /// The watch list entry this station matches.
+    pub watched: Option<u64>,
 }
 
 #[derive(Default)]
@@ -187,6 +189,19 @@ impl Cluster {
                 let mode = cluster::guess_mode(s.freq_khz, &s.comment).to_string();
                 let entity = hub.entity(&s.call);
                 let needed = hub.needed(&s.call, entity.as_ref().and_then(|e| e.dxcc), band.as_deref(), Some(mode.as_str()).filter(|m| !m.is_empty()));
+                let sighting = crate::watch::Sighting {
+                    call: &s.call,
+                    entity_prefix: entity.as_ref().map(|e| e.prefix.as_str()),
+                    entity_name: entity.as_ref().map(|e| e.name.as_str()),
+                    band: band.as_deref(),
+                    mode: &mode,
+                    freq_hz,
+                    grid: None,
+                    source: "cluster",
+                    detail: &s.comment,
+                };
+                let watched = hub.watch.check(&sighting);
+                let hit = watched.and_then(|id| hub.watch.record(id, &sighting, chrono::Utc::now().timestamp()));
                 let spot = {
                     let mut inner = self.lock();
                     inner.seq += 1;
@@ -202,6 +217,7 @@ impl Cluster {
                         comment: s.comment,
                         entity,
                         needed,
+                        watched,
                     };
                     inner.spots.push_back(spot.clone());
                     while inner.spots.len() > MAX_SPOTS {
@@ -210,6 +226,9 @@ impl Cluster {
                     spot
                 };
                 hub.emit(json!({"type": "spot", "spot": spot}));
+                if let Some(hit) = hit {
+                    hub.emit(json!({"type": "watch_hit", "hit": hit}));
+                }
             }
         }
     }

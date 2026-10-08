@@ -1,0 +1,80 @@
+/* Station notes: the Notes pane and the note line in the Station pane. */
+.notes-pane { flex: 1 1 auto; height: 100%; min-height: 0; overflow: hidden; }
+.notes-pane .panel-title { flex: 0 0 auto; }
+.notes-pane .panel-title button.tiny { font-weight: 400; }
+.nt-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.nt-call { font-family: var(--mono); }
+.nt-as { font-weight: 400; }
+
+.nt-editor { flex: 1 1 auto; min-height: 0; display: flex; padding: 4px; }
+.nt-text {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 40px;
+  resize: none;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 4px 6px;
+  font: 13px/1.4 var(--ui);
+  white-space: pre-wrap;
+}
+.nt-text:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.nt-text[readonly] { color: var(--muted); }
+.nt-text::placeholder { color: var(--muted); opacity: 0.8; }
+
+.nt-status {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 10px;
+  padding: 2px 6px;
+  border-top: 1px solid var(--line);
+  background: var(--panel-2);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.nt-status > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+
+.nt-search { flex: 0 0 auto; padding: 4px; border-bottom: 1px solid var(--line); }
+.nt-search input { width: 100%; }
+.nt-list { flex: 1 1 auto; min-height: 0; overflow: auto; outline: none; }
+.nt-empty { padding: 8px; font-size: 12px; }
+.nt-more { padding: 4px; }
+
+.nt-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+.nt-table th {
+  position: sticky;
+  top: 0;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font: 600 11px var(--ui);
+  text-align: left;
+  padding: 2px 6px 2px 4px;
+  width: 8.5em;
+}
+.nt-table th.nt-wide { width: auto; }
+.nt-table td {
+  padding: 1px 6px 1px 4px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.nt-table td.nt-c { font: 600 12px var(--mono); }
+.nt-table td.nt-d { font-family: var(--mono); color: var(--muted); }
+.nt-table tr.sel { background: var(--panel-2); }
+
+/* Station pane: one line, the full note on hover. */
+.lookup-note {
+  margin-top: 4px;
+  color: var(--new);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}

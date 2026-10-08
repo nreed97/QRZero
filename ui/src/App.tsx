@@ -31,6 +31,11 @@ const HOME: Partial<Record<PaneId, [PaneId, Zone]>> = {
   ftx: ["log", "center"],
   cluster: ["log", "center"],
   awards: ["log", "center"],
+  bandmap: ["log", "center"],
+  watch: ["lookup", "center"],
+  propagation: ["map", "center"],
+  rotator: ["map", "center"],
+  notes: ["worked", "center"],
 };
 
 function dockBack(root: WS["root"], id: PaneId): WS["root"] {
@@ -140,6 +145,7 @@ export default function App() {
           if (e.call) setNotice(e.added ? `Logged ${e.call} from ${e.source}` : `${e.call} from ${e.source} was already in the log`);
         }
         if (e.type === "error") setNotice(e.message);
+        if (e.type === "watch_hit") setNotice(`Watch list: ${e.hit.call} on ${(e.hit.freq_hz / 1000).toFixed(1)} kHz, ${e.hit.label}`);
       }),
     [logId, loadLogs],
   );
@@ -255,6 +261,7 @@ export default function App() {
           units: general.units,
           refreshKey,
           editingId: editing?.id ?? null,
+          radioKey,
         };
 
   // Messages from popped-out panes; a ref so the listener always sees current state.

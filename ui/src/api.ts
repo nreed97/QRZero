@@ -1,4 +1,5 @@
-import type { QslService, QslDownload, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Qso, QsoFilter, Settings, StationCallsign } from "./types";
+import type { PropagationReport } from "./types";
+import type { QslService, QslDownload, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, Settings, StationCallsign, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
 function sessionToken(): string {
@@ -72,6 +73,11 @@ export const api = {
   search: (logId: number, filter: QsoFilter, offset: number, limit: number, sort = "newest") =>
     json<{ total: number; rows: Qso[] }>("POST", `/logs/${logId}/qsos/search`, { filter, offset, limit, sort }),
   lookup: (logId: number, call: string) => json<LookupResult>("GET", `/logs/${logId}/lookup/${encodeURIComponent(call)}`),
+  notes: (logId: number, q: string, offset: number, limit: number) =>
+    json<{ total: number; rows: Note[] }>("GET", `/logs/${logId}/notes?${new URLSearchParams({ q, offset: String(offset), limit: String(limit) })}`),
+  note: (logId: number, call: string) => json<Note | null>("GET", `/logs/${logId}/notes/${encodeURIComponent(call)}`),
+  setNote: (logId: number, call: string, text: string) => json<Note | null>("PUT", `/logs/${logId}/notes/${encodeURIComponent(call)}`, { text }),
+  deleteNote: (logId: number, call: string) => json<boolean>("DELETE", `/logs/${logId}/notes/${encodeURIComponent(call)}`),
 
   importAdif: async (logId: number, file: Blob, opts: Record<string, string>) => {
     const q = new URLSearchParams(opts).toString();
@@ -107,6 +113,10 @@ export const api = {
   rotate: (azimuth: number) => json<null>("POST", "/rotator", { azimuth }),
   cty: () => json<CtyStatus>("GET", "/cty"),
   updateCty: () => json<CtyStatus>("POST", "/cty/update"),
+  ctyEntities: () => json<CtyEntityInfo[]>("GET", "/cty/entities"),
+  watch: () => json<WatchEntry[]>("GET", "/watch"),
+  saveWatch: (entries: WatchEntry[]) => json<WatchEntry[]>("PUT", "/watch", entries),
+  watchHits: () => json<WatchHit[]>("GET", "/watch/hits"),
   installCty: async (file: Blob) => (await request("POST", "/cty", undefined, file)).json() as Promise<CtyStatus>,
 
   cluster: () => json<ClusterSnapshot>("GET", "/cluster"),
@@ -118,4 +128,5 @@ export const api = {
   testQrzLogbook: (callsign: string) => json<{ callsign: string }>("POST", "/qsl/qrz/test", { callsign }),
   qslUpload: (service: QslService) => json<QslRun>("POST", `/qsl/upload/${service}`),
   qslDownload: (service: "lotw" | "eqsl") => json<QslDownload>("POST", `/qsl/download/${service}`),
+  propagation: (refresh = false) => json<PropagationReport>("GET", `/propagation${refresh ? "?refresh=true" : ""}`),
 };

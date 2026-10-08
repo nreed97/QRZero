@@ -5,6 +5,7 @@ import { BANDS } from "../modes";
 import { localGet, localSet } from "../prefs";
 import type { Spot } from "../types";
 import type { DecodePick } from "./FtxMonitor";
+import "../watch.css";
 
 const KEEP = 500;
 const DIGITAL = ["FT8", "FT4", "RTTY", "PSK31", "JS8", "Q65", "MSK144", "SSTV"];
@@ -156,12 +157,12 @@ export default function ClusterPane({ onPick, onSettings }: { onPick: (p: Decode
             >
               <span className="mono">{s.time ? `${s.time.slice(0, 2)}:${s.time.slice(2, 4)}` : ""}</span>
               <span className="mono num">{(s.freq_hz / 1000).toFixed(1)}</span>
-              <span className="mono call">{s.call}</span>
+              <span className={`mono call ${s.watched ? "watched" : ""}`}>{s.call}</span>
               <span>{s.entity?.name ?? ""}</span>
               <span className="mono">{s.mode}</span>
               <span className="mono">{s.spotter}</span>
               <span className="comment">{s.comment}</span>
-              <span className="flags">{flags.map((f) => <span key={f.text} className={`flag ${f.cls}`}>{f.text}</span>)}</span>
+              <span className="flags">{s.watched ? <span className="flag watched" title="On your watch list">Watched</span> : null}{flags.map((f) => <span key={f.text} className={`flag ${f.cls}`}>{f.text}</span>)}</span>
             </div>
           );
         })}

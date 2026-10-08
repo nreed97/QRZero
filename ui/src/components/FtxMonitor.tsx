@@ -3,6 +3,7 @@ import { api } from "../api";
 import { onLive, useInstances } from "../live";
 import { localGet, localSet } from "../prefs";
 import type { FtxDecode, FtxInstance } from "../types";
+import "../watch.css";
 
 const KEEP = 600;
 
@@ -159,10 +160,10 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
               <span className="mono num">{d.snr}</span>
               <span className="mono num">{d.dt.toFixed(1)}</span>
               <span className="mono num">{d.df}</span>
-              <span className="mono msg">{highlight(d.message, mycall)}</span>
+              <span className="mono msg">{highlight(d.message, mycall, d.watched ? d.call : null)}</span>
               <span>{d.entity?.name ?? ""}</span>
               <span className="mono">{d.band ?? ""}</span>
-              <span className="flags">{flags.map((f) => <span key={f.text} className={`flag ${f.cls}`}>{f.text}</span>)}</span>
+              <span className="flags">{d.watched ? <span className="flag watched" title="On your watch list">Watched</span> : null}{flags.map((f) => <span key={f.text} className={`flag ${f.cls}`}>{f.text}</span>)}</span>
             </div>
           );
         })}
@@ -171,13 +172,16 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
   );
 }
 
-function highlight(message: string, mycall: string) {
-  if (!mycall) return message;
+function highlight(message: string, mycall: string, watched: string | null = null) {
+  if (!mycall && !watched) return message;
   const parts = message.split(" ");
-  return parts.map((p, i) => (
-    <span key={i}>
-      {i > 0 && " "}
-      {p.replace(/[<>]/g, "").toUpperCase() === mycall.toUpperCase() ? <mark>{p}</mark> : p}
-    </span>
-  ));
+  return parts.map((p, i) => {
+    const bare = p.replace(/[<>]/g, "").toUpperCase();
+    return (
+      <span key={i}>
+        {i > 0 && " "}
+        {mycall && bare === mycall.toUpperCase() ? <mark>{p}</mark> : watched && bare === watched.toUpperCase() ? <b className="watched-call">{p}</b> : p}
+      </span>
+    );
+  });
 }
