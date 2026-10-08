@@ -145,13 +145,21 @@ impl Packet {
 }
 
 fn status(dial: u64, mode: &str) -> Vec<u8> {
-    let mut p = Packet::new(1, "WSJT-X");
+    status_from("WSJT-X", dial, mode)
+}
+
+fn status_from(id: &str, dial: u64, mode: &str) -> Vec<u8> {
+    let mut p = Packet::new(1, id);
     p.u64(dial).str(mode).str("").str("").str(mode).bool(false).bool(false).bool(true).u32(1500).u32(1500).str("N0CALL").str("EN34").str("");
     p.0
 }
 
 fn decode(time_ms: u32, snr: i32, df: u32, message: &str) -> Vec<u8> {
-    let mut p = Packet::new(2, "WSJT-X");
+    decode_from("WSJT-X", time_ms, snr, df, message)
+}
+
+fn decode_from(id: &str, time_ms: u32, snr: i32, df: u32, message: &str) -> Vec<u8> {
+    let mut p = Packet::new(2, id);
     p.bool(true).u32(time_ms).i32(snr).f64(0.1).u32(df).str("~").str(message).bool(false).bool(false);
     p.0
 }
@@ -310,4 +318,35 @@ async fn hamlib_rig_follows_and_tunes() {
     let got: Vec<String> = vec![seen.recv().await.unwrap(), seen.recv().await.unwrap()];
     assert_eq!(got, ["F 7030000", "M LSB 0"]);
     next_matching(&mut events, |e| e["type"] == "radios" && e["radios"][0]["freq_hz"] == 7_030_000 && e["radios"][0]["mode"] == "SSB").await;
+}
+
+#[tokio::test]
+async fn wsjtx_instances_on_separate_ports() {
+    let api = Api::new().await;
+    setup(&api).await;
+    let (a, b) = (free_udp_port(), free_udp_port());
+    let mut cfg = api.get("/integrations").await["config"].clone();
+    cfg["wsjtx_listen"] = json!(format!("127.0.0.1:{a}, 127.0.0.1:{b}"));
+    let saved = api.send(reqwest::Method::PUT, "/integrations", Some(cfg), None).await;
+    let st = saved["status"]["wsjtx"].as_str().unwrap();
+    assert!(st.contains(&format!("listening on 127.0.0.1:{a}")) && st.contains(&format!("listening on 127.0.0.1:{b}")), "{st}");
+
+    let one = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let two = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    one.send_to(&status_from("WSJT-X - 20m", 14_074_000, "FT8"), format!("127.0.0.1:{a}")).await.unwrap();
+    one.send_to(&decode_from("WSJT-X - 20m", 45_015_000, -12, 1200, "CQ K1ABC FN42"), format!("127.0.0.1:{a}")).await.unwrap();
+    two.send_to(&status_from("JTDX - 40m", 7_074_000, "FT8"), format!("127.0.0.1:{b}")).await.unwrap();
+    two.send_to(&decode_from("JTDX - 40m", 45_015_000, -5, 900, "CQ JA1XYZ PM95"), format!("127.0.0.1:{b}")).await.unwrap();
+
+    let ftx = api.wait_for("/ftx", None, |v| v["decodes"].as_array().is_some_and(|d| d.len() == 2) && v["instances"].as_array().is_some_and(|i| i.len() == 2)).await;
+    let ja = ftx["decodes"].as_array().unwrap().iter().find(|d| d["call"] == "JA1XYZ").unwrap().clone();
+    assert_eq!(ja["band"], "40m");
+
+    // A reply goes to the instance that decoded it, on its own port.
+    api.post("/ftx/reply", json!({"seq": ja["seq"]})).await;
+    let mut buf = [0u8; 1024];
+    let (n, from) = tokio::time::timeout(Duration::from_secs(2), two.recv_from(&mut buf)).await.unwrap().unwrap();
+    assert_eq!(from.port(), b);
+    assert!(String::from_utf8_lossy(&buf[..n]).contains("CQ JA1XYZ PM95"));
+    assert!(tokio::time::timeout(Duration::from_millis(200), one.recv_from(&mut buf)).await.is_err(), "nothing for the other instance");
 }
