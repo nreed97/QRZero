@@ -121,6 +121,8 @@ pub struct FtxDecode {
     pub source: String,
     pub slice: Option<String>,
     pub color_index: u8,
+    /// The watch list entry this station matches.
+    pub watched: Option<u64>,
     #[serde(skip)]
     raw: wsjtx::Decode,
 }
@@ -327,12 +329,22 @@ pub struct Hub {
     events: broadcast::Sender<Arc<str>>,
     inner: Mutex<Inner>,
     cty: RwLock<Option<Arc<CtyDb>>>,
+    pub(crate) watch: crate::watch::Watch,
 }
 
 impl Hub {
     pub fn new(store: Arc<Mutex<Store>>, data_dir: PathBuf) -> Arc<Self> {
         let (events, _) = broadcast::channel(1024);
-        let hub = Arc::new(Hub { store, data_dir, events, inner: Mutex::default(), cty: RwLock::default() });
+        let watch_list = store
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .get_setting(crate::watch::SETTING_KEY)
+            .ok()
+            .flatten()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default();
+        let watch = crate::watch::Watch::new(watch_list);
+        let hub = Arc::new(Hub { store, data_dir, events, inner: Mutex::default(), cty: RwLock::default(), watch });
         if let Err(e) = hub.load_cty_file() {
             tracing::info!("no country file yet: {e}");
         }
@@ -678,6 +690,20 @@ impl Hub {
             M::Decode(d) => {
                 if let Some(decode) = self.make_decode(d) {
                     self.emit(json!({"type": "decode", "decode": &decode}));
+                    if let (Some(id), Some(call)) = (decode.watched, &decode.call) {
+                        let s = crate::watch::Sighting {
+                            call,
+                            entity_prefix: decode.entity.as_ref().map(|e| e.prefix.as_str()),
+                            entity_name: decode.entity.as_ref().map(|e| e.name.as_str()),
+                            band: decode.band.as_deref(),
+                            mode: &decode.mode,
+                            freq_hz: decode.freq_hz,
+                            grid: decode.grid.as_deref(),
+                            source: "ftx",
+                            detail: &decode.message,
+                        };
+                        self.watch_hit(id, &s);
+                    }
                     let mut inner = self.lock();
                     inner.decodes.push_back(decode);
                     while inner.decodes.len() > MAX_DECODES {
@@ -726,6 +752,15 @@ impl Hub {
             (Some((_, idx)), Some(call)) => Some(idx.needed(call, entity.as_ref().and_then(|e| e.dxcc), band.as_deref(), Some(&mode))),
             _ => None,
         };
+        let watched = ft.from.as_deref().and_then(|call| {
+            self.watch.check(&crate::watch::Sighting {
+                call,
+                entity_prefix: entity.as_ref().map(|e| e.prefix.as_str()),
+                band: band.as_deref(),
+                mode: &mode,
+                ..Default::default()
+            })
+        });
         inner.seq += 1;
         let time = d.time_ms / 1000;
         Some(FtxDecode {
@@ -751,6 +786,7 @@ impl Hub {
             source,
             slice,
             color_index,
+            watched,
             raw: d,
         })
     }
@@ -854,6 +890,13 @@ impl Hub {
     }
 
     // ---- country file ---------------------------------------------------
+
+    /// Alerts for a watched station (at most once per ten minutes per call and band).
+    pub(crate) fn watch_hit(&self, entry_id: u64, s: &crate::watch::Sighting) {
+        if let Some(hit) = self.watch.record(entry_id, s, chrono::Utc::now().timestamp()) {
+            self.emit(json!({"type": "watch_hit", "hit": hit}));
+        }
+    }
 
     pub fn cty(&self) -> Option<Arc<CtyDb>> {
         self.cty.read().unwrap_or_else(|p| p.into_inner()).clone()

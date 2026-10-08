@@ -11,6 +11,9 @@ async fn main() -> anyhow::Result<()> {
         .init();
     let mut cfg = Config::local(default_data_dir());
     cfg.addr = "127.0.0.1:8073".parse()?;
+    if let Ok(url) = std::env::var("QRZERO_PROPAGATION_URL") {
+        cfg.propagation_url = url;
+    }
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         let mut value = || args.next().ok_or_else(|| anyhow::anyhow!("{arg} needs a value"));

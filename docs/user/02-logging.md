@@ -37,6 +37,7 @@ Tick **Enter time** to type the date and time (UTC) yourself, for example when c
 After a lookup the panel shows:
 
 - **Station details** from QRZ.com (when lookups are on), or from your last QSO with that call.
+- **Note**: your station note for the call, if you have written one (see **Station notes**).
 - **Flags**: *New DXCC* when you have never worked that entity, *New band* or *New mode* when you haven't worked the entity on the band or mode set in the entry panel, and *Already worked on …* when this would be a duplicate on the same band and mode.
 
 DXCC flags need the DXCC entity number, which comes from the QRZ lookup. Without lookups, only the per-call flags are shown. Your full history with the call is in the Worked before pane.
@@ -63,6 +64,20 @@ Working with the rows:
 The line under the list sums up the station: the bands and modes you have worked it on, the date of your first QSO, and which band and mode slots are confirmed.
 
 The pane updates by itself when you log or edit a QSO.
+
+## Station notes
+
+A station note is something you want to remember about a callsign: the operator's name, their dog, the rig they were building, "QSL direct only", or that you promised to meet on 40m. You write it once, and it comes back every time you work that station again.
+
+With a call in the entry panel, the **Notes** pane shows that station's note, ready to edit. Just type. The note saves itself a moment after you stop typing, and again when you click away, and the line under it says when, for example *Saved 14:02*. Line breaks are kept.
+
+When you type the call again later, the **Station** pane shows the note on one line in a highlight colour, right under the station details. Hover over it to read the whole note.
+
+Notes belong to the station, not to a single QSO, and they are kept per log. Portable forms share the home call's note, so DL1ABC/P and EA8/DL1ABC show the note you wrote for DL1ABC. Notes are not written into your QSOs and are not part of an ADIF export.
+
+When the call box is empty, the Notes pane lists all your notes, the most recently changed first, with the call, the first line and the date. Type in the search box to find calls containing what you typed; the arrow keys and <kbd>Enter</kbd> work there too. Click a note to open it. This doesn't touch the entry panel, so it's safe in the middle of a QSO. **All notes** takes you back to the list. To write a note for a station without typing it into the entry panel, search for the call and click **New note for ...**.
+
+To remove a note, click **Delete** and confirm, or simply clear all of its text.
 
 ## The map
 

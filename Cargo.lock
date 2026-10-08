@@ -3037,6 +3037,7 @@ dependencies = [
  "mime_guess",
  "qrzero-core",
  "qrzero-radio",
+ "quick-xml 0.38.4",
  "rand 0.9.5",
  "reqwest 0.12.28",
  "rust-embed",

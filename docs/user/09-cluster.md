@@ -21,6 +21,7 @@ Each spot shows the time, frequency, call, country, a best guess at the mode (fr
 
 - **Click a spot** to fill in the QSO panel. When the panel follows a radio QRZero controls, the radio tunes to the spot and changes mode.
 - The filters narrow the list by band, mode group (CW, phone, digital), age, **Needed only** and **Hide worked**.
+- Stations on your watch list (see **Watch list**) are marked **Watched**, with the call in colour.
 
 ## Console
 

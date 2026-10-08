@@ -1,7 +1,10 @@
 import type { LookupResult } from "../types";
 import type { EntryContext } from "./EntryPanel";
+import { useLiveNote } from "../notes";
+import "../notes.css";
 
 export default function LookupPanel({ result, entry }: { result: LookupResult | null; entry: EntryContext }) {
+  const note = useLiveNote(entry.fields.CALL ?? "", result?.note ?? null);
   if (!result) {
     return (
       <section className="panel lookup">
@@ -51,6 +54,7 @@ export default function LookupPanel({ result, entry }: { result: LookupResult | 
       ) : (
         <div className="muted">{result.error ? `Lookup: ${result.error}` : "No station details (lookup is off or the call wasn't found)."}</div>
       )}
+      {note && <div className="lookup-note" title={note}>Note: {note.trim().replace(/\s*\n\s*/g, " / ")}</div>}
       <div className="flags">
         {flags.map((f) => (
           <span key={f.text} className={`flag ${f.cls}`}>{f.text}</span>

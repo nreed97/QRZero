@@ -38,6 +38,8 @@ export interface LookupResult {
   station: Fields | null;
   source: string | null;
   error: string | null;
+  /** The operator's station note for the base call. */
+  note: string | null;
 }
 
 export interface ImportReport {
@@ -95,6 +97,8 @@ export interface FtxDecode {
   slice: string | null;
   /** 0..7, stable per instance: picks the --src-N colour. */
   color_index: number;
+  /** Id of the watch list entry this station matches. */
+  watched?: number | null;
 }
 
 export interface FtxInstance {
@@ -143,6 +147,8 @@ export interface Spot {
   comment: string;
   entity: Entity | null;
   needed: Needed | null;
+  /** Id of the watch list entry this station matches. */
+  watched?: number | null;
 }
 
 export interface ClusterNode { name: string; host: string; port: number; login: string; password: string; commands: string[] }
@@ -190,3 +196,42 @@ export type AwardStatus = "worked" | "confirmed";
 export interface AwardRow { key: string; name: string; cells: Record<string, AwardStatus> }
 export interface AwardColumn { key: string; worked: number; confirmed: number }
 export interface AwardTable { award: AwardKind; columns: AwardColumn[]; rows: AwardRow[]; total: number }
+
+/** A station note, stored under the base call. Times are Unix seconds. */
+export interface Note {
+  call: string;
+  text: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export type WatchKind = "call" | "prefix" | "entity";
+export interface WatchEntry { id: number; kind: WatchKind; value: string; name: string; bands: string[]; modes: string[]; note: string; enabled: boolean }
+export interface WatchHit {
+  seq: number;
+  entry_id: number;
+  label: string;
+  note: string;
+  call: string;
+  freq_hz: number;
+  band: string | null;
+  mode: string;
+  grid: string | null;
+  country: string | null;
+  source: "cluster" | "ftx";
+  detail: string;
+  time: number;
+}
+export interface CtyEntityInfo { prefix: string; name: string; dxcc: number | null; cont: string }
+
+/** N0NBH solar data as /api/propagation returns it. */
+export interface SolarData {
+  source: string;
+  updated: string;
+  updated_utc: string | null;
+  /** Simple readings by the feed's element name ("solarflux", "kindex", ...). */
+  values: Record<string, string>;
+  bands: { name: string; time: string; condition: string }[];
+  vhf: { name: string; location: string; condition: string }[];
+}
+export interface PropagationReport { data: SolarData | null; fetched_at: string | null; error: string | null }

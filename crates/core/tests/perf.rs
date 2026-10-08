@@ -78,6 +78,16 @@ fn large_log_speed() {
     let (_, n) = st.export_adif(log, &QsoFilter::default(), ExportProfile::Full, "perf").unwrap();
     println!("export {n} QSOs: {:?}", t.elapsed());
 
+    for i in 0..5_000 {
+        st.set_note(log, &format!("K{}{}{}", i % 10, (b'A' + (i / 10 % 26) as u8) as char, i / 260), "a station note\nsecond line").unwrap();
+    }
+    timed("first note query", &|| st.list_notes(log, "", 0, 1).unwrap().0);
+    let note = timed("station note for EA8/K5Q1/P", &|| st.get_note(log, "EA8/K5Q1/P").unwrap().map_or(0, |_| 1));
+    let notes = timed("notes list, newest 200", &|| st.list_notes(log, "", 0, 200).unwrap().0);
+    let notes_q = timed("notes matching 5Q", &|| st.list_notes(log, "5Q", 0, 200).unwrap().0);
+    for e in [note, notes, notes_q] {
+        assert!(e.as_millis() < 100, "notes query too slow: {e:?}");
+    }
     for e in [page, call, exact, exact_pfx, band, band_only, wb, pending, batch] {
         assert!(e.as_millis() < 100, "interactive query too slow: {e:?}");
     }

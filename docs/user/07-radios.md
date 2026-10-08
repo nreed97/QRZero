@@ -40,3 +40,20 @@ The rig recorded with each QSO (`MY_RIG`) is the radio being followed.
 ## Rotator
 
 With PstRotatorAz set up (**Settings → Radios and programs**), the map shows the rotator's heading and **Turn SP** / **LP** buttons that turn the antenna to the short or long path of the station you're working.
+
+## Rotator pane
+
+The **Rotator** pane gives the rotator a proper control of its own. Open it from **Layout**, **Rotator**. It shares a tab with the map to start with; drag it anywhere you like, or pop it out to its own window.
+
+The compass dial shows where the antenna points now, with the heading in degrees at the top. When you have a station in the QSO panel whose location QRZero knows, an orange **SP** arrow marks the short-path bearing and a grey **LP** arrow the long path.
+
+There are several ways to turn the antenna:
+
+- **Click anywhere on the dial** to turn to that bearing. As you move the mouse over the dial, QRZero shows the bearing you'd turn to.
+- **Short path** and **Long path** turn to the station in the QSO panel.
+- Type a bearing in the box and press **Go** (or <kbd>Enter</kbd>).
+- The preset buttons, for example **EU 45°** or **JA 330°**, turn to places you call often. Click **Edit presets** to rename them, change their bearings, remove them or add your own. **Add** starts a new preset at the current heading. Presets are kept on this computer.
+
+While the antenna is moving you'll see **Turning to 123°**. It clears once the heading is within 3° of where you asked for, or after a minute and a half if the rotator doesn't get there.
+
+If PstRotatorAz isn't set up yet, the pane says so and offers a button that opens **Settings → Radios and programs**, where you turn it on. If the heading shows `---`, QRZero isn't hearing back from PstRotatorAz: check that its UDP control is on.

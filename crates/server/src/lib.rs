@@ -25,8 +25,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 mod cluster;
+mod propagation;
 mod qsl;
 mod station;
+mod watch;
 
 pub use qsl::Endpoints as QslEndpoints;
 use cluster::{Cluster, ClusterConfig};
@@ -54,6 +56,8 @@ pub struct Config {
     /// QRZ Logbook and Club Log endpoints (overridable for tests).
     /// QSL service URLs (tests point these at local stand-ins).
     pub qsl_endpoints: QslEndpoints,
+    /// N0NBH's solar data feed (tests point this at a stand-in).
+    pub propagation_url: String,
 }
 
 impl Config {
@@ -66,6 +70,7 @@ impl Config {
             secret_service: "QRZero".to_string(),
             update_cty: true,
             qsl_endpoints: QslEndpoints::default(),
+            propagation_url: propagation::DEFAULT_URL.to_string(),
         }
     }
 }
@@ -93,6 +98,7 @@ struct AppState {
     hub: Arc<Hub>,
     cluster: Arc<Cluster>,
     qsl: Arc<Qsl>,
+    propagation: Arc<propagation::Propagation>,
     /// Award tables by request, with the QSO version they were counted at.
     award_cache: AwardCache,
 }
@@ -125,6 +131,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
         hub,
         cluster,
         qsl,
+        propagation: propagation::Propagation::new(cfg.propagation_url),
         qrz: tokio::sync::Mutex::new(None),
         qrz_endpoint: cfg.qrz_endpoint,
         secret_service: cfg.secret_service,
@@ -168,6 +175,8 @@ fn router(state: Shared) -> Router {
         .route("/logs/{id}/paper-queue", get(paper_queue))
         .route("/logs/{id}/awards/{award}", get(award))
         .route("/logs/{id}/lookup/{call}", get(lookup))
+        .route("/logs/{id}/notes", get(list_notes))
+        .route("/logs/{id}/notes/{call}", get(get_note).put(put_note).delete(delete_note))
         .route(
             "/logs/{id}/import",
             post(import).layer(DefaultBodyLimit::max(512 * 1024 * 1024)),
@@ -189,10 +198,14 @@ fn router(state: Shared) -> Router {
         .route("/rotator", post(rotate))
         .route("/cty", get(cty_status).post(cty_install))
         .route("/cty/update", post(cty_update))
+        .route("/cty/entities", get(cty_entities))
+        .route("/watch", get(watch_get).put(watch_put))
+        .route("/watch/hits", get(watch_hits))
         .route("/cluster", get(cluster_get).put(cluster_put))
         .route("/cluster/connect", post(cluster_connect))
         .route("/cluster/send", post(cluster_send))
         .route("/qsl", get(qsl_get).put(qsl_put))
+        .route("/propagation", get(propagation_get))
         .route("/qsl/qrz/test", post(qsl_test_qrz))
         .route("/qsl/upload/{service}", post(qsl_upload))
         .route("/qsl/download/{service}", post(qsl_download))
@@ -564,11 +577,13 @@ struct LookupResult {
     station: Option<Fields>,
     source: Option<&'static str>,
     error: Option<String>,
+    /// The operator's station note for the (base) call.
+    note: Option<String>,
 }
 
 async fn lookup(State(s): State<Shared>, Path((log_id, call)): Path<(i64, String)>) -> ApiResult<LookupResult> {
     let call = call.trim().to_ascii_uppercase();
-    let mut result = LookupResult { worked: WorkedBefore::default(), entity: s.hub.entity(&call), station: None, source: None, error: None };
+    let mut result = LookupResult { worked: WorkedBefore::default(), entity: s.hub.entity(&call), station: None, source: None, error: None, note: None };
     match qrz_lookup(&s, &call).await {
         Ok(Some((fields, source))) => {
             result.station = Some(fields);
@@ -583,8 +598,54 @@ async fn lookup(State(s): State<Shared>, Path((log_id, call)): Path<(i64, String
         .and_then(|f| f.get("DXCC"))
         .and_then(|d| d.parse().ok())
         .or_else(|| result.entity.as_ref().and_then(|e| e.dxcc).map(i64::from));
-    result.worked = db(&s, move |st| st.worked_before(log_id, &call, dxcc)).await?;
+    let (worked, note) = db(&s, move |st| {
+        let note = if qrzero_core::store::base_call(&call).is_empty() { None } else { st.get_note(log_id, &call)? };
+        Ok((st.worked_before(log_id, &call, dxcc)?, note.map(|n| n.text)))
+    })
+    .await?;
+    result.worked = worked;
+    result.note = note;
     Ok(Json(result))
+}
+
+#[derive(Deserialize)]
+struct NotesQuery {
+    #[serde(default)]
+    q: String,
+    #[serde(default)]
+    offset: i64,
+    limit: Option<i64>,
+}
+
+#[derive(Serialize)]
+struct NotesPage {
+    total: i64,
+    rows: Vec<Note>,
+}
+
+async fn list_notes(State(s): State<Shared>, Path(log_id): Path<i64>, Query(q): Query<NotesQuery>) -> ApiResult<NotesPage> {
+    let limit = q.limit.unwrap_or(100).clamp(1, 1000);
+    db(&s, move |st| st.list_notes(log_id, &q.q, q.offset, limit))
+        .await
+        .map(|(total, rows)| Json(NotesPage { total, rows }))
+}
+
+async fn get_note(State(s): State<Shared>, Path((log_id, call)): Path<(i64, String)>) -> ApiResult<Option<Note>> {
+    db(&s, move |st| st.get_note(log_id, &call)).await.map(Json)
+}
+
+#[derive(Deserialize)]
+struct NoteBody {
+    text: String,
+}
+
+/// Saves a note; blank text deletes it and answers null.
+async fn put_note(State(s): State<Shared>, Path((log_id, call)): Path<(i64, String)>, Json(b): Json<NoteBody>) -> ApiResult<Option<Note>> {
+    db(&s, move |st| st.set_note(log_id, &call, &b.text)).await.map(Json)
+}
+
+async fn delete_note(State(s): State<Shared>, Path((log_id, call)): Path<(i64, String)>) -> ApiResult<bool> {
+    db(&s, move |st| st.delete_note(log_id, &call)).await.map(Json)
 }
 
 /// QRZ lookup with a 30-day cache. Ok(None) when lookups are off or the call is unknown.
@@ -837,6 +898,32 @@ async fn cty_update(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
     Ok(Json(s.hub.cty_status()))
 }
 
+/// Every entity in the country file, by name, for pickers.
+async fn cty_entities(State(s): State<Shared>) -> ApiResult<Vec<serde_json::Value>> {
+    let mut list: Vec<_> = s.hub.cty().map_or_else(Vec::new, |db| {
+        db.entities().iter().map(|e| json!({"prefix": e.prefix, "name": e.name, "dxcc": e.dxcc, "cont": e.cont})).collect()
+    });
+    list.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
+    Ok(Json(list))
+}
+
+// ---- watch list ------------------------------------------------------------
+
+async fn watch_get(State(s): State<Shared>) -> ApiResult<Vec<watch::WatchEntry>> {
+    Ok(Json(s.hub.watch.entries()))
+}
+
+async fn watch_put(State(s): State<Shared>, Json(entries): Json<Vec<watch::WatchEntry>>) -> ApiResult<Vec<watch::WatchEntry>> {
+    let saved = s.hub.watch.set_entries(entries);
+    let text = serde_json::to_string(&saved).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    s.hub.set_setting(watch::SETTING_KEY, &text).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(Json(saved))
+}
+
+async fn watch_hits(State(s): State<Shared>) -> ApiResult<Vec<watch::WatchHit>> {
+    Ok(Json(s.hub.watch.hits()))
+}
+
 // ---- cluster -------------------------------------------------------------
 
 async fn cluster_get(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
@@ -873,6 +960,16 @@ async fn cluster_send(State(s): State<Shared>, Json(b): Json<LineBody>) -> ApiRe
 }
 
 // ---- QSL services ----------------------------------------------------------
+
+#[derive(Deserialize)]
+struct PropagationQuery {
+    #[serde(default)]
+    refresh: bool,
+}
+
+async fn propagation_get(State(s): State<Shared>, Query(q): Query<PropagationQuery>) -> ApiResult<serde_json::Value> {
+    Ok(Json(s.propagation.get(q.refresh).await))
+}
 
 async fn qsl_get(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
     let q = s.qsl.clone();

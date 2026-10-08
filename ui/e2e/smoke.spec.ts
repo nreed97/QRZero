@@ -182,6 +182,16 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(editWin2.getByLabel("Call", { exact: true })).toHaveValue("K1XYZ");
   await Promise.all([editWin2.waitForEvent("close"), editWin2.getByRole("button", { name: "Close editor" }).click()]);
 
+  // A note on a station shows again next time the call is typed.
+  await page.getByRole("tab", { name: "Notes" }).click();
+  await page.getByLabel("Note for K1XYZ").fill("Runs 5 W\nQSL direct only");
+  await expect(page.locator(".notes-pane, .ws-pane").getByText(/Saved \d/).first()).toBeVisible();
+  await call.fill("");
+  await call.fill("K1XYZ");
+  await call.press("Tab");
+  await expect(page.locator(".lookup-note")).toContainText("Runs 5 W / QSL direct only");
+  await page.getByRole("tab", { name: "Worked before" }).click();
+
   // Panes: drag the Cluster tab beside the Station pane, it gets its own group.
   const station = page.locator(".ws-group", { has: page.getByRole("tab", { name: "Station" }) }).locator(".ws-body");
   const box = (await station.boundingBox())!;

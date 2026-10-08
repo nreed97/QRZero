@@ -1,5 +1,6 @@
 // Positions, Maidenhead grids, great-circle bearings and distances.
 
+import { subsolar } from "./sun";
 import type { Fields } from "./types";
 
 export interface LatLon { lat: number; lon: number }
@@ -98,15 +99,7 @@ export function compass(b: number): string {
   return pts[Math.round(b / 22.5) % 16];
 }
 
-/** Sub-solar point for the grey line (accurate to a fraction of a degree). */
+/** Sub-solar point for the grey line (see sun.ts; the old one-line approximation was up to a degree off). */
 export function subsolarPoint(date: Date): LatLon {
-  const day = (Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) - Date.UTC(date.getUTCFullYear(), 0, 0)) / 864e5;
-  const g = rad((360 / 365.25) * (day - 81));
-  const decl = 23.44 * Math.sin(g);
-  // Equation of time, minutes.
-  const B = rad((360 / 365) * (day - 81));
-  const eot = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
-  const minutes = date.getUTCHours() * 60 + date.getUTCMinutes() + date.getUTCSeconds() / 60;
-  const lon = -((minutes + eot) / 4 - 180);
-  return { lat: decl, lon: ((lon + 540) % 360) - 180 };
+  return subsolar(date);
 }

@@ -1,0 +1,54 @@
+/* Band map pane */
+.bandmap { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; background: var(--panel); }
+.bandmap .grid-tools select { padding: 1px 3px; }
+.bandmap .bm-btn { min-width: 24px; padding: 1px 6px; }
+.bandmap .bm-zoom { min-width: 76px; text-align: right; }
+.bm-map { position: relative; flex: 1; min-height: 120px; overflow: hidden; background: var(--panel-2); user-select: none; }
+.bm-svg { position: absolute; left: 0; top: 0; display: block; }
+
+.bm-seg { opacity: 0.55; }
+.bm-seg.cw { fill: var(--src-0); }
+.bm-seg.data { fill: var(--src-2); }
+.bm-seg.phone { fill: var(--src-1); }
+.bm-seg.all { fill: var(--src-7); }
+.bm-seg.beacon { fill: var(--err); }
+.bm-out { fill: var(--bg); opacity: 0.8; }
+.bm-axis { stroke: var(--line); }
+.bm-tick { stroke: var(--muted); stroke-width: 1; shape-rendering: crispEdges; }
+.bm-tick-label { fill: var(--muted); font: 11px var(--mono); }
+.bm-pass { fill: var(--accent); opacity: 0.6; }
+.bm-leader { fill: none; stroke: var(--muted); stroke-width: 1; opacity: 0.8; }
+.bm-rig line { stroke: var(--err); stroke-width: 1; shape-rendering: crispEdges; }
+.bm-rig polygon { fill: var(--err); }
+
+.bm-label {
+  position: absolute; display: flex; align-items: baseline; gap: 6px; height: 17px; padding: 0 4px;
+  font-size: 12px; line-height: 16px; white-space: nowrap; overflow: hidden;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 2px; cursor: pointer;
+}
+.bm-label:hover, .bm-ftx-calls > span:hover { border-color: var(--accent); background: var(--row-sel); }
+.bm-label .call { font-family: var(--mono); font-weight: 700; color: var(--text); }
+.bm-label .age { color: var(--muted); font-size: 11px; }
+.bm-label .need { color: var(--new); font-weight: 600; font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+.bm-label.worked .call { color: var(--muted); font-weight: 400; }
+
+.bm-ftx { position: absolute; padding: 0 4px 2px; font-size: 11px; background: var(--panel); border: 1px solid var(--line); border-left: 2px solid var(--accent); border-radius: 2px; }
+.bm-ftx-head { display: flex; gap: 6px; height: 16px; line-height: 16px; font-weight: 700; font-size: 12px; }
+.bm-ftx-head .muted { font-weight: 400; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bm-ftx-head .count { margin-left: auto; }
+.bm-ftx-calls { display: grid; grid-template-columns: 1fr 1fr; }
+.bm-ftx-calls > span { font-family: var(--mono); line-height: 15px; height: 15px; padding: 0 2px; cursor: pointer; border: 1px solid transparent; overflow: hidden; white-space: nowrap; }
+.bm-ftx-calls > span.cq { font-weight: 700; }
+.bm-ftx-calls > span.needed { color: var(--new); }
+.bm-ftx-calls > span.worked { color: var(--muted); }
+.bm-ftx .more { line-height: 15px; }
+
+.bm-more {
+  position: absolute; left: 6px; width: 70px; padding: 0 2px; font-size: 11px; line-height: 15px;
+  background: var(--title); border: 1px solid var(--line); border-radius: 2px; color: var(--text);
+}
+.bm-more.top { top: 2px; }
+.bm-more.bottom { bottom: 2px; }
+.bm-empty { position: absolute; left: 120px; top: 10px; right: 10px; }
+.bm-label.watched .call { color: var(--watch, var(--src-3)); font-weight: 700; }
+.bm-label .watch-mark { color: var(--watch, var(--src-3)); font-weight: 700; }

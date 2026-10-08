@@ -129,3 +129,13 @@ pub struct WorkedBefore {
     pub dxcc_bands: Vec<String>,
     pub dxcc_modes: Vec<String>,
 }
+
+/// A note the operator keeps about a station, stored under its base call.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Note {
+    pub call: String,
+    pub text: String,
+    /// Unix seconds.
+    pub created_at: i64,
+    pub updated_at: i64,
+}

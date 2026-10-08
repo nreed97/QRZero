@@ -145,6 +145,7 @@ export default function App() {
           if (e.call) setNotice(e.added ? `Logged ${e.call} from ${e.source}` : `${e.call} from ${e.source} was already in the log`);
         }
         if (e.type === "error") setNotice(e.message);
+        if (e.type === "watch_hit") setNotice(`Watch list: ${e.hit.call} on ${(e.hit.freq_hz / 1000).toFixed(1)} kHz, ${e.hit.label}`);
       }),
     [logId, loadLogs],
   );
