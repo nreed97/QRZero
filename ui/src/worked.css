@@ -85,4 +85,6 @@
   padding: 3px 10px;
 }
 .wb-menu button:hover:not(:disabled), .wb-menu button:focus-visible { background: var(--row-sel); border-color: transparent; outline: none; }
+.wb-menu a.menu-link { color: inherit; text-decoration: none; padding: 3px 10px; border: 1px solid transparent; border-radius: 2px; }
+.wb-menu a.menu-link:hover, .wb-menu a.menu-link:focus-visible { background: var(--row-sel); outline: none; }
 .wb-menu hr { border: none; border-top: 1px solid var(--line); margin: 2px 0; }

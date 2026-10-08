@@ -10,8 +10,11 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 fn popout_handler(app: AppHandle, home: String) -> impl Fn(tauri::Url, tauri::webview::NewWindowFeatures) -> NewWindowResponse<tauri::Wry> + Send + 'static {
     static NEXT: AtomicU32 = AtomicU32::new(1);
     move |url, features| {
-        // Only QRZero's own pages; anything else opens in the browser instead.
+        // Only QRZero's own pages get a window; web links open in the system browser.
         if !url.as_str().starts_with(&home) {
+            if matches!(url.scheme(), "http" | "https") {
+                let _ = tauri_plugin_opener::open_url(url.as_str(), None::<&str>);
+            }
             return NewWindowResponse::Deny;
         }
         let label = format!("pane-{}", NEXT.fetch_add(1, Ordering::Relaxed));

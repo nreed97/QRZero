@@ -6,6 +6,7 @@ import { BANDS, MODES } from "../modes";
 import { COLUMNS, DEFAULT_COLUMNS } from "../fields";
 import { localGet, localSet } from "../prefs";
 import type { Location, Qso, QsoFilter } from "../types";
+import { qrzPageUrl } from "./QrzPageLink";
 import "../worked.css";
 
 const PAGE = 200;
@@ -423,7 +424,8 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
           return (
             <div className="wb-menu" role="menu" style={{ left: menu.x, top: menu.y }} onPointerDown={(e) => e.stopPropagation()}>
               <button role="menuitem" onClick={act(() => onEdit(menu.q))}>Edit {menu.q.fields.CALL ?? "QSO"}</button>
-              <button role="menuitem" onClick={act(() => void lookupQsos(ids))}>Look up {what} on QRZ and fill in blanks</button>
+              <button role="menuitem" onClick={act(() => void lookupQsos(ids))}>Fill {what} from QRZ</button>
+              {ids.length === 1 && menu.q.fields.CALL && <a role="menuitem" className="menu-link" href={qrzPageUrl(menu.q.fields.CALL)} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(null)}>View {menu.q.fields.CALL} on QRZ.com</a>}
               <button role="menuitem" onClick={act(() => void sendQsos(ids))}>Send {what} through UDP connections</button>
               <hr />
               <button role="menuitem" onClick={act(onExportSelected)}>Export {what}…</button>

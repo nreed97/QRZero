@@ -4,6 +4,7 @@ import { BANDS, MODES, bandForFreq, choiceFor } from "../modes";
 import { antennaForBand, hasBands } from "../antennas";
 import { fieldDef, freshValues, type EntryLayout } from "../fields";
 import { localGet, localSet } from "../prefs";
+import QrzPageLink from "./QrzPageLink";
 import type { Equipment, Fields, Location, LookupResult, Radio } from "../types";
 import { adifDateTime } from "../util";
 
@@ -181,9 +182,9 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
   };
 
   type Found = { fill: Fields };
-  const runLookup = async (typed = call): Promise<Found | null> => {
+  const runLookup = async (typed = call, force = false): Promise<Found | null> => {
     const c = typed.trim().toUpperCase();
-    if (c.length < 3 || c === lookedUp.current) return null;
+    if (c.length < 3 || (c === lookedUp.current && !force)) return null;
     lookedUp.current = c;
     const seq = ++lookupSeq.current;
     try {
@@ -458,6 +459,12 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
           <div className="actions">
             <button className="primary" onClick={() => void log()} disabled={busy || !call}>Log <kbd>Enter</kbd></button>
             <button onClick={() => clear()}>Clear <kbd>Esc</kbd></button>
+            <button
+              onClick={() => void runLookup(call, true)}
+              disabled={call.trim().length < 3}
+              title="Look the call up on QRZ and fill in the boxes that are still blank"
+            >Fill from QRZ</button>
+            <QrzPageLink call={call} />
           </div>
         </div>
       </div>

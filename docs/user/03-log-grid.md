@@ -20,7 +20,8 @@ With rows selected you can **Export selected** or **Delete** them. Deleting asks
 Right-click a row for a menu. It acts on the selected rows when you right-click one of them, otherwise on that row alone:
 
 - **Edit** opens the QSO editor.
-- **Look up on QRZ and fill in blanks** looks each call up on QRZ and fills in name, QTH, state, grid and the rest wherever the QSO has nothing. Nothing you already have is changed. It needs your QRZ login (Settings, **Callsign lookup**).
+- **Fill from QRZ** looks each call up on QRZ and fills in name, QTH, state, grid and the rest wherever the QSO has nothing. Nothing you already have is changed. It needs your QRZ login (Settings, **Callsign lookup**).
+- **View CALL on QRZ.com** (one row only) opens that station's page on QRZ.com in your web browser. It needs no login.
 - **Send through UDP connections** sends the QSOs again to every **QSO logged** connection under Settings, **UDP connections**, just as if they had been logged now. Use it to push older contacts into another program. See [UDP connections](16-udp-and-startup.md).
 - **Export** and **Delete** do the same as the buttons above the grid.
 
@@ -48,7 +49,7 @@ Keys while the editor is open:
 - <kbd>Esc</kbd> closes the editor window. If you have unsaved changes it asks before throwing them away.
 - <kbd>Alt</kbd>+<kbd>Up</kbd> and <kbd>Alt</kbd>+<kbd>Down</kbd> step to the QSO above or below in the log grid, as do the arrow buttons in the title bar.
 
-**QRZ lookup** in the editor's bottom bar looks the call up and fills in only the fields that are blank, then lists what it filled. Nothing is saved until you press **Save**.
+**Fill from QRZ** in the editor's bottom bar looks the call up and fills in only the fields that are blank, then lists what it filled. Nothing is saved until you press **Save**. **View on QRZ.com** next to it opens the station's page on QRZ.com in your web browser.
 
 **Revert** puts back what was saved, and **Delete QSO** removes the contact after asking. Editing a QSO that was already uploaded to QRZ or Club Log marks it for upload again.
 

@@ -4,6 +4,7 @@ import { CUSTOM_PREFIX, DEFAULT_LAYOUT, ENTRY_FIELDS, fieldDef, type EntryLayout
 import { BANDS, MODES, bandForFreq } from "../modes";
 import { usePref } from "../prefs";
 import type { Equipment, Fields, Location, Qso, StationCallsign } from "../types";
+import QrzPageLink from "./QrzPageLink";
 import "../editor.css";
 
 export interface QsoEditorProps {
@@ -558,7 +559,8 @@ export default function QsoEditor({ qso, locations, equipment, callsigns, onClos
       <footer className="qe-foot">
         <button className="danger" onClick={remove}>Delete QSO</button>
         <span className="spacer" />
-        <button onClick={() => void lookup()} disabled={busy || !get("CALL").trim()} title="Look the call up on QRZ and fill in the fields that are blank">QRZ lookup</button>
+        <button onClick={() => void lookup()} disabled={busy || !get("CALL").trim()} title="Look the call up on QRZ and fill in the fields that are blank">Fill from QRZ</button>
+        <QrzPageLink call={get("CALL")} />
         <button onClick={revert} disabled={!dirty}>Revert</button>
         <button className="primary" onClick={() => void save()} disabled={!dirty || busy} title="Save (Ctrl+S)">Save</button>
       </footer>
