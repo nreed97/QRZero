@@ -29,6 +29,7 @@ The **Equipment** tab lists what you have at each location as a tree: radios, an
 - **add radio**, **add antenna** and so on add an item under that location.
 - **Edit** changes its name and details: model, power in watts, bands, height (antennas) and notes. You can also move it to another location.
 - The arrows change the order, which is the order shown in the QSO panel.
+- An antenna's **Bands** row has a tick box for each band from 160m to 70cm. Tick the bands it is used on; the tree then shows them after the antenna's name (for example *40 20 15 m*). The QSO panel uses them to pick the antenna for the band you are on, and QSOs logged by WSJT-X, JTDX or N1MM get the first antenna in the list that covers their band.
 
 Equipment is chosen per QSO from the QSO panel (see **Logging QSOs**).
 

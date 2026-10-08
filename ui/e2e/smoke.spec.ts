@@ -139,6 +139,33 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.locator(".award-table")).toContainText("Zone 40");
   await page.getByRole("button", { name: "Log", exact: true }).click();
 
+  // Antennas with bands: the QSO panel picks the one for the band.
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("button", { name: "Equipment" }).click();
+  for (const [antName, bands] of [["Hex beam", ["20m", "15m"]], ["Dipole", ["40m"]]] as const) {
+    await page.getByRole("button", { name: "add antenna" }).click();
+    await page.getByLabel("Name (shown when logging)").fill(antName);
+    for (const b of bands) await page.getByTestId("antenna-bands").getByLabel(b, { exact: true }).check();
+    await page.getByRole("button", { name: "Save" }).click();
+  }
+  await expect(page.locator(".tree .item", { hasText: "Hex beam" })).toContainText("20 15 m");
+  await page.getByRole("button", { name: "Close" }).click();
+  const ant = page.getByTestId("gear-antenna");
+  const bandPick = page.locator(".entry label.f", { has: page.locator("span", { hasText: /^Band$/ }) }).locator("select");
+  await bandPick.selectOption("20m");
+  await expect(ant.locator("option:checked")).toHaveText("Auto: Hex beam");
+  await bandPick.selectOption("6m");
+  await expect(ant.locator("option:checked")).toHaveText("Auto: none for 6m");
+  await bandPick.selectOption("40m");
+  await expect(ant.locator("option:checked")).toHaveText("Auto: Dipole");
+  await call.fill("K9ANT");
+  await call.press("Enter");
+  await expect(page.getByText("Logged K9ANT on 40m")).toBeVisible();
+  const headers = { "x-qrzero-token": "e2e" };
+  const logId = (await (await page.request.get("/api/logs", { headers })).json())[0].id;
+  const found = await (await page.request.post(`/api/logs/${logId}/qsos/search`, { headers, data: { filter: { call: "K9ANT" } } })).json();
+  expect(found.rows[0].fields.MY_ANTENNA).toBe("Dipole");
+
   // The user guide opens from the top bar.
   await page.getByRole("button", { name: "Help" }).click();
   await expect(page.getByRole("heading", { name: "Getting started" })).toBeVisible();

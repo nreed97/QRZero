@@ -18,6 +18,15 @@
   --land: #3b4a3c;
   --border-line: #556556;
   --path: #f2b84b;
+  /* One colour per WSJT-X/JTDX instance in the FTx monitor. */
+  --src-0: #5fa8e8;
+  --src-1: #e0904f;
+  --src-2: #6cc28a;
+  --src-3: #c88be0;
+  --src-4: #d8c25a;
+  --src-5: #4fc4c4;
+  --src-6: #e87b9c;
+  --src-7: #a0a8b4;
   --mono: "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
   --ui: "Segoe UI", Tahoma, system-ui, sans-serif;
   color-scheme: dark;
@@ -42,6 +51,14 @@
     --land: #c9d6bf;
     --border-line: #9aaa92;
     --path: #c0392b;
+    --src-0: #1f64b0;
+    --src-1: #b45309;
+    --src-2: #1d7a43;
+    --src-3: #7b3fa0;
+    --src-4: #857000;
+    --src-5: #0f7a7a;
+    --src-6: #b03060;
+    --src-7: #5b6470;
     color-scheme: light;
   }
 }
@@ -228,6 +245,9 @@ table.fields .w-default { width: 90px; }
 .item-name { font-weight: 600; min-width: 120px; }
 .item-actions { margin-left: auto; display: flex; gap: 3px; }
 .equipment-form { margin-top: 10px; }
+.band-picks { display: flex; flex-wrap: wrap; gap: 2px 8px; }
+.band-picks label { display: flex; align-items: center; gap: 2px; font-size: 12px; }
+.band-picks input { margin: 0; }
 
 /* Wizard */
 .wizard { display: flex; gap: 16px; min-height: 340px; }
@@ -282,9 +302,14 @@ table.list.fields input:not([type=checkbox]), table.list.fields select { width: 
 .ftx { background: var(--panel); border: 1px solid var(--line); border-top: none; border-radius: 0 0 3px 3px; display: flex; flex-direction: column; }
 .ftx .instance { font: 12px var(--mono); border: 1px solid var(--line); padding: 1px 6px; border-radius: 2px; }
 .ftx .instance.tx { border-color: var(--err); color: var(--err); }
+.ftx .instance, .ftx .instance.tx { border-left: 3px solid var(--src, var(--line)); }
+.ftx .instance .src-tag { color: var(--src); font-weight: 700; margin-right: 5px; }
+.ftx .src-0 { --src: var(--src-0); } .ftx .src-1 { --src: var(--src-1); } .ftx .src-2 { --src: var(--src-2); } .ftx .src-3 { --src: var(--src-3); }
+.ftx .src-4 { --src: var(--src-4); } .ftx .src-5 { --src: var(--src-5); } .ftx .src-6 { --src: var(--src-6); } .ftx .src-7 { --src: var(--src-7); }
 .ftx-msg { padding: 2px 8px; border-bottom: 1px solid var(--line); }
 .ftx-table { flex: 1; overflow: auto; min-height: 100px; }
-.ftx-row { display: grid; grid-template-columns: 76px 38px 46px 48px minmax(180px, 2fr) minmax(90px, 1fr) 50px minmax(110px, 1.2fr); align-items: center; font-size: 12.5px; border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent); cursor: default; }
+.ftx-row { display: grid; grid-template-columns: 76px 32px 38px 46px 48px minmax(180px, 2fr) minmax(90px, 1fr) 50px minmax(110px, 1.2fr); align-items: center; font-size: 12.5px; border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent); cursor: default; border-left: 3px solid var(--src, transparent); }
+.ftx-row .src-tag { color: var(--src); font-weight: 700; }
 .ftx-row > span { padding: 1px 5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ftx-row .num { text-align: right; }
 .ftx-row.head { position: sticky; top: 0; background: var(--title); font-weight: 600; font-size: 12px; z-index: 1; }

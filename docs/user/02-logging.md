@@ -63,6 +63,12 @@ If you have set up equipment for the location (see **Equipment**), the **Rig**, 
 
 The power box fills from the amplifier's power, or the rig's when no amplifier is picked.
 
+### Antenna by band
+
+Once any antenna at the location has bands ticked (see **Equipment**), the **Ant** box has an **Auto (by band)** choice, and it is the default. In Auto, QRZero picks the antenna whose bands include the band you are on, and changes it whenever the band changes: typed, picked, or followed from the radio. The box shows what it picked, such as *Auto: Hex beam*, and that antenna is saved with the QSO. When no antenna covers the band it shows *Auto: none for 6m* and the QSO is saved without an antenna.
+
+If more than one antenna covers the band, Auto uses the one you last picked by hand on that band, otherwise the first in the equipment list. Picking an antenna by hand uses that antenna on every band until you choose **Auto** again.
+
 ## Station callsigns and locations
 
 Pick the callsign you're operating under and where you are from the top bar. The location's details (your grid, POTA or SOTA reference, rig, antenna and so on) are written into each QSO as the ADIF `MY_…` fields. See **Callsigns, locations and logs**.

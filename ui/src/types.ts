@@ -88,9 +88,30 @@ export interface FtxDecode {
   entity: Entity | null;
   needed: Needed | null;
   low_confidence: boolean;
+  /** Short label of the instance it came from, e.g. "Slice A · WSJT-X". */
+  source: string;
+  slice: string | null;
+  /** 0..7, stable per instance: picks the --src-N colour. */
+  color_index: number;
 }
 
-export interface FtxInstance { id: string; dial_freq: number; band: string | null; mode: string; de_call: string; dx_call: string; transmitting: boolean; tx_enabled: boolean }
+export interface FtxInstance {
+  id: string;
+  dial_freq: number;
+  band: string | null;
+  mode: string;
+  de_call: string;
+  dx_call: string;
+  transmitting: boolean;
+  tx_enabled: boolean;
+  program: string;
+  configuration_name: string;
+  slice: string | null;
+  rig_key: string | null;
+  rig_name: string | null;
+  source: string;
+  color_index: number;
+}
 
 export interface Integrations {
   wsjtx_enabled: boolean;
