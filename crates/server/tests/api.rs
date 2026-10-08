@@ -49,7 +49,9 @@ impl Api {
         let mut cfg = Config::local(dir.path().to_path_buf());
         cfg.qrz_endpoint = qrz_endpoint;
         // Keep test passwords away from the real credential store entries.
-        cfg.secret_service = format!("QRZero-test-{}", std::process::id());
+        // Tests run in parallel and the Windows credential store is shared, so each server gets its own entries.
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        cfg.secret_service = format!("QRZero-test-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::SeqCst));
         cfg.update_cty = false;
         let running = start(cfg).await.unwrap();
         Api {
