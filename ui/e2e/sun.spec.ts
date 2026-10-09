@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fmtUtc, subsolar, sunTimes } from "../src/sun";
+import { fmtUtc, greylineOverlap, subsolar, sunTimes } from "../src/sun";
 
 // Checked against NOAA's solar calculator.
 test("sunrise and sunset", () => {
@@ -16,4 +16,18 @@ test("sub-solar point", () => {
   const p = subsolar(new Date("2026-06-21T12:00Z"));
   expect(p.lat).toBeCloseTo(23.44, 1);
   expect(Math.abs(p.lon)).toBeLessThan(1);
+});
+
+test("grey line overlap", () => {
+  const day = new Date("2026-10-08T12:00Z");
+  const east = { lat: 40, lon: -75 };
+  const west = { lat: 35, lon: 139 };
+  const w = greylineOverlap(day, east, west);
+  for (const x of w) expect(x.to.getTime()).toBeGreaterThan(x.from.getTime());
+  // Same place: every sunrise and sunset window overlaps itself in full (a whole hour each).
+  const same = greylineOverlap(day, east, east);
+  expect(same.length).toBe(2);
+  expect((same[0].to.getTime() - same[0].from.getTime()) / 6e4).toBe(60);
+  // The poles in midwinter have no sunrise, so no window.
+  expect(greylineOverlap(new Date("2026-12-21T12:00Z"), { lat: 78, lon: 15 }, east)).toEqual([]);
 });

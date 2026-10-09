@@ -30,6 +30,7 @@ export default function SharedPane({ id, ctx, act }: { id: PaneId; ctx: PopConte
   const integrations = useIntegrations();
   const rotatorAz = useRotator();
   const [mapView, setMapView] = useState<MapView>(localGet("qrzero.map", { view: "flat" as MapView }).view);
+  const [mapShade, setMapShade] = useState<boolean>(localGet("qrzero.map", { shade: true }).shade);
 
   switch (id) {
     case "lookup":
@@ -60,7 +61,12 @@ export default function SharedPane({ id, ctx, act }: { id: PaneId; ctx: PopConte
           view={mapView}
           onView={(v) => {
             setMapView(v);
-            localSet("qrzero.map", { view: v });
+            localSet("qrzero.map", { view: v, shade: mapShade });
+          }}
+          shade={mapShade}
+          onShade={(on) => {
+            setMapShade(on);
+            localSet("qrzero.map", { view: mapView, shade: on });
           }}
         />
       );

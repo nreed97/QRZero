@@ -41,4 +41,4 @@ These are broad estimates for the whole world. Your own path, antenna and noise 
 
 At the bottom, QRZero works out sunrise and sunset at your location (from the grid of the location in the top bar), in UTC, and says whether it's daylight or dark there now. When the other station's position is known (from their grid or a lookup), it shows theirs too. Paths along the grey line, where it's dawn or dusk at one or both ends, are often the best for long-distance contacts on the low bands.
 
-The Map pane shades the night side of the Earth with the same calculation, moving once a minute, so you can see the grey line.
+The Map pane shows the same sunrise and sunset times, plus the times when the grey line is over both ends of the path. It shades the night side of the Earth with the same calculation, moving once a minute, so you can see the grey line.
