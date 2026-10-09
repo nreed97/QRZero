@@ -456,6 +456,25 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(cwtYear).toContainText("none yet");
   await page.getByRole("tab", { name: "Log", exact: true }).click();
 
+  // Awards you don't chase can be switched off in Settings; they leave the Awards pane.
+  await fromMenu(page, "Settings…");
+  await page.getByRole("button", { name: "Awards", exact: true }).click();
+  await page.getByRole("checkbox", { name: /^SKCC/ }).uncheck();
+  await page.getByRole("checkbox", { name: /^CWops/ }).uncheck();
+  await page.screenshot({ path: "e2e-results/settings-awards.png" });
+  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("tab", { name: "Awards" }).click();
+  await expect(page.getByRole("button", { name: "WAZ" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "SKCC" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "CWops" })).toHaveCount(0);
+  await page.screenshot({ path: "e2e-results/awards-no-cw.png" });
+  await fromMenu(page, "Settings…");
+  await page.getByRole("button", { name: "Awards", exact: true }).click();
+  await page.getByRole("button", { name: "Select all" }).click();
+  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("button", { name: "SKCC" })).toBeVisible();
+  await page.getByRole("tab", { name: "Log", exact: true }).click();
+
   // The user guide opens from the top bar.
   await fromMenu(page, /^Help/);
   await expect(page.getByRole("heading", { name: "Getting started" })).toBeVisible();
