@@ -107,7 +107,7 @@ pub struct Download {
     pub received: usize,
     /// QSOs newly marked confirmed.
     pub confirmed: usize,
-    /// Downloaded confirmations with no matching QSO (first 50).
+    /// Downloaded confirmations with no matching QSO (first 1000).
     pub unmatched: Vec<String>,
     pub unmatched_count: usize,
     pub error: Option<String>,
@@ -184,7 +184,38 @@ fn since(date: &str) -> i64 {
         .map_or_else(|| Utc::now().timestamp(), |d| d.and_utc().timestamp())
 }
 
+/// Unix seconds for the start of `from` and the end of `to` (exclusive), both YYYY-MM-DD.
+fn day_range(from: &str, to: &str) -> Result<(i64, i64), String> {
+    let day = |d: &str| NaiveDate::parse_from_str(d.trim(), "%Y-%m-%d").map_err(|_| format!("'{d}' isn't a date"));
+    let (a, b) = (day(from)?, day(to)?);
+    if b < a {
+        return Err("the end date is before the start date".into());
+    }
+    let at = |d: NaiveDate| d.and_hms_opt(0, 0, 0).map_or(0, |t| t.and_utc().timestamp());
+    Ok((at(a), at(b) + 86_400))
+}
+
 impl Qsl {
+    /// QSOs in a date range that LoTW hasn't been sent yet, per mapped location.
+    pub fn lotw_waiting(&self, from: &str, to: &str) -> Result<serde_json::Value, String> {
+        let (a, b) = day_range(from, to)?;
+        let cfg = self.config();
+        let rows: Vec<_> = cfg
+            .lotw
+            .iter()
+            .map(|m| {
+                let n = self
+                    .db(|st| {
+                        let loc = st.get_location(m.location_id)?;
+                        st.count_pending_between(loc.log_id, LOTW.status_key, std::slice::from_ref(&m.callsign), Some(m.location_id), a, b)
+                    })
+                    .unwrap_or(0);
+                json!({"mapping": m, "waiting": n})
+            })
+            .collect();
+        Ok(json!({ "locations": rows }))
+    }
+
     pub fn new(store: Arc<Mutex<Store>>, hub: Arc<Hub>, secret_service: String, data_dir: PathBuf, endpoints: Endpoints) -> Arc<Self> {
         let config = hub.setting("qsl").and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
         Arc::new(Qsl {
@@ -539,7 +570,7 @@ impl Qsl {
                 d.received = s.received;
                 d.confirmed = s.new;
                 d.unmatched_count = s.unmatched.len();
-                d.unmatched = s.unmatched.into_iter().take(50).collect();
+                d.unmatched = s.unmatched.into_iter().take(1000).collect();
             }
             Err(e) => {
                 d.error = Some(e.to_string());
@@ -566,15 +597,21 @@ impl Qsl {
     }
 
     /// Signs and uploads pending QSOs to LoTW with TQSL, one station location at a time.
-    pub async fn upload_lotw(&self) -> Run {
+    /// With `range` (first and last day, YYYY-MM-DD, both included) it sends every QSO
+    /// in that range that isn't marked sent, whatever the "QSOs from" date says.
+    pub async fn upload_lotw(&self, range: Option<(&str, &str)>) -> Run {
+        let bounds = match range.map(|(a, b)| day_range(a, b)).transpose() {
+            Ok(b) => b,
+            Err(e) => return Run { error: Some(e), at: Utc::now().timestamp(), ..Run::default() },
+        };
         let _busy = self.busy.lock().await;
         self.set_run(LOTW.name, Run { running: true, at: Utc::now().timestamp(), ..Run::default() });
-        let run = self.lotw_run().await;
+        let run = self.lotw_run(bounds).await;
         self.set_run(LOTW.name, run.clone());
         run
     }
 
-    async fn lotw_run(&self) -> Run {
+    async fn lotw_run(&self, bounds: Option<(i64, i64)>) -> Run {
         let mut run = Run { at: Utc::now().timestamp(), ..Run::default() };
         let cfg = self.config();
         let Some(tqsl) = (if cfg.tqsl_path.is_empty() { qsl::find_tqsl() } else { Some(PathBuf::from(&cfg.tqsl_path)) }) else {
@@ -593,7 +630,8 @@ impl Qsl {
         for m in &cfg.lotw {
             let pending = self.db(|st| {
                 let loc = st.get_location(m.location_id)?;
-                st.pending_uploads(loc.log_id, LOTW.status_key, std::slice::from_ref(&m.callsign), Some(m.location_id), since(&cfg.lotw_since), 50_000)
+                let (from, until) = bounds.unwrap_or_else(|| (since(&cfg.lotw_since), i64::MAX));
+                st.pending_uploads_between(loc.log_id, LOTW.status_key, std::slice::from_ref(&m.callsign), Some(m.location_id), from, until, 50_000)
             });
             let pending = match pending {
                 Ok(p) if p.is_empty() => continue,
@@ -671,5 +709,13 @@ mod tests {
     fn since_dates() {
         assert_eq!(since("2024-01-02"), 1_704_153_600);
         assert!(since("") >= Utc::now().timestamp() - 5, "no date means from now on");
+    }
+
+    #[test]
+    fn day_ranges() {
+        assert_eq!(day_range("2024-01-02", "2024-01-02"), Ok((1_704_153_600, 1_704_153_600 + 86_400)));
+        assert_eq!(day_range("2024-01-02", "2024-01-04").unwrap().1, 1_704_153_600 + 3 * 86_400);
+        assert!(day_range("2024-01-03", "2024-01-02").is_err());
+        assert!(day_range("x", "2024-01-02").is_err());
     }
 }

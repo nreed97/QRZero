@@ -360,9 +360,12 @@ pub fn confirmation_updates(service: Service, rec: &Fields) -> ConfirmUpdate {
         Service::Eqsl => ("EQSL_QSL_RCVD", "EQSL_QSLRDATE", &["QSLRDATE", "EQSL_QSLRDATE", "RCVD_DATE"], &["GRIDSQUARE"]),
     };
     let mut set = Fields::new();
+    // A confirmed QSO is on the service, so it counts as sent too (the date only if blank).
+    set.insert(rcvd.replace("RCVD", "SENT"), "Y".into());
     set.insert(rcvd.into(), "Y".into());
     set.insert(date_key.into(), date_field(rec, date_sources).unwrap_or_else(today));
-    let fill = fill_keys.iter().filter_map(|k| nonempty(rec, k).map(|v| (k.to_string(), v.to_string()))).collect();
+    let mut fill: Fields = fill_keys.iter().filter_map(|k| nonempty(rec, k).map(|v| (k.to_string(), v.to_string()))).collect();
+    fill.insert(date_key.replace("RDATE", "SDATE"), today());
     ConfirmUpdate { set, fill }
 }
 

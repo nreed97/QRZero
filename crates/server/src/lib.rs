@@ -278,6 +278,7 @@ fn router(state: Shared) -> Router {
         .route("/propagation", get(propagation_get))
         .route("/qsl/qrz/test", post(qsl_test_qrz))
         .route("/qsl/upload/{service}", post(qsl_upload))
+        .route("/qsl/lotw/range", get(qsl_lotw_waiting).post(qsl_lotw_range))
         .route("/qsl/download/{service}", post(qsl_download))
         .merge(backups::routes())
         .layer(middleware::from_fn_with_state(state.clone(), require_token))
@@ -1478,9 +1479,24 @@ async fn qsl_download(State(s): State<Shared>, Path(service): Path<String>) -> A
     Ok(Json(s.qsl.download(&service).await))
 }
 
+#[derive(Deserialize)]
+struct RangeBody {
+    from: String,
+    to: String,
+}
+
+async fn qsl_lotw_waiting(State(s): State<Shared>, Query(q): Query<RangeBody>) -> ApiResult<serde_json::Value> {
+    let v = s.qsl.lotw_waiting(&q.from, &q.to).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(v))
+}
+
+async fn qsl_lotw_range(State(s): State<Shared>, Json(b): Json<RangeBody>) -> ApiResult<qsl::Run> {
+    Ok(Json(s.qsl.upload_lotw(Some((&b.from, &b.to))).await))
+}
+
 async fn qsl_upload(State(s): State<Shared>, Path(service): Path<String>) -> ApiResult<qsl::Run> {
     let run = match service.as_str() {
-        "lotw" => s.qsl.upload_lotw().await,
+        "lotw" => s.qsl.upload_lotw(None).await,
         other => s.qsl.upload(other).await,
     };
     Ok(Json(run))

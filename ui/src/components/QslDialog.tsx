@@ -22,7 +22,11 @@ function DownloadLine({ d }: { d?: QslDownload }) {
     <span>
       Last check {when}Z: {d.received} confirmation{d.received === 1 ? "" : "s"}, {d.confirmed} new.
       {d.unmatched_count > 0 && (
-        <span className="muted small" title={d.unmatched.join("\n")}> {d.unmatched_count} not found in the log.</span>
+        <details className="small">
+          <summary>Review {d.unmatched_count} not found in the log</summary>
+          <p className="muted">These are on the service but match no QSO in your log. Nothing was added to the log.</p>
+          <pre className="mono">{d.unmatched.join("\n")}{d.unmatched_count > d.unmatched.length ? `\n… and ${d.unmatched_count - d.unmatched.length} more` : ""}</pre>
+        </details>
       )}
     </span>
   );
@@ -83,6 +87,21 @@ function Online({ callsigns, locations }: Props) {
     });
   }, []);
 
+
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [waiting, setWaiting] = useState<number | null>(null);
+  const rangeOk = !!rangeFrom && !!rangeTo && rangeFrom <= rangeTo;
+  const mapped = (cfg?.lotw ?? []).map((m) => m.location_id).join(",");
+  useEffect(() => {
+    setWaiting(null);
+    if (!rangeOk) return;
+    let live = true;
+    api.lotwWaiting(rangeFrom, rangeTo).then((w) => live && setWaiting(w.locations.reduce((n, l) => n + l.waiting, 0)), () => {});
+    return () => {
+      live = false;
+    };
+  }, [rangeFrom, rangeTo, rangeOk, mapped, o?.runs.lotw]);
   if (!o || !cfg) return <p className="muted">Loading…</p>;
 
   const calls = callsigns.map((c) => c.callsign);
@@ -157,6 +176,19 @@ function Online({ callsigns, locations }: Props) {
     const rest = cfg.lotw.filter((m) => !(m.callsign === call && m.location_id === locId));
     set({ lotw: name ? [...rest, { callsign: call, location_id: locId, station_location: name }] : rest });
   };
+  const uploadRange = async () => {
+    setBusy("lotw");
+    setMsg(null);
+    try {
+      await save();
+      await api.lotwUploadRange(rangeFrom, rangeTo);
+      await load();
+    } catch (e) {
+      setMsg({ text: (e as Error).message, ok: false });
+    } finally {
+      setBusy("");
+    }
+  };
   const lotwPending = o.pending.lotw.reduce((n, p) => n + p.pending, 0);
 
   return (
@@ -208,6 +240,15 @@ function Online({ callsigns, locations }: Props) {
             </button>
             <RunLine run={o.runs.lotw} />
           </div>
+          <div className="row">
+            <label className="f w-m"><span>Upload needed, from</span><input type="date" value={rangeFrom} onChange={(e) => setRangeFrom(e.target.value)} /></label>
+            <label className="f w-m"><span>to</span><input type="date" value={rangeTo} onChange={(e) => setRangeTo(e.target.value)} /></label>
+            <button disabled={!!busy || !cfg.lotw.length || !rangeOk || !waiting} onClick={uploadRange}>
+              {busy === "lotw" ? "Signing and uploading…" : `Sign and upload ${waiting ?? 0} QSO${waiting === 1 ? "" : "s"} in this range`}
+            </button>
+          </div>
+          <p className="small muted">Picks every QSO in the range whose LoTW sent status is N or blank, whatever the "QSOs from" date says.</p>
+          <p className="small muted"><b>Moving from another logger?</b> Download confirmations before your first upload. Matching QSOs are marked sent and confirmed, so they aren't uploaded again.</p>
           <p className="small muted">To download confirmations (for awards), enter your LoTW website login. It's not your TQSL password.</p>
           <div className="row">
             <label className="f w-m"><span>LoTW username</span><input value={cfg.lotw_username} onChange={(e) => set({ lotw_username: e.target.value })} /></label>

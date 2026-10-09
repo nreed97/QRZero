@@ -202,6 +202,7 @@ export interface ClusterNode { name: string; host: string; port: number; login: 
 export interface ClusterConfig { nodes: ClusterNode[]; auto_connect: boolean }
 export interface ClusterSnapshot { home?: Entity | null; config: ClusterConfig; state: string; connected: boolean; spots: Spot[]; lines: string[] }
 
+export interface LotwWaiting { locations: { mapping: LotwMapping; waiting: number }[] }
 export interface QslRun { at: number; running: boolean; uploaded: number; duplicates: number; rejected: string[]; error: string | null }
 export interface LotwMapping { callsign: string; location_id: number; station_location: string }
 export interface QslConfig {
