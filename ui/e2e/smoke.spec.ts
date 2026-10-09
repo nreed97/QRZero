@@ -514,6 +514,14 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await fromMenu(page, /^Help/);
   await expect(page.getByRole("heading", { name: "Getting started" })).toBeVisible();
   await page.screenshot({ path: "e2e-results/help.png" });
+  // Links between pages work, and the search box finds text on any page and jumps to it.
+  await page.locator("article.doc").getByRole("link", { name: "Radios and rig control" }).click();
+  await expect(page.getByRole("heading", { name: "Radios and rig control", level: 1 })).toBeVisible();
+  await page.getByLabel("Search the guide").fill("ci-v address");
+  await page.screenshot({ path: "e2e-results/help-search.png" });
+  await page.getByLabel("Search results").getByRole("button").first().click();
+  await expect(page.locator("article.doc mark").first()).toBeVisible();
+  await page.screenshot({ path: "e2e-results/help-search-page.png" });
 });
 
 /** A WSJT-X UDP datagram: magic, schema 2, message type and instance id, then the fields. */

@@ -375,9 +375,17 @@ table.fields .w-default { width: 90px; }
 
 /* Help */
 .help { display: flex; gap: 14px; min-height: 50vh; }
-.help nav { display: flex; flex-direction: column; gap: 1px; width: 180px; flex-shrink: 0; }
+.help nav { position: sticky; top: 0; align-self: flex-start; max-height: 80vh; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; width: 180px; flex-shrink: 0; }
 .help nav button { text-align: left; background: none; border: 1px solid transparent; white-space: normal; }
 .help nav button.active { border-color: var(--line); background: var(--panel-2); font-weight: 600; }
+.help-search { width: 100%; box-sizing: border-box; margin-bottom: 4px; }
+.help-results { display: flex; flex-direction: column; gap: 1px; max-height: 60vh; overflow-y: auto; }
+.help-results button { text-align: left; background: none; border: 1px solid transparent; white-space: normal; }
+.help-results button:hover { border-color: var(--line); background: var(--panel-2); }
+.help-where { opacity: .75; }
+.help-snip { display: block; font-size: 11px; opacity: .8; }
+.help-none { padding: 4px; opacity: .7; }
+.doc mark { background: #ffe680; color: #000; padding: 0; }
 .doc { flex: 1; min-width: 0; line-height: 1.5; }
 .doc h1 { font-size: 18px; margin-top: 0; }
 .doc h2 { font-size: 15px; margin-top: 18px; }
