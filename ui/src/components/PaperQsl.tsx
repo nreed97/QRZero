@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../api";
-import { PAPER_ACTIONS, qf as f, cardDate as date, cardTime as time, cardFreq as freq, cardMode as mode } from "../paper";
+import { PAPER_ACTIONS, piles as makePiles, pileStations, type GroupBy, qf as f, cardDate as date, cardTime as time, cardFreq as freq, cardMode as mode } from "../paper";
 import { localGet, localSet } from "../prefs";
 import type { Qso } from "../types";
 
@@ -122,6 +122,7 @@ export default function PaperQsl({ logId }: { logId: number }) {
   const [skip, setSkip] = useState(0);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [printing, setPrinting] = useState(false);
+  const [by, setBy] = useState<GroupBy>(() => localGet<{ v: GroupBy }>("qsl.groupBy", { v: "none" }).v ?? "none");
 
   const load = () =>
     api.paperQueue(logId).then((q) => {
@@ -144,7 +145,9 @@ export default function PaperQsl({ logId }: { logId: number }) {
     };
   }, [printing]);
 
-  const chosen = useMemo(() => (queue ?? []).filter((q) => picked.has(q.id)), [queue, picked]);
+  const grouped = useMemo(() => makePiles(queue ?? [], by), [queue, by]);
+  // Labels print in the order shown, so a pile comes off the printer together.
+  const chosen = useMemo(() => grouped.flatMap((p) => p.qsos).filter((q) => picked.has(q.id)), [grouped, picked]);
   const items = useMemo(() => labels(chosen, SHEETS[sheet].lines), [chosen, sheet]);
 
   if (!queue) return <p className="muted">Loading…</p>;
@@ -167,6 +170,12 @@ export default function PaperQsl({ logId }: { logId: number }) {
     setPicked(next);
   };
 
+  const togglePile = (p: { qsos: Qso[] }, on: boolean) => {
+    const next = new Set(picked);
+    for (const q of p.qsos) (on ? next.add(q.id) : next.delete(q.id));
+    setPicked(next);
+  };
+
   return (
     <div className="paper">
       <p className="small muted">
@@ -176,6 +185,17 @@ export default function PaperQsl({ logId }: { logId: number }) {
         <p className="muted">No cards waiting.</p>
       ) : (
         <>
+          <div className="row">
+            <label className="f w-l">
+              <span>Group by</span>
+              <select value={by} onChange={(e) => { setBy(e.target.value as GroupBy); localSet("qsl.groupBy", { v: e.target.value }); }} title="Sort the queue into piles for a bulk mailing; labels print in this order">
+                <option value="none">None</option>
+                <option value="bureau">Bureau (country)</option>
+                <option value="manager">QSL manager</option>
+              </select>
+            </label>
+            {by !== "none" && <span className="muted small">{grouped.length} pile{grouped.length === 1 ? "" : "s"}, {queue.length} card{queue.length === 1 ? "" : "s"}</span>}
+          </div>
           <table className="list paper-queue">
             <thead>
               <tr>
@@ -184,18 +204,28 @@ export default function PaperQsl({ logId }: { logId: number }) {
               </tr>
             </thead>
             <tbody>
-              {queue.map((q) => (
-                <tr key={q.id}>
-                  <td><input type="checkbox" checked={picked.has(q.id)} onChange={(e) => toggle(q.id, e.target.checked)} aria-label={`Pick ${f(q, "CALL")}`} /></td>
-                  <td className="call">{f(q, "CALL")}</td>
-                  <td className="mono">{f(q, "QSL_VIA")}</td>
-                  <td className="mono">{date(f(q, "QSO_DATE"))}</td>
-                  <td className="mono">{time(f(q, "TIME_ON"))}</td>
-                  <td className="mono">{freq(q)}</td>
-                  <td className="mono">{mode(q)}</td>
-                  <td className="mono">{f(q, "RST_SENT")}</td>
-                  <td>{f(q, "QSL_RCVD") === "Y" ? "received" : ""}</td>
-                </tr>
+              {grouped.map((p) => (
+                <Fragment key={p.key}>
+                  {by !== "none" && (
+                    <tr className="pile">
+                      <td><input type="checkbox" aria-label={`Pick ${p.title}`} checked={p.qsos.every((q) => picked.has(q.id))} onChange={(e) => togglePile(p, e.target.checked)} /></td>
+                      <td colSpan={8}><b>{p.title}</b> — {p.qsos.length} card{p.qsos.length === 1 ? "" : "s"}, {pileStations(p)} station{pileStations(p) === 1 ? "" : "s"}</td>
+                    </tr>
+                  )}
+                  {p.qsos.map((q) => (
+                    <tr key={q.id}>
+                      <td><input type="checkbox" checked={picked.has(q.id)} onChange={(e) => toggle(q.id, e.target.checked)} aria-label={`Pick ${f(q, "CALL")}`} /></td>
+                      <td className="call">{f(q, "CALL")}</td>
+                      <td className="mono">{f(q, "QSL_VIA")}</td>
+                      <td className="mono">{date(f(q, "QSO_DATE"))}</td>
+                      <td className="mono">{time(f(q, "TIME_ON"))}</td>
+                      <td className="mono">{freq(q)}</td>
+                      <td className="mono">{mode(q)}</td>
+                      <td className="mono">{f(q, "RST_SENT")}</td>
+                      <td>{f(q, "QSL_RCVD") === "Y" ? "received" : ""}</td>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>
