@@ -500,3 +500,27 @@ async fn rotator_over_rotctld_reads_and_turns() {
     assert_eq!(turns.recv().await.unwrap(), "P 272 0");
     next_matching(&mut events, |e| e["type"] == "rotator" && e["azimuth"] == 272.0).await;
 }
+
+#[tokio::test]
+async fn n1mm_turns_the_rotator_through_qrzero() {
+    let api = Api::new().await;
+    let mut events = api.events().await;
+    let (tx, mut turns) = mpsc::unbounded_channel();
+    let port = mock_rotctld(tx).await;
+    // Pick a free UDP port for QRZero to listen on, with its reply port (+1) free as well.
+    let probe = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let listen = probe.local_addr().unwrap();
+    drop(probe);
+    let mut cfg = api.get("/integrations").await["config"].clone();
+    cfg["rotator_enabled"] = true.into();
+    cfg["rotator_kind"] = "rotctld".into();
+    cfg["rotator_tcp"] = format!("127.0.0.1:{port}").into();
+    cfg["rotator_serve"] = true.into();
+    cfg["rotator_serve_addr"] = listen.to_string().into();
+    api.send(reqwest::Method::PUT, "/integrations", Some(cfg), None).await;
+    next_matching(&mut events, |e| e["type"] == "rotator" && e["azimuth"] == 80.0).await;
+
+    let n1mm = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    n1mm.send_to(b"<PST><AZIMUTH>135</AZIMUTH></PST>", listen).await.unwrap();
+    assert_eq!(turns.recv().await.unwrap(), "P 135 0");
+}

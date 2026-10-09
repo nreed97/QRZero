@@ -54,6 +54,9 @@ pub struct Integrations {
     pub rotator_tcp: String,
     pub rotator_serial: String,
     pub rotator_baud: u32,
+    /// Listen for rotator commands from N1MM (and other PstRotatorAz-style senders) and pass them to the rotator.
+    pub rotator_serve: bool,
+    pub rotator_serve_addr: String,
 }
 
 impl Integrations {
@@ -87,6 +90,8 @@ impl Default for Integrations {
             rotator_tcp: "127.0.0.1:4533".into(),
             rotator_serial: String::new(),
             rotator_baud: 9600,
+            rotator_serve: false,
+            rotator_serve_addr: "127.0.0.1:12040".into(),
         }
     }
 }
@@ -775,8 +780,12 @@ impl Hub {
         }
         if cfg.rotator_enabled && cfg.rotator_kind == "pst" {
             inner.status.rotator = Some(format!("talking to {}", cfg.rotator_addr));
-            inner.listeners.push(tokio::spawn(rotator_poller(weak, cfg.rotator_addr.clone())));
-        } else if cfg.rotator_enabled {
+            inner.listeners.push(tokio::spawn(rotator_poller(weak.clone(), cfg.rotator_addr.clone())));
+        }
+        if cfg.rotator_serve {
+            inner.listeners.push(tokio::spawn(rotator_server(Arc::downgrade(self), cfg.rotator_serve_addr.clone())));
+        }
+        if cfg.rotator_enabled && cfg.rotator_kind != "pst" {
             let (protocol, link) = if cfg.rotator_kind == "rotctld" {
                 (rotor::Protocol::Rotctld, rotor::Link::Tcp(cfg.rotator_tcp.clone()))
             } else if cfg.rotator_serial.trim().is_empty() {
@@ -1270,6 +1279,26 @@ impl Hub {
         Ok(())
     }
 
+    /// Stops the rotator (if its connection supports it).
+    pub async fn rotator_stop(&self) {
+        let (enabled, kind, addr, direct) = {
+            let inner = self.lock();
+            (
+                inner.integrations.rotator_enabled,
+                inner.integrations.rotator_kind.clone(),
+                inner.integrations.rotator_addr.clone(),
+                inner.rotator_tx.clone(),
+            )
+        };
+        if let Some(tx) = direct {
+            let _ = tx.send(rotor::Cmd::Stop);
+        } else if enabled && kind == "pst" {
+            if let Ok(sock) = UdpSocket::bind("0.0.0.0:0").await {
+                let _ = sock.send_to(pst::stop().as_bytes(), &addr).await;
+            }
+        }
+    }
+
     // ---- country file ---------------------------------------------------
 
     /// Alerts for a watched station (at most once per ten minutes per call and band).
@@ -1504,6 +1533,43 @@ async fn n1mm_listener(hub: std::sync::Weak<Hub>, listen: String) {
         match n1mm::parse(&buf[..n]) {
             Ok(msg) => h.on_n1mm(msg),
             Err(e) => tracing::debug!("N1MM packet: {e}"),
+        }
+    }
+}
+
+/// Takes rotator commands from N1MM and the like (PstRotatorAz-style UDP) and passes them on.
+async fn rotator_server(hub: std::sync::Weak<Hub>, listen: String) {
+    let socket = match bind_udp(&listen, "") {
+        Ok(s) => s,
+        Err(e) => {
+            if let Some(h) = hub.upgrade() {
+                h.set_status("rotator", format!("can't listen for N1MM rotator commands on {listen}: {e}"));
+            }
+            return;
+        }
+    };
+    let reply_port = socket.local_addr().map_or(0, |a| a.port().saturating_add(1));
+    let mut buf = vec![0u8; 2048];
+    loop {
+        let Ok((n, from)) = socket.recv_from(&mut buf).await else {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            continue;
+        };
+        let Some(h) = hub.upgrade() else { return };
+        match pst::parse_request(&String::from_utf8_lossy(&buf[..n])) {
+            Some(pst::Request::Turn(az)) => {
+                if let Err(e) = h.rotate(az).await {
+                    h.set_status("rotator", format!("N1MM asked for {az:.0}° but: {e}"));
+                }
+            }
+            Some(pst::Request::Stop) => h.rotator_stop().await,
+            Some(pst::Request::Query) => {
+                let az = h.lock().rotator_az;
+                if let Some(az) = az {
+                    let _ = socket.send_to(pst::reply(az).as_bytes(), SocketAddr::new(from.ip(), reply_port)).await;
+                }
+            }
+            None => tracing::debug!("rotator command not understood"),
         }
     }
 }
