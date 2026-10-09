@@ -533,6 +533,7 @@ table.list th { text-align: left; font-size: 12px; font-weight: 600; padding: 2p
 .reply-table th { text-align: left; font-weight: 600; padding: 3px 5px; border-bottom: 1px solid var(--line); }
 .reply-table td { vertical-align: top; }
 .reply-table input:not([type=date]) { width: 100%; }
+.paper-queue tr.pile td { background: var(--panel-2); border-top: 1px solid var(--line); padding: 3px 5px; }
 .paper-queue th { text-align: left; font-weight: 600; padding: 3px 5px; border-bottom: 1px solid var(--line); }
 
 /* Awards */
