@@ -26,9 +26,16 @@ Choose **manual** to type frequency and mode yourself.
 
 ## Split
 
-When a TCI radio (Flex through AetherSDR, or an Expert Electronics SDR) is in split, the VFO readout in the header shows both frequencies, **RX** for the one you listen on and **TX** for the one you transmit on. The QSO panel shows the transmit frequency in the first box (labelled **TX MHz**) and the receive frequency in a second box (**RX MHz**), and both are logged: the QSO's frequency is where you transmitted and its RX frequency is where you listened. Typing a frequency in the **TX MHz** box and leaving it sets the radio's transmit frequency. Out of split, the panel goes back to a single **Freq MHz** box.
+When a radio is in split, the VFO readout in the header shows both frequencies, **RX** for the one you listen on and **TX** for the one you transmit on. The QSO panel shows the transmit frequency in the first box (labelled **TX MHz**) and the receive frequency in a second box (**RX MHz**), and both are logged: the QSO's frequency is where you transmitted and its RX frequency is where you listened. Typing a frequency in the **TX MHz** box and leaving it sets the radio's transmit frequency. Out of split, the panel goes back to a single **Freq MHz** box.
 
-Split is read from and set on TCI radios only. Other rig control methods show and log the single frequency they report.
+Split works over every rig control method, with these limits:
+
+- **TCI** and **Hamlib (rigctld)**: split is read and set. Hamlib needs a radio whose driver supports split (`rigctl` commands `s`, `S` and `I`).
+- **Kenwood, Elecraft and Flex CAT**, and **Yaesu CAT**: split is read and set. Setting it receives on VFO A and transmits on VFO B.
+- **Icom CI-V**: split is read and set on radios that can read the other VFO's frequency (IC-7300, IC-7610, IC-705, IC-9700 and similar). Older Icoms show the single frequency, and QRZero turns split off but can't set the transmit frequency.
+- **WSJT-X and N1MM** radios show the single frequency they report.
+
+Radios that don't report split show and log one frequency, as before.
 
 ### Split from spots
 

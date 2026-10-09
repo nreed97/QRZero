@@ -25,6 +25,9 @@ const SET_MODE: u8 = 0x06;
 const EXTENDED: u8 = 0x1A;
 const DATA_MODE: u8 = 0x06;
 const TX_STATE: u8 = 0x1C;
+const SPLIT: u8 = 0x0F;
+/// Reads or sets the selected (`00`) or unselected (`01`) VFO's frequency; newer rigs only.
+const VFO_FREQ: u8 = 0x25;
 
 const NO_RESPONSE: &str = "no response from radio (check port, baud rate and CI-V address)";
 
@@ -49,6 +52,8 @@ pub(super) struct Icom {
     has_data: bool,
     /// Supports reading PTT (`1C 00`).
     has_tx: bool,
+    /// Supports reading/setting the unselected VFO's frequency (`25 01`), which is where split transmits.
+    has_unselected: bool,
     freq_hz: u64,
     mode: Option<u8>,
     data: bool,
@@ -57,7 +62,7 @@ pub(super) struct Icom {
 
 impl Icom {
     pub(super) fn new(addr: u8) -> Self {
-        Icom { addr, has_data: false, has_tx: false, freq_hz: 0, mode: None, data: false, tx: false }
+        Icom { addr, has_data: false, has_tx: false, has_unselected: false, freq_hz: 0, mode: None, data: false, tx: false }
     }
 
     /// Sends a command and waits for the radio's reply: the same command (and sub-command) for
@@ -114,7 +119,14 @@ impl Protocol for Icom {
         }
         self.has_data = matches!(self.request(io, EXTENDED, &[DATA_MODE], &[])?, Answer::Ok(_));
         self.has_tx = matches!(self.request(io, TX_STATE, &[0x00], &[])?, Answer::Ok(_));
-        tracing::info!("CI-V {:#04x}: data mode {}, PTT {}", self.addr, self.has_data, self.has_tx);
+        self.has_unselected = matches!(self.request(io, VFO_FREQ, &[0x01], &[])?, Answer::Ok(_));
+        tracing::info!(
+            "CI-V {:#04x}: data mode {}, PTT {}, split frequency {}",
+            self.addr,
+            self.has_data,
+            self.has_tx,
+            self.has_unselected
+        );
         Ok(())
     }
 
@@ -138,6 +150,17 @@ impl Protocol for Icom {
             }
         }
         let mut st = RigState { freq_hz: self.freq_hz, tx: self.tx, ..Default::default() };
+        // Split transmits on the unselected VFO. Rigs that can't tell us that stay shown as not split.
+        if self.has_unselected {
+            if let Answer::Ok(f) = self.request(io, SPLIT, &[], &[])? {
+                if f.data.first() == Some(&1) {
+                    if let Answer::Ok(f) = self.request(io, VFO_FREQ, &[0x01], &[])? {
+                        st.tx_freq_hz = f.data.get(1..).and_then(bcd_to_freq).unwrap_or(0);
+                        st.split = st.tx_freq_hz > 0;
+                    }
+                }
+            }
+        }
         if let Some(mode) = self.mode {
             decode_mode(mode, self.data).apply(&mut st);
         }
@@ -157,7 +180,14 @@ impl Protocol for Icom {
                 }
                 Ok(())
             }
-            RigCommand::SetSplit(_) => anyhow::bail!("split control needs a TCI connection"),
+            RigCommand::SetSplit(Some(hz)) => {
+                if !self.has_unselected {
+                    bail!("this radio can't set the split transmit frequency over CI-V");
+                }
+                self.set(io, VFO_FREQ, &[0x01], &freq_to_bcd(*hz), "split frequency")?;
+                self.set(io, SPLIT, &[], &[1], "split")
+            }
+            RigCommand::SetSplit(None) => self.set(io, SPLIT, &[], &[0], "split"),
         }
     }
 }
@@ -302,6 +332,7 @@ mod tests {
     /// A fake IC-7300 at 0x94 that echoes every frame (single-wire CI-V) and answers it.
     fn fake_ic7300() -> FakeLink<impl FnMut(&[u8]) -> Vec<u8> + Send> {
         let (mut freq, mut mode, mut data) = ([0x00, 0x40, 0x07, 0x14, 0x00], 0x01u8, 1u8);
+        let (mut vfo_b, mut split) = ([0u8; 5], 0u8);
         FakeLink::new(move |req: &[u8]| {
             let mut out = req.to_vec();
             let reply = |payload: &[u8]| [&[0xFE, 0xFE, 0xE0, 0x94][..], payload, &[0xFD]].concat();
@@ -310,6 +341,16 @@ mod tests {
                 [0x04] => reply(&[0x04, mode, 0x01]),
                 [0x1A, 0x06] => reply(&[0x1A, 0x06, data, data]),
                 [0x1C, 0x00] => reply(&[0xFA]),
+                [0x0F] => reply(&[0x0F, split]),
+                [0x0F, on] => {
+                    split = *on;
+                    reply(&[0xFB])
+                }
+                [0x25, 0x01] => reply(&[&[0x25, 0x01][..], &vfo_b[..]].concat()),
+                [0x25, 0x01, f @ ..] => {
+                    vfo_b.copy_from_slice(f);
+                    reply(&[0xFB])
+                }
                 [0x05, f @ ..] => {
                     freq.copy_from_slice(f);
                     reply(&[0xFB])
@@ -351,6 +392,17 @@ mod tests {
         assert!(has(&[0xFE, 0xFE, 0x94, 0xE0, 0x06, 0x03, 0xFD]));
         assert!(has(&[0xFE, 0xFE, 0x94, 0xE0, 0x1A, 0x06, 0x00, 0x00, 0xFD]));
         drop(w);
+
+        // Split: VFO B (the unselected one) transmits.
+        assert!(icom.has_unselected && !st.split);
+        icom.command(&mut io, &RigCommand::SetSplit(Some(7_035_000)), 0).unwrap();
+        let st = icom.poll(&mut io).unwrap();
+        assert_eq!((st.freq_hz, st.split, st.tx_freq_hz), (7_030_000, true, 7_035_000));
+        icom.command(&mut io, &RigCommand::SetSplit(None), 0).unwrap();
+        assert!(!icom.poll(&mut io).unwrap().split);
+        // A radio without the unselected-VFO command can't be given a split frequency.
+        icom.has_unselected = false;
+        assert!(icom.command(&mut io, &RigCommand::SetSplit(Some(7_035_000)), 0).is_err());
 
         // A silent radio fails to initialise.
         let mut rig = Icom::new(0x94);

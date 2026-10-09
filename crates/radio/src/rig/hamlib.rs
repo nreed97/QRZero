@@ -77,6 +77,16 @@ impl Conn {
         if let Ok(t) = self.query("t", 1).await? {
             st.tx = t[0].trim() == "1";
         }
+        // Split is optional too: a rig that refuses `s` is shown as not in split.
+        if let Ok(sp) = self.query("s", 2).await? {
+            if sp[0].trim() == "1" {
+                // The transmit frequency; if the rig won't say, leave it 0 and the UI shows one frequency.
+                if let Ok(i) = self.query("i", 1).await? {
+                    st.tx_freq_hz = parse_freq(&i[0]).unwrap_or(0);
+                }
+                st.split = st.tx_freq_hz > 0;
+            }
+        }
         Ok(st)
     }
 
@@ -87,9 +97,21 @@ impl Conn {
                 let Some(req) = ModeReq::from_adif(m, freq_hz) else { return Ok(()) };
                 format!("M {} 0", encode_mode(req))
             }
-            RigCommand::SetSplit(_) => bail!("split control needs a TCI connection"),
+            RigCommand::SetSplit(tx) => {
+                // Split on with VFO B transmitting, then its frequency; or split off with VFO A transmitting.
+                let on = if tx.is_some() { "S 1 VFOB" } else { "S 0 VFOA" };
+                self.set(on).await?;
+                return match tx {
+                    Some(hz) => self.set(&format!("I {hz}")).await,
+                    None => Ok(()),
+                };
+            }
         };
-        match self.query(&line, 1).await? {
+        self.set(&line).await
+    }
+
+    async fn set(&mut self, line: &str) -> Result<()> {
+        match self.query(line, 1).await? {
             Err(0) => Ok(()),
             Err(code) => bail!("rigctld refused '{line}' (RPRT {code})"),
             Ok(other) => bail!("rigctld: unexpected reply '{}' to '{line}'", other[0]),
@@ -173,6 +195,7 @@ mod tests {
             let (r, mut w) = sock.into_split();
             let mut lines = BufReader::new(r).lines();
             let (mut freq, mut mode) = (14_074_000u64, "PKTUSB".to_string());
+            let (mut split, mut tx_freq) = (false, 0u64);
             while let Ok(Some(line)) = lines.next_line().await {
                 log2.lock().unwrap().push(line.clone());
                 let parts: Vec<&str> = line.split_whitespace().collect();
@@ -180,6 +203,16 @@ mod tests {
                     ["f"] => format!("{freq}\n"),
                     ["m"] => format!("{mode}\n3000\n"),
                     ["t"] => "RPRT -11\n".to_string(),
+                    ["s"] => format!("{}\nVFOB\n", split as u8),
+                    ["i"] => format!("{tx_freq}\n"),
+                    ["S", on, _] => {
+                        split = *on == "1";
+                        "RPRT 0\n".into()
+                    }
+                    ["I", hz] => {
+                        tx_freq = hz.parse().unwrap();
+                        "RPRT 0\n".into()
+                    }
                     ["F", "1"] => "RPRT -1\n".into(),
                     ["F", hz] => {
                         freq = hz.parse().unwrap();
@@ -224,6 +257,18 @@ mod tests {
             assert!(log.contains(&"F 7030000".to_string()));
             assert!(log.contains(&"M CW 0".to_string()));
             assert!(log.contains(&"M LSB 0".to_string()));
+        }
+        // Split: VFO B transmits on its own frequency, then split goes off.
+        assert!(!st[0].split);
+        handle.send(0, RigCommand::SetSplit(Some(7_035_000)));
+        let st = wait(&mut rx, |s| s.split && s.tx_freq_hz == 7_035_000).await;
+        assert_eq!(st[0].freq_hz, 7_030_000);
+        handle.send(0, RigCommand::SetSplit(None));
+        wait(&mut rx, |s| !s.split).await;
+        {
+            let log = log.lock().unwrap();
+            assert!(log.contains(&"S 1 VFOB".to_string()) && log.contains(&"I 7035000".to_string()));
+            assert!(log.contains(&"S 0 VFOA".to_string()));
         }
         handle.send(0, RigCommand::SetFreq(1));
         let st = wait(&mut rx, |s| s.error.is_some()).await;
