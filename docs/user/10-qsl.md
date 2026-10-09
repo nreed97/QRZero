@@ -34,6 +34,10 @@ If TQSL asks for your certificate password, it will show its own window.
 
 QSOs imported without a location are not uploaded to LoTW, since QRZero can't tell which station location they belong to. Edit them to give them a location first.
 
+### Moving from another logger: download first
+
+If your log came from another logger, **download confirmations before your first upload** (LoTW and eQSL have a **Download confirmations** button). Every QSO the service already has is marked sent (with the date filled in if blank) and confirmed, so the upload buttons don't send duplicates. A download never adds QSOs to your log. Records it finds that match nothing are counted, and **Review … not found in the log** under the button lists them, so you can see what the service has that your log doesn't.
+
 ### LoTW confirmations
 
 To see which QSOs LoTW has confirmed (for the **Awards** tab), enter your LoTW **website** username and password (the ones you use at lotw.arrl.org, not your certificate password) and click **Download confirmations**. Matching QSOs get **LoTW R** set to Y with the date. LoTW also sends the other station's state, zones, grid and county, and QRZero fills those in where your QSO has them blank. The next download only fetches confirmations newer than the last one.

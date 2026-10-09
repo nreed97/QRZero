@@ -22,7 +22,11 @@ function DownloadLine({ d }: { d?: QslDownload }) {
     <span>
       Last check {when}Z: {d.received} confirmation{d.received === 1 ? "" : "s"}, {d.confirmed} new.
       {d.unmatched_count > 0 && (
-        <span className="muted small" title={d.unmatched.join("\n")}> {d.unmatched_count} not found in the log.</span>
+        <details className="small">
+          <summary>Review {d.unmatched_count} not found in the log</summary>
+          <p className="muted">These are on the service but match no QSO in your log. Nothing was added to the log.</p>
+          <pre className="mono">{d.unmatched.join("\n")}{d.unmatched_count > d.unmatched.length ? `\n… and ${d.unmatched_count - d.unmatched.length} more` : ""}</pre>
+        </details>
       )}
     </span>
   );
@@ -243,6 +247,7 @@ function Online({ callsigns, locations }: Props) {
             </button>
           </div>
           <p className="small muted">Picks every QSO in the range whose LoTW sent status is N or blank, whatever the "QSOs from" date says.</p>
+          <p className="small muted"><b>Moving from another logger?</b> Download confirmations before your first upload. Matching QSOs are marked sent and confirmed, so they aren't uploaded again.</p>
           <p className="small muted">To download confirmations (for awards), enter your LoTW website login. It's not your TQSL password.</p>
           <div className="row">
             <label className="f w-m"><span>LoTW username</span><input value={cfg.lotw_username} onChange={(e) => set({ lotw_username: e.target.value })} /></label>

@@ -107,7 +107,7 @@ pub struct Download {
     pub received: usize,
     /// QSOs newly marked confirmed.
     pub confirmed: usize,
-    /// Downloaded confirmations with no matching QSO (first 50).
+    /// Downloaded confirmations with no matching QSO (first 1000).
     pub unmatched: Vec<String>,
     pub unmatched_count: usize,
     pub error: Option<String>,
@@ -570,7 +570,7 @@ impl Qsl {
                 d.received = s.received;
                 d.confirmed = s.new;
                 d.unmatched_count = s.unmatched.len();
-                d.unmatched = s.unmatched.into_iter().take(50).collect();
+                d.unmatched = s.unmatched.into_iter().take(1000).collect();
             }
             Err(e) => {
                 d.error = Some(e.to_string());
