@@ -63,6 +63,12 @@ Several QSOs with the same station share a label. **Skip labels** leaves the fir
 
 When a card arrives, select its QSOs in the log and pick **Paper QSL…, Card received via bureau** (or direct).
 
+## QSL lookup
+
+For answering cards or writing them in bulk: pick **QSL lookup…** from the **☰** menu, or press **Alt+Q**. Type a callsign and press **Enter**. You get that station's QSOs, newest first: date, UTC, MHz, mode, the RST you sent and received, your own callsign, and the card status (sent and received, with the bureau or direct route and date, and OQRS if you've asked). Above the list are the QSL manager (QSL via), name, QTH and address, taken from the newest QSO that has them.
+
+The call box is emptied and ready for the next call after each lookup; **Esc** closes the window. The call is matched whole, so DL1ABC finds DL1ABC and its portable forms such as DL1ABC/P, but not DL1ABCD.
+
 ## What gets sent
 
 Uploads send the standard ADIF fields of each QSO. If a service refuses a QSO, the reason is shown under the service and QRZero doesn't keep retrying it until you restart.

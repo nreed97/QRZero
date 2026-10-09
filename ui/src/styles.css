@@ -577,3 +577,4 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 .spot-row.mode-phone .mode { color: var(--mode-phone); font-weight: 700; }
 .mode-key { display: inline-flex; gap: 8px; font-size: 11px; color: var(--muted); }
 .mode-key span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 3px; border-radius: 1px; background: var(--k); }
+.qsl-who { margin: 8px 0; }

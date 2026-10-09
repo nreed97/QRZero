@@ -1,5 +1,5 @@
 import { OQRS, OQRS_DATE } from "./confirmations";
-import type { Fields } from "./types";
+import type { Fields, Qso } from "./types";
 
 const today = () => new Date().toISOString().slice(0, 10).replace(/-/g, "");
 
@@ -17,3 +17,10 @@ export const PAPER_ACTIONS: { key: string; label: string; fields: () => Fields }
   { key: "rcvd-d", label: "Card received direct", fields: () => ({ QSL_RCVD: "Y", QSLRDATE: today(), QSL_RCVD_VIA: "D" }) },
   { key: "none", label: "Not sending a card", fields: () => ({ QSL_SENT: "N" }) },
 ];
+
+/** Field text for a QSO as it goes on a card or label. */
+export const qf = (q: Qso, k: string) => q.fields[k] ?? "";
+export const cardDate = (d: string) => (d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : d);
+export const cardTime = (t: string) => t.slice(0, 4);
+export const cardFreq = (q: Qso) => (qf(q, "FREQ") ? Number(qf(q, "FREQ")).toFixed(3) : qf(q, "BAND"));
+export const cardMode = (q: Qso) => qf(q, "SUBMODE") || qf(q, "MODE");
