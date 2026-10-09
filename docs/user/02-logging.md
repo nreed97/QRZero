@@ -37,11 +37,15 @@ Modes are saved the way the ADIF standard expects, so FT4 is stored as mode `MFS
 
 Tick **Enter time** to type the date and time (UTC) yourself, for example when copying a paper log.
 
+## CW club numbers
+
+SKCC, NAQCC, FISTS and CWops numbers can be entered in the entry panel. Choose the **CW clubs** layout under Settings, Entry fields, or add **SKCC**, **NAQCC**, **FISTS** or **CWops** to your own layout. When you type a call, each number is filled from your last QSO with that call, in grey like other lookup data; type over it if it changed (SKCC numbers gain a suffix as the member advances). The numbers are saved as the ADIF fields SKCC, NAQCC, FISTS and CWOPS, and can be shown as columns in the log.
+
 ## The station panel
 
 After a lookup the panel shows:
 
-- **Station details** from QRZ.com (when lookups are on), or from your last QSO with that call. Notes carry over from that QSO; the Comment, serial numbers and reports do not, because they belong to one contact.
+- **Station details** from QRZ.com (when lookups are on), or from your last QSO with that call. Notes and club numbers (see below) carry over from that QSO; the Comment, serial numbers and reports do not, because they belong to one contact.
 - **Note**: your station note for the call, if you have written one (see **Station notes**).
 - **Flags**: *First QSO with this call*, or *Already worked on …* when this would be a duplicate on the same band and mode.
 - **DXCC slots**: a small grid for the entity of the call, with the bands across and CW, Phone and Digital down. **W** means worked, **C** means confirmed (by the sources set in the Awards pane), and a blank cell is a slot you still need. The band and mode set in the entry panel are marked with a box and bold labels, so you can see at once whether this QSO fills a blank. It follows the DXCC number in the entry form, or the entity from the country file.

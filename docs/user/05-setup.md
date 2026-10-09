@@ -49,6 +49,7 @@ The **Entry fields** tab chooses what you type for each QSO. Call, reports, freq
 - Give a field your own **label**, a **width**, and a **default** that fills every new QSO.
 - Tick **keep** to hold the value from one QSO to the next (handy for a park reference, or your power).
 - The arrows move a field left or right, or up and down a line.
+- **Fields for** at the top picks which modes the layout applies to. **All modes** is the main layout. For **CW**, **Phone** or **Digital**, click **Set up fields for…** to give that group a layout of its own (it starts as a copy of the main one). Whenever the entry panel's mode belongs to the group, those fields replace the main ones, so CW can show club numbers while SSB shows something else. A group marked * has its own layout. **Use the main layout** takes it back. Values in fields that the new mode doesn't show are dropped, so nothing is logged unseen.
 
 ## General
 

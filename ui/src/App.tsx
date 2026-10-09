@@ -5,7 +5,7 @@ import VfoBar from "./components/VfoBar";
 import type { Equipment, Fields, Location, Log, LookupResult, Qso, QsoFilter, StationCallsign } from "./types";
 import { localClock, utcClock } from "./util";
 import { useDisplay } from "./display";
-import { DEFAULT_COLUMNS, DEFAULT_LAYOUT, type EntryLayout } from "./fields";
+import { DEFAULT_COLUMNS, DEFAULT_LAYOUT, type EntryLayout, type ModeLayouts } from "./fields";
 import { gridToLatLon, positionOf } from "./geo";
 import { localGet, localSet, usePref } from "./prefs";
 import EntryPanel, { type EntryContext, type Prefill } from "./components/EntryPanel";
@@ -72,6 +72,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [now, setNow] = useState(new Date());
   const [layout, setLayout, layoutLoaded] = usePref<EntryLayout>("entry_layout", DEFAULT_LAYOUT);
+  const [modeLayouts, setModeLayouts, modeLayoutsLoaded] = usePref<ModeLayouts>("entry_layouts", {});
   const [columns, setColumns] = usePref<string[]>("grid_columns", DEFAULT_COLUMNS);
   const [general, setGeneral] = usePref<GeneralPrefs>("general", { units: "km" });
   const display = useDisplay();
@@ -359,7 +360,7 @@ export default function App() {
   }, []);
 
   if (error) return <div className="fatal">{error}</div>;
-  if (logId === null || callsigns === null || !layoutLoaded) return <div className="fatal">Loading…</div>;
+  if (logId === null || callsigns === null || !layoutLoaded || !modeLayoutsLoaded) return <div className="fatal">Loading…</div>;
 
   const reloadStation = async () => {
     await loadStation(logId);
@@ -421,6 +422,7 @@ export default function App() {
                 stationCall={stationCall}
                 location={location}
                 layout={layout}
+                modeLayouts={modeLayouts}
                 equipment={equipment.filter((e) => e.location_id === location?.id)}
                 onLogged={refreshGrid}
                 onLookup={setLookup}
@@ -502,6 +504,8 @@ export default function App() {
           equipment={equipment}
           layout={layout}
           onLayout={setLayout}
+          modeLayouts={modeLayouts}
+          onModeLayouts={setModeLayouts}
           general={general}
           onGeneral={setGeneral}
           onWizard={() => setDialog("wizard")}

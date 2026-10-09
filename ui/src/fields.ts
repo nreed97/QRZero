@@ -3,7 +3,7 @@
 import type { Fields, Qso } from "./types";
 import { fmtDate, fmtTime } from "./util";
 import { fmtFreq } from "./display";
-import { modeLabel } from "./modes";
+import { modeLabel, type ModeGroup } from "./modes";
 import { confirmedShort, OQRS } from "./confirmations";
 
 export type Width = "s" | "m" | "l" | "xl";
@@ -38,6 +38,10 @@ export const ENTRY_FIELDS: FieldDef[] = [
   { key: "RX_PWR", label: "Their power", width: "s" },
   { key: "RIG", label: "Their rig", width: "m" },
   { key: "AGE", label: "Age", width: "s" },
+  { key: "SKCC", label: "SKCC", width: "s", hint: "Straight Key Century Club number with its suffix, e.g. 1234S" },
+  { key: "NAQCC", label: "NAQCC", width: "s", hint: "North America QRP CW Club number" },
+  { key: "FISTS", label: "FISTS", width: "s", hint: "FISTS CW Club number" },
+  { key: "CWOPS", label: "CWops", width: "s", hint: "CWops member number" },
   { key: "POTA_REF", label: "Their POTA", width: "m", hint: "Park reference, e.g. US-0001" },
   { key: "SOTA_REF", label: "Their SOTA", width: "m", hint: "Summit reference, e.g. W7A/MN-001" },
   { key: "WWFF_REF", label: "Their WWFF", width: "m" },
@@ -105,6 +109,12 @@ export const PRESETS: { id: string; name: string; description: string; layout: E
     layout: { rows: [keys("NAME", "QTH", "GRIDSQUARE", "RX_PWR"), [{ key: "COMMENT", width: "xl" }, { key: "TX_PWR", sticky: true }]] },
   },
   {
+    id: "cwclubs",
+    name: "CW clubs",
+    description: "SKCC, NAQCC, FISTS and CWops numbers. They fill in from your last QSO with the call.",
+    layout: { rows: [keys("NAME", "QTH", "STATE", "SKCC", "NAQCC", "FISTS", "CWOPS"), [{ key: "COMMENT", width: "xl" }, { key: "TX_PWR", sticky: true }]] },
+  },
+  {
     id: "portable",
     name: "Parks and summits",
     description: "Adds POTA, SOTA and WWFF references for hunting or chasing activators.",
@@ -123,6 +133,9 @@ export const PRESETS: { id: string; name: string; description: string; layout: E
     layout: { rows: [keys("NAME", "STATE", "COUNTRY"), [{ key: "CONTEST_ID", sticky: true }, { key: "STX" }, { key: "SRX" }, { key: "SRX_STRING" }, { key: "TX_PWR", sticky: true }]] },
   },
 ];
+
+/** Entry layouts for a group of modes, used instead of the main layout. */
+export type ModeLayouts = Partial<Record<ModeGroup, EntryLayout>>;
 
 export const DEFAULT_LAYOUT = PRESETS[0].layout;
 
@@ -177,6 +190,10 @@ export const COLUMNS: ColumnDef[] = [
   { key: "QRZCOM_QSO_DOWNLOAD_STATUS", label: "QRZ R", width: "46px", get: f("QRZCOM_QSO_DOWNLOAD_STATUS") },
   { key: OQRS, label: "OQRS", width: "46px", get: f(OQRS) },
   { key: "confirmed", label: "Confirmed", width: "70px", get: (q) => confirmedShort(q.fields) },
+  { key: "SKCC", label: "SKCC", width: "60px", get: f("SKCC") },
+  { key: "NAQCC", label: "NAQCC", width: "60px", get: f("NAQCC") },
+  { key: "FISTS", label: "FISTS", width: "56px", get: f("FISTS") },
+  { key: "CWOPS", label: "CWops", width: "56px", get: f("CWOPS") },
   { key: "COMMENT", label: "Comment", width: "minmax(100px,2fr)", get: f("COMMENT") },
   { key: "NOTES", label: "Notes", width: "minmax(100px,2fr)", get: f("NOTES") },
 ];

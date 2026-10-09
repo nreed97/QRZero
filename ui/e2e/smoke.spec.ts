@@ -401,6 +401,21 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await closeWindow(popup.getByRole("button", { name: "Dock back" }));
   await expect(page.getByRole("tab", { name: "FTx monitor" })).toBeVisible();
 
+  // Entry fields can differ by mode group: CW gets its own layout with an SKCC box.
+  await fromMenu(page, "Settings…");
+  await page.getByRole("button", { name: "Entry fields", exact: true }).click();
+  await page.getByRole("button", { name: "CW", exact: true }).click();
+  await page.getByRole("button", { name: "Set up fields for CW" }).click();
+  await page.getByLabel("Add a field to line 2").selectOption("SKCC");
+  await page.getByRole("button", { name: "Add", exact: true }).first().click();
+  await page.getByRole("button", { name: "Close" }).click();
+  await page.locator("label.f", { has: page.locator("span", { hasText: "Mode" }) }).locator("select").selectOption("CW");
+  await expect(page.getByLabel("SKCC")).toBeVisible();
+  await page.locator("label.f", { has: page.locator("span", { hasText: "Mode" }) }).locator("select").selectOption("SSB");
+  await expect(page.getByLabel("SKCC")).toHaveCount(0);
+  await page.locator("label.f", { has: page.locator("span", { hasText: "Mode" }) }).locator("select").selectOption("CW");
+  await expect(page.getByLabel("SKCC")).toBeVisible();
+
   // Backups: back up now, download it, then stage a restore and cancel it.
   await fromMenu(page, "Settings…");
   await page.getByRole("button", { name: "Backups", exact: true }).click();
