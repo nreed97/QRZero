@@ -207,6 +207,9 @@ export interface QslRun { at: number; running: boolean; uploaded: number; duplic
 export interface LotwMapping { callsign: string; location_id: number; station_location: string }
 export interface QslConfig {
   interval_min: number;
+  qrz_interval_min: number;
+  clublog_interval_min: number;
+  eqsl_interval_min: number;
   qrz_enabled: boolean;
   qrz_since: string;
   qrz_calls: string[];
