@@ -16,7 +16,7 @@ function cardStatus(q: Qso): string {
     if (!v || v === "N") return "";
     const via = qf(q, `QSL_${dir}_VIA`);
     const date = qf(q, dir === "SENT" ? "QSLSDATE" : "QSLRDATE");
-    const word = { Y: label, Q: `${label} queued`, R: `${label} requested`, I: `${label} ignored` }[v] ?? `${label} ${v}`;
+    const word = ({ Y: label, Q: "queued", R: "requested", I: "ignored" } as Record<string, string>)[v] ?? `${label} ${v}`;
     return [word, via, date && cardDate(date)].filter(Boolean).join(" ");
   };
   const oqrs = qf(q, OQRS) === "Y" ? "OQRS" : "";
