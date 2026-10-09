@@ -71,6 +71,12 @@ Cards arrive in the mail and don't always get answered right away. The **To repl
 - Each row shows the call, the date the card arrived (change it if it was earlier), a note you can type in (direct, via bureau, an address), and the newest QSOs you have with that station.
 - When you've replied, click **Replied**. Pick **Sent via bureau** or **Sent direct** to also mark those QSOs as card sent with today's date, or **Just remove** to only take the call off the list. The entry is deleted; no history is kept.
 
+## QSL lookup
+
+For answering cards or writing them in bulk: pick **QSL lookup…** from the **☰** menu, or press **Alt+Q**. Type a callsign and press **Enter**. You get that station's QSOs, newest first: date, UTC, MHz, mode, the RST you sent and received, your own callsign, and the card status (sent and received, with the bureau or direct route and date, and OQRS if you've asked). Above the list are the QSL manager (QSL via), name, QTH and address, taken from the newest QSO that has them.
+
+The call box is emptied and ready for the next call after each lookup; **Esc** closes the window. The call is matched whole, so DL1ABC finds DL1ABC and its portable forms such as DL1ABC/P, but not DL1ABCD.
+
 ## What gets sent
 
 Uploads send the standard ADIF fields of each QSO. If a service refuses a QSO, the reason is shown under the service and QRZero doesn't keep retrying it until you restart.

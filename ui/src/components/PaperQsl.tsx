@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../api";
-import { PAPER_ACTIONS } from "../paper";
+import { PAPER_ACTIONS, qf as f, cardDate as date, cardTime as time, cardFreq as freq, cardMode as mode } from "../paper";
 import type { Qso } from "../types";
 
 /** Label sheets: how many labels per page, the grid, and QSO lines per label. */
@@ -13,11 +13,6 @@ type Sheet = keyof typeof SHEETS;
 
 interface Label { call: string; via: string; own: string; qsos: Qso[]; tnx: boolean }
 
-const f = (q: Qso, k: string) => q.fields[k] ?? "";
-const date = (d: string) => (d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : d);
-const time = (t: string) => t.slice(0, 4);
-const freq = (q: Qso) => (f(q, "FREQ") ? Number(f(q, "FREQ")).toFixed(3) : f(q, "BAND"));
-const mode = (q: Qso) => f(q, "SUBMODE") || f(q, "MODE");
 
 /** One label per call and own callsign, split when it has more QSOs than fit. */
 function labels(queue: Qso[], lines: number): Label[] {

@@ -254,6 +254,17 @@ kbd { font: 11px var(--mono); opacity: 0.75; margin-left: 4px; }
 .award-hints .ah-text { min-width: 0; }
 .award-hints .ah-new { color: var(--new); font-weight: 700; }
 
+.dxcc-slots { margin: 6px 0 2px; font-size: 12px; border-top: 1px solid var(--line); padding-top: 4px; }
+.dxcc-slots .ah-title { color: var(--muted); font-size: 11px; margin-bottom: 2px; }
+.dxcc-slots table { border-collapse: collapse; }
+.dxcc-slots th, .dxcc-slots td { border: 1px solid var(--line); padding: 0 3px; min-width: 22px; text-align: center; font: 12px var(--mono); }
+.dxcc-slots th { font-weight: 400; color: var(--muted); }
+.dxcc-slots th:first-child { text-align: left; min-width: 0; border-color: transparent; }
+.dxcc-slots th.cur { font-weight: 700; color: var(--text); }
+.dxcc-slots td.worked { color: var(--muted); }
+.dxcc-slots td.confirmed { font-weight: 700; }
+.dxcc-slots td.cur { outline: 2px solid var(--new); outline-offset: -2px; }
+
 /* Map */
 .map-box { flex: 1; min-height: 150px; position: relative; overflow: hidden; }
 .map-box svg { position: absolute; inset: 0; display: block; }
@@ -449,6 +460,7 @@ table.list.fields input:not([type=checkbox]), table.list.fields select { width: 
 .radios-tab legend { font-weight: 600; }
 label.button-like { display: inline-block; border: 1px solid var(--line); border-radius: 2px; padding: 3px 10px; cursor: pointer; background: var(--panel-2); }
 label.button-like:hover { border-color: var(--accent); }
+.map-sun { display: flex; flex-wrap: wrap; gap: 2px 14px; padding: 3px 8px; border-top: 1px solid var(--line); font: 12px var(--mono); }
 .map-info .turn { display: inline-flex; gap: 2px; }
 .map-info .rot { margin-left: auto; }
 
@@ -580,3 +592,4 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 .spot-row.mode-phone .mode { color: var(--mode-phone); font-weight: 700; }
 .mode-key { display: inline-flex; gap: 8px; font-size: 11px; color: var(--muted); }
 .mode-key span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 3px; border-radius: 1px; background: var(--k); }
+.qsl-who { margin: 8px 0; }

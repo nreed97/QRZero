@@ -266,7 +266,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("tab", { name: "Log", exact: true }).click();
 
   // QSL uploads: keys are saved, never shown back.
-  await fromMenu(page, /^QSL/);
+  await fromMenu(page, /^QSL:/);
   await page.getByLabel("QRZ API key for N0OLD").fill("ABCD-1234");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Saved.")).toBeVisible();
@@ -276,7 +276,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // Paper cards: queue one from the log, then find it in QSL, Paper cards.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click();
   await page.getByLabel("Paper QSL").selectOption("queue");
-  await fromMenu(page, /^QSL/);
+  await fromMenu(page, /^QSL:/);
   await page.getByRole("button", { name: "Paper cards" }).click();
   await expect(page.locator(".paper-queue")).toContainText("K1ABC");
   await expect(page.getByRole("button", { name: "Print 1 label" })).toBeVisible();
@@ -285,7 +285,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // Reply list: add from the log's right-click menu, jot a note, mark it replied.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click({ button: "right" });
   await page.getByRole("menuitem", { name: /to reply list/ }).click();
-  await fromMenu(page, /^QSL/);
+  await fromMenu(page, /^QSL:/);
   await page.getByRole("button", { name: "To reply to" }).click();
   await expect(page.locator(".reply-table")).toContainText("K1ABC");
   await page.getByLabel("Note for K1ABC").fill("send direct");
@@ -294,6 +294,14 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "Just remove" }).click();
   await expect(page.getByText("Nothing waiting for a reply.")).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
+
+  // QSL lookup: type a call, Enter, results with the queued card.
+  await fromMenu(page, /^QSL lookup/);
+  const lookup = page.getByRole("dialog", { name: "QSL lookup" });
+  await lookup.getByLabel("Call").fill("k1abc");
+  await lookup.getByLabel("Call").press("Enter");
+  await expect(lookup.locator("tbody tr").first()).toContainText("queued");
+  await page.keyboard.press("Escape");
 
   // OQRS: mark from the right-click menu, then see it in the editor.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click({ button: "right" });
@@ -356,6 +364,8 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.locator(".lookup-note")).toContainText("Runs 5 W / QSL direct only");
   // The Station pane says what the QSO would add to awards (K1 is already worked).
   await expect(page.getByLabel("Award hints", { exact: true })).toContainText("WPX");
+  // The DXCC slot grid shows when the call resolves to an entity (needs the country file).
+  if (await page.getByLabel("DXCC slots", { exact: true }).count()) await expect(page.getByLabel("DXCC slots", { exact: true })).toContainText("CW");
   await page.getByRole("tab", { name: "Worked before" }).click();
 
   // Panes: drag the Cluster tab beside the Station pane, it gets its own group.

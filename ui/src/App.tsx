@@ -11,6 +11,7 @@ import { localGet, localSet, usePref } from "./prefs";
 import EntryPanel, { type EntryContext, type Prefill } from "./components/EntryPanel";
 import { type DecodePick } from "./components/FtxMonitor";
 import QslDialog from "./components/QslDialog";
+import QslLookup from "./components/QslLookup";
 import { onLive, useRadios } from "./live";
 import LogGrid from "./components/LogGrid";
 import ImportDialog from "./components/ImportDialog";
@@ -24,7 +25,7 @@ import { listen, openPopout, post, type BusMsg, type PopContext, type WindowId }
 import { DEFAULT_WORKSPACE, canPopOut, findPane, removePane, sanitize, showPane, type PaneId, type Workspace as WS, type Zone } from "./workspace";
 import SetupWizard from "./components/SetupWizard";
 
-type Dialog = "import" | "export" | "settings" | "help" | "wizard" | "qsl" | null;
+type Dialog = "import" | "export" | "settings" | "help" | "wizard" | "qsl" | "qsllookup" | null;
 
 /** Where a pane goes back to when its window closes. */
 const HOME: Partial<Record<PaneId, [PaneId, Zone]>> = {
@@ -90,6 +91,17 @@ export default function App() {
   const greeted = useRef(new Set<WindowId>());
   const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === "q") {
+        e.preventDefault();
+        setDialog((d) => (d === null ? "qsllookup" : d));
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -222,7 +234,7 @@ export default function App() {
     setWs({ ...cur, root: showPane(cur.root, "log") });
   };
 
-  const pick = (p: DecodePick) => setPrefill({ nonce: Date.now(), call: p.call, grid: p.grid, band: p.band, mode: p.mode, freq_hz: p.freq_hz, tx_freq_hz: p.tx_freq_hz });
+  const pick = (p: DecodePick) => setPrefill({ nonce: Date.now(), call: p.call, grid: p.grid, band: p.band, mode: p.mode, freq_hz: p.freq_hz, tx_freq_hz: p.tx_freq_hz, ftx: p.ftx });
 
   const refreshGrid = () => {
     setRefreshKey((k) => k + 1);
@@ -507,6 +519,7 @@ export default function App() {
         />
       )}
       {dialog === "qsl" && logId !== null && <QslDialog logId={logId} callsigns={callsigns} locations={locations} onClose={() => setDialog(null)} />}
+      {dialog === "qsllookup" && logId !== null && <QslLookup logId={logId} onClose={() => setDialog(null)} />}
       {dialog === "help" && <HelpView onClose={() => setDialog(null)} />}
     </div>
   );

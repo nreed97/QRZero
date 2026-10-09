@@ -10,7 +10,7 @@ use std::time::Duration;
 use qrzero_core::adif::{self, Fields};
 use qrzero_core::band::band_for_freq;
 use qrzero_core::cty::{CtyDb, Entity};
-use qrzero_core::awards::{AwardHint, AwardIndex, AwardQso, Counts, CtyFacts};
+use qrzero_core::awards::{SlotGrid, AwardHint, AwardIndex, AwardQso, Counts, CtyFacts};
 use qrzero_core::worked::{Needed, WorkedIndex};
 use qrzero_core::Store;
 use qrzero_radio::rig::{self, RigCommand, RigConfig, RigHandle, RigState};
@@ -603,6 +603,23 @@ impl Hub {
             Some(a) => Ok(a.index.hints(q, counts)),
             None => Ok(Vec::new()),
         }
+    }
+
+    /// The DXCC band/mode slots of one entity, from the kept award cells (recounted if stale).
+    pub fn dxcc_slots(&self, log_id: i64, dxcc: u32, counts: Counts) -> qrzero_core::Result<SlotGrid> {
+        let version = self.with_store(|st| st.qso_version())?;
+        let fresh = |inner: &Inner| {
+            inner.awards.as_ref().filter(|a| a.log_id == log_id && a.version == version).map(|a| a.index.dxcc_slots(dxcc, counts))
+        };
+        if let Some(g) = fresh(&self.lock()) {
+            return Ok(g);
+        }
+        self.build_award_cells(log_id)?;
+        let inner = self.lock();
+        Ok(inner.awards.as_ref().filter(|a| a.log_id == log_id).map_or_else(
+            || AwardIndex::default().dxcc_slots(dxcc, counts),
+            |a| a.index.dxcc_slots(dxcc, counts),
+        ))
     }
 
     /// Records a newly logged QSO in the worked-before sets.
