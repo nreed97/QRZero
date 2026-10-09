@@ -690,7 +690,7 @@ impl Store {
         let mut idx = WorkedIndex::default();
         let mut stmt = self
             .conn
-            .prepare("SELECT call, dxcc, band, IFNULL(submode, mode) FROM qsos WHERE log_id = ?1")?;
+            .prepare("SELECT call, dxcc, band, IFNULL(submode, mode), json_extract(fields, '$.GRIDSQUARE') FROM qsos WHERE log_id = ?1")?;
         let mut rows = stmt.query([log_id])?;
         while let Some(r) = rows.next()? {
             let call: String = r.get(0)?;
@@ -699,6 +699,10 @@ impl Store {
             let mode: Option<String> = r.get(3)?;
             let dxcc = dxcc.and_then(|d| u32::try_from(d).ok()).or_else(|| resolve(&call));
             idx.add(&call, dxcc, band.as_deref(), mode.as_deref());
+            let grid: Option<String> = r.get(4)?;
+            if let (Some(g), Some(b)) = (grid, band.as_deref()) {
+                idx.add_grid(&g, b);
+            }
         }
         Ok(idx)
     }

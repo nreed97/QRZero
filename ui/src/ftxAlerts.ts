@@ -3,7 +3,7 @@ import { localGet, localSet } from "./prefs";
 import type { FtxDecode } from "./types";
 
 /** What makes a decode stand out, most important first. */
-export type AlertKind = "toMe" | "watched" | "newDxcc" | "newBand" | "newMode" | "newCall" | "newCallBand" | "cq";
+export type AlertKind = "toMe" | "watched" | "newDxcc" | "newBand" | "newMode" | "newGrid" | "newCall" | "newCallBand" | "cq";
 
 export interface AlertStyle { on: boolean; color: string }
 
@@ -25,6 +25,7 @@ export const ALERTS: { kind: AlertKind; name: string; tag: string; help: string 
   { kind: "newDxcc", name: "New DXCC", tag: "DXCC", help: "A country you have never worked" },
   { kind: "newBand", name: "New band", tag: "BAND", help: "A country you have not worked on this band" },
   { kind: "newMode", name: "New mode", tag: "MODE", help: "A country you have not worked in this mode" },
+  { kind: "newGrid", name: "New grid", tag: "GRID", help: "A grid square you have not worked on this band (6 m and up)" },
   { kind: "newCall", name: "New call", tag: "NEW", help: "A callsign you have never worked" },
   { kind: "newCallBand", name: "New call on band", tag: "NB", help: "A callsign you have worked, but not on this band" },
   { kind: "cq", name: "Calling CQ", tag: "CQ", help: "The station is calling CQ" },
@@ -39,6 +40,7 @@ export const DEFAULT_ALERTS: FtxAlertConfig = {
     newDxcc: { on: true, color: "#e8a33d" },
     newBand: { on: true, color: "#d8c25a" },
     newMode: { on: true, color: "#4fc4c4" },
+    newGrid: { on: true, color: "#8fb0f0" },
     newCall: { on: false, color: "#6cc28a" },
     newCallBand: { on: false, color: "#5fa8e8" },
     cq: { on: true, color: "#6cc28a" },
@@ -96,6 +98,7 @@ export function alertsOf(d: FtxDecode): AlertKind[] {
       if (n.new_band) out.push("newBand");
       if (n.new_mode) out.push("newMode");
     }
+    if (n.new_grid) out.push("newGrid");
     if (n.new_call) out.push("newCall");
     else if (n.new_call_band) out.push("newCallBand");
   }
