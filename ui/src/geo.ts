@@ -103,3 +103,12 @@ export function compass(b: number): string {
 export function subsolarPoint(date: Date): LatLon {
   return subsolar(date);
 }
+
+/** The point `deg` degrees of arc from `from` along a great circle leaving on `bearingDeg`. */
+export function destination(from: LatLon, bearingDeg: number, deg: number): LatLon {
+  const r = Math.PI / 180;
+  const lat1 = from.lat * r, b = bearingDeg * r, d = deg * r;
+  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(b));
+  const lon2 = from.lon * r + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+  return { lat: lat2 / r, lon: ((lon2 / r + 540) % 360) - 180 };
+}

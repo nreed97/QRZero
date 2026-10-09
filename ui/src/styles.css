@@ -264,6 +264,7 @@ kbd { font: 11px var(--mono); opacity: 0.75; margin-left: 4px; }
 .map-box .night { fill: #000; opacity: 0.22; }
 .map-box .short-path { fill: none; stroke: var(--path); stroke-width: 2; }
 .map-box .long-path { fill: none; stroke: var(--path); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.7; }
+.map-box .beam-path { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 1 3; }
 .map-box .home circle { fill: var(--accent); stroke: #000; stroke-width: 0.5; }
 .map-box .dx circle { fill: var(--path); stroke: #000; stroke-width: 0.5; }
 .map-box text { font: 600 11px var(--mono); fill: var(--text); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }

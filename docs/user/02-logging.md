@@ -92,7 +92,9 @@ The map shows your location (from its grid, or latitude/longitude) and the stati
 - **SP**: the beam heading for the short path, with compass point and distance.
 - **LP**: the long-path heading (short path + 180°) and distance.
 
-The shaded area is night, so you can see the grey line. **Flat** shows the whole world centred on your longitude; **Azimuthal** is a great-circle map centred on you, where straight lines from the centre are true beam headings. Choose kilometres or miles in **Settings → General**.
+The shaded area is night, so you can see the grey line. **Flat** shows the whole world centred on your longitude; **Azimuthal** is a great-circle map centred on you, where straight lines from the centre are true beam headings. When a rotator is connected, a dotted line shows where the beam points: a true great circle leaving your location on the rotator's current heading, so on the Flat map it curves the way the signal really travels, and on the Azimuthal map it is a straight line from the centre. It follows the rotator live.
+
+Choose kilometres or miles in **Settings → General**.
 
 ## Rig, antenna and amplifier
 

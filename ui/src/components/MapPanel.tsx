@@ -4,7 +4,7 @@ import { feature, mesh } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import world from "world-atlas/countries-110m.json";
 import { api } from "../api";
-import { compass, fmtDistance, pathInfo, subsolarPoint, type LatLon } from "../geo";
+import { compass, destination, fmtDistance, pathInfo, subsolarPoint, type LatLon } from "../geo";
 
 const topo = world as unknown as Topology<{ countries: GeometryCollection; land: GeometryCollection }>;
 const land = feature(topo, topo.objects.land);
@@ -72,6 +72,17 @@ export default function MapPanel({ home, homeLabel, dx, dxLabel, units, view, on
     longPath = path({ type: "LineString", coordinates: [[home.lon, home.lat], anti, [dx.lon, dx.lat]] }) ?? "";
   }
 
+  // The beam: a great circle leaving the QTH on the rotator heading, drawn out to the far side of the globe.
+  let beamPath = "";
+  if (home && typeof rotator === "number") {
+    const coords: [number, number][] = [];
+    for (let d = 0; d <= 180; d += 2) {
+      const p = destination(home, rotator, d);
+      coords.push([p.lon, p.lat]);
+    }
+    beamPath = path({ type: "LineString", coordinates: coords }) ?? "";
+  }
+
   const marker = (ll: LatLon | null, label: string, cls: string) => {
     const pt = ll && project(ll);
     if (!pt) return null;
@@ -100,6 +111,7 @@ export default function MapPanel({ home, homeLabel, dx, dxLabel, units, view, on
           <path className="night" d={path(night) ?? ""} />
           {longPath && <path className="long-path" d={longPath} />}
           {shortPath && <path className="short-path" d={shortPath} />}
+          {beamPath && <path className="beam-path" d={beamPath} />}
           {marker(home, homeLabel, "home")}
           {marker(dx, dxLabel, "dx")}
         </svg>
@@ -121,7 +133,7 @@ export default function MapPanel({ home, homeLabel, dx, dxLabel, units, view, on
             )}
           </>
         )}
-        {rotator !== undefined && <span className="muted rot" title="Rotator heading">Rot {rotator === null ? "?" : `${Math.round(rotator)}°`}</span>}
+        {rotator !== undefined && <span className="muted rot" title="Rotator heading (dotted line on the map)">Rot {rotator === null ? "?" : `${Math.round(rotator)}°`}</span>}
         {turnErr && <span className="err">{turnErr}</span>}
       </div>
     </section>
