@@ -644,3 +644,5 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 .needed-row.mode-cw .mode { color: var(--mode-cw); font-weight: 700; }
 .needed-row.mode-digital .mode { color: var(--mode-digital); font-weight: 700; }
 .needed-row.mode-phone .mode { color: var(--mode-phone); font-weight: 700; }
+.club-sessions { margin: 4px 8px; }
+.club-sessions summary { cursor: pointer; }
