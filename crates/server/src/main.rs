@@ -14,6 +14,9 @@ async fn main() -> anyhow::Result<()> {
     if let Ok(url) = std::env::var("QRZERO_PROPAGATION_URL") {
         cfg.propagation_url = url;
     }
+    if let Ok(url) = std::env::var("QRZERO_CONTESTS_URL") {
+        cfg.contests_url = url;
+    }
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         let mut value = || args.next().ok_or_else(|| anyhow::anyhow!("{arg} needs a value"));

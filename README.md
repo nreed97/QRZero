@@ -174,6 +174,10 @@ The **DXpeditions** pane reads NG3K's calendar and lists what is on the air now 
 
 ![DXpeditions](docs/screenshots/dxpeditions.png)
 
+### Contests
+
+The **Contests** pane reads the WA7BNM Contest Calendar and lists the contests on the air now and those coming up, with a CW / Phone / Digital filter and a link to each one's rules. It is a calendar only; contest logging stays in your contest logger.
+
 ### Propagation
 
 The **Propagation** pane shows solar flux, sunspots, A and K index, X-ray, solar wind, Bz, MUF and N0NBH's band-condition estimates for HF and VHF, with sunrise and sunset at your end and the other station's. It only fetches the feed while the pane is open.
@@ -227,7 +231,7 @@ For everything QRZero does not know by name (an antenna switch, a band decoder, 
 
 ## Arranging the window
 
-Everything is a pane: New QSO, Station, Worked before, Map, Log, FTx monitor, Cluster, Awards, Band map, Watch list, DXpeditions, Propagation, Rotator and Notes. Drag a tab to dock a pane beside another or stack it as a tab, drag the bars to resize, hide panes you don't use, and pop any pane except New QSO and the Log out to its own window for a second screen. Save arrangements by name (a laptop layout, a two-screen shack layout, an FT8 evening) and switch between them; **Lock panes** stops accidents. Layouts live in the log database, so they survive restarts and come back with a restored backup.
+Everything is a pane: New QSO, Station, Worked before, Map, Log, FTx monitor, Cluster, Awards, Band map, Watch list, DXpeditions, Contests, Propagation, Rotator and Notes. Drag a tab to dock a pane beside another or stack it as a tab, drag the bars to resize, hide panes you don't use, and pop any pane except New QSO and the Log out to its own window for a second screen. Save arrangements by name (a laptop layout, a two-screen shack layout, an FT8 evening) and switch between them; **Lock panes** stops accidents. Layouts live in the log database, so they survive restarts and come back with a restored backup.
 
 | | |
 | --- | --- |
@@ -278,6 +282,7 @@ The full user guide is in [docs/user](docs/user/01-getting-started.md) and is bu
 15. [Propagation](docs/user/15-propagation.md)
 16. [UDP connections and startup programs](docs/user/16-udp-and-startup.md)
 17. [DXpeditions](docs/user/17-dxpeditions.md)
+18. [Contests](docs/user/18-contests.md)
 
 ![Help in the app](docs/screenshots/help.png)
 

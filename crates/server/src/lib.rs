@@ -31,6 +31,7 @@ mod qsl;
 mod startup;
 mod station;
 mod udp_out;
+mod contests;
 mod dxped;
 mod watch;
 
@@ -64,6 +65,8 @@ pub struct Config {
     pub propagation_url: String,
     /// NG3K's DXpedition calendar (tests point this at a stand-in).
     pub dxped_url: String,
+    /// WA7BNM's contest calendar feed (tests point this at a stand-in).
+    pub contests_url: String,
     /// Start the programs listed under Settings, Startup programs.
     pub launch_apps: bool,
 }
@@ -80,6 +83,7 @@ impl Config {
             qsl_endpoints: QslEndpoints::default(),
             propagation_url: propagation::DEFAULT_URL.to_string(),
             dxped_url: dxped::DEFAULT_URL.to_string(),
+            contests_url: contests::DEFAULT_URL.to_string(),
             launch_apps: true,
         }
     }
@@ -140,13 +144,14 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
     let hub = Hub::new(store.clone(), cfg.data_dir.clone());
     hub.start(cfg.update_cty);
     hub.dxped.set_url(cfg.dxped_url);
+    hub.contests.set_url(cfg.contests_url);
     if cfg.update_cty {
         // Keeps the DXpedition calendar fresh in the background (weak, so it never holds the database open).
         let weak = Arc::downgrade(&hub);
         tokio::spawn(async move {
             loop {
                 let Some(hub) = weak.upgrade() else { break };
-                let wait = dxped::refresh(&hub, false).await;
+                let wait = dxped::refresh(&hub, false).await.min(contests::refresh(&hub, false).await);
                 drop(hub);
                 tokio::time::sleep(wait).await;
             }
@@ -272,6 +277,8 @@ fn router(state: Shared) -> Router {
         .route("/watch/hits", get(watch_hits))
         .route("/dxpeditions", get(dxped_get).put(dxped_put))
         .route("/dxpeditions/refresh", post(dxped_refresh))
+        .route("/contests", get(contests_get))
+        .route("/contests/refresh", post(contests_refresh))
         .route("/cluster", get(cluster_get).put(cluster_put))
         .route("/cluster/connect", post(cluster_connect))
         .route("/cluster/send", post(cluster_send))
@@ -1408,6 +1415,19 @@ async fn watch_put(State(s): State<Shared>, Json(entries): Json<Vec<watch::Watch
 
 fn dxped_view(s: &Shared) -> serde_json::Value {
     s.hub.dxped.view(&s.hub, chrono::Utc::now().date_naive())
+}
+
+fn contests_view(s: &Shared) -> serde_json::Value {
+    s.hub.contests.view(chrono::Utc::now().timestamp())
+}
+
+async fn contests_get(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
+    Ok(Json(contests_view(&s)))
+}
+
+async fn contests_refresh(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
+    contests::refresh(&s.hub, true).await;
+    Ok(Json(contests_view(&s)))
 }
 
 async fn dxped_get(State(s): State<Shared>) -> ApiResult<serde_json::Value> {

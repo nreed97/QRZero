@@ -37,6 +37,7 @@ const HOME: Partial<Record<PaneId, [PaneId, Zone]>> = {
   bandmap: ["log", "center"],
   watch: ["lookup", "center"],
   dxped: ["watch", "center"],
+  contests: ["dxped", "center"],
   propagation: ["map", "center"],
   rotator: ["map", "center"],
   notes: ["worked", "center"],

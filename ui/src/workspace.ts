@@ -1,6 +1,6 @@
 // The docked pane layout: a tree of splits whose leaves are tab groups.
 
-export type PaneId = "entry" | "lookup" | "worked" | "map" | "log" | "ftx" | "cluster" | "awards" | "bandmap" | "watch" | "dxped" | "propagation" | "rotator" | "notes";
+export type PaneId = "entry" | "lookup" | "worked" | "map" | "log" | "ftx" | "cluster" | "awards" | "bandmap" | "watch" | "dxped" | "contests" | "propagation" | "rotator" | "notes";
 
 export const PANES: { id: PaneId; title: string; popout: boolean }[] = [
   { id: "entry", title: "New QSO", popout: false },
@@ -14,6 +14,7 @@ export const PANES: { id: PaneId; title: string; popout: boolean }[] = [
   { id: "bandmap", title: "Band map", popout: true },
   { id: "watch", title: "Watch list", popout: true },
   { id: "dxped", title: "DXpeditions", popout: true },
+  { id: "contests", title: "Contests", popout: true },
   { id: "propagation", title: "Propagation", popout: true },
   { id: "rotator", title: "Rotator", popout: true },
   { id: "notes", title: "Notes", popout: true },
