@@ -86,6 +86,8 @@ The **Rotator** pane gives the rotator a proper control of its own. Open it from
 
 The compass dial shows where the antenna points now, with the heading in degrees at the top. When you have a station in the QSO panel whose location QRZero knows, an orange **SP** arrow marks the short-path bearing and a grey **LP** arrow the long path.
 
+Tick **Map** next to the heading to draw an azimuthal map behind the dial. It is centred on your location with north at the top, so the dial's bearings line up with the map: the other station sits at its true bearing and distance, and a dotted line from the centre follows the rotator's heading as a great circle (on this projection every great circle through your location is a straight line). It needs your grid under **Settings**; the choice is remembered.
+
 There are several ways to turn the antenna:
 
 - **Click anywhere on the dial** to turn to that bearing. As you move the mouse over the dial, QRZero shows the bearing you'd turn to.

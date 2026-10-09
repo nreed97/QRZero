@@ -1,14 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { geoAzimuthalEquidistant, geoCircle, geoEquirectangular, geoGraticule10, geoInterpolate, geoPath } from "d3-geo";
-import { feature, mesh } from "topojson-client";
-import type { GeometryCollection, Topology } from "topojson-specification";
-import world from "world-atlas/countries-110m.json";
 import { api } from "../api";
 import { compass, destination, fmtDistance, pathInfo, subsolarPoint, type LatLon } from "../geo";
 
-const topo = world as unknown as Topology<{ countries: GeometryCollection; land: GeometryCollection }>;
-const land = feature(topo, topo.objects.land);
-const borders = mesh(topo, topo.objects.countries, (a, b) => a !== b);
+import { land, borders } from "../mapData";
 
 export type MapView = "flat" | "azimuthal";
 

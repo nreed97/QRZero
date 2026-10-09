@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { geoAzimuthalEquidistant, geoGraticule10, geoPath } from "d3-geo";
+import { borders, land } from "../mapData";
 import { api } from "../api";
 import type { PopContext } from "../bus";
-import { pathInfo } from "../geo";
+import { destination, pathInfo } from "../geo";
 import { useIntegrations, useRotator } from "../live";
 import { localGet, localSet } from "../prefs";
 import type { PaneActions } from "./SharedPanes";
@@ -15,6 +17,7 @@ const DEFAULT_PRESETS: Preset[] = [
   { name: "VK", az: 260 },
   { name: "JA", az: 330 },
 ];
+const MAP_KEY = "qrzero.rotator.map";
 const TIMEOUT_MS = 90_000;
 
 const norm = (a: number) => ((Math.round(a) % 360) + 360) % 360;
@@ -35,6 +38,26 @@ export default function RotatorPane({ ctx, act }: { ctx: PopContext; act: PaneAc
   const [presets, setPresets] = useState<Preset[]>(() => localGet(PRESETS_KEY, { presets: DEFAULT_PRESETS }).presets);
   const [editing, setEditing] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
+  const [showMap, setShowMap] = useState<boolean>(() => localGet(MAP_KEY, { on: false }).on);
+  const toggleMap = (on: boolean) => {
+    setShowMap(on);
+    localSet(MAP_KEY, { on });
+  };
+  const home = ctx.home;
+  // Azimuthal equidistant centred on the QTH, north up, so the dial's bearings read straight off the map.
+  const mapPaths = useMemo(() => {
+    if (!home) return null;
+    const proj = geoAzimuthalEquidistant().rotate([-home.lon, -home.lat]).scale(100 / Math.PI).translate([0, 0]).clipAngle(179.9);
+    const path = geoPath(proj);
+    return {
+      sea: path({ type: "Sphere" }) ?? "",
+      grat: path(geoGraticule10()) ?? "",
+      land: path(land) ?? "",
+      borders: path(borders) ?? "",
+      project: (lon: number, lat: number) => proj([lon, lat]),
+      path,
+    };
+  }, [home?.lat, home?.lon]);
 
   const info = ctx.home && ctx.dx ? pathInfo(ctx.home, ctx.dx) : null;
   // A UDP connection for rotator requests (Settings, UDP connections) also counts as set up.
@@ -135,6 +158,9 @@ export default function RotatorPane({ ctx, act }: { ctx: PopContext; act: PaneAc
       <div className="rot-head">
         <span className="rot-heading mono">{heading === null ? "---" : `${String(Math.round(heading) % 360).padStart(3, "0")}°`}</span>
         <span className={`rot-status ${target ? "moving" : "muted"}`}>{statusText}</span>
+        <label className="small rot-maptoggle" title="Show an azimuthal map centred on your location behind the dial">
+          <input type="checkbox" checked={showMap} disabled={!home} onChange={(e) => toggleMap(e.target.checked)} /> Map
+        </label>
         {hover !== null && <span className="muted small rot-hover">Click to turn to {hover}°</span>}
       </div>
       <div className="rot-body">
@@ -153,6 +179,27 @@ export default function RotatorPane({ ctx, act }: { ctx: PopContext; act: PaneAc
             aria-label={`Rotator heading ${heading === null ? "unknown" : Math.round(heading) + " degrees"}`}
           >
             <circle className="face" r={104} />
+            {showMap && mapPaths && (
+              <g className="dial-map">
+                <clipPath id="rot-clip"><circle r={100} /></clipPath>
+                <g clipPath="url(#rot-clip)">
+                  <path className="sea" d={mapPaths.sea} />
+                  <path className="graticule" d={mapPaths.grat} />
+                  <path className="land" d={mapPaths.land} />
+                  <path className="borders" d={mapPaths.borders} />
+                  {heading !== null && home && (
+                    <path
+                      className="beam-path"
+                      d={mapPaths.path({ type: "LineString", coordinates: Array.from({ length: 91 }, (_, i) => { const q = destination(home, heading, i * 2); return [q.lon, q.lat]; }) }) ?? ""}
+                    />
+                  )}
+                  {ctx.dx && (() => {
+                    const pt = mapPaths.project(ctx.dx.lon, ctx.dx.lat);
+                    return pt ? <circle className="dx-dot" cx={pt[0]} cy={pt[1]} r={3} /> : null;
+                  })()}
+                </g>
+              </g>
+            )}
             <circle className="rim" r={100} />
             <g className="ticks">{ticks}</g>
             {numbers}
