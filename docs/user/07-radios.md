@@ -61,9 +61,17 @@ The rig recorded with each QSO (`MY_RIG`) is the radio being followed.
 
 ## Rotator
 
-With PstRotatorAz set up (**Settings → Radios and programs**), the map shows the rotator's heading and **Turn SP** / **LP** buttons that turn the antenna to the short or long path of the station you're working.
+QRZero can talk to a rotator directly or through PstRotatorAz. In **Settings → Radios and programs → Rotator**, tick **Control a rotator** and pick how to connect:
 
-For another rotator program, or to send the heading somewhere else as well, add a UDP connection that sends on **Rotator turn request** (see *UDP connections and startup programs*). The Rotator pane works with that alone too, though it only shows the current heading when PstRotatorAz is on.
+- **PstRotatorAz (UDP)**: the existing link; in PstRotatorAz turn on UDP Control (port 12000).
+- **Hamlib rotctld (TCP)**: give the address of a running `rotctld`, normally `127.0.0.1:4533`. This covers any rotator Hamlib supports.
+- **Yaesu GS-232 (serial or TCP)**: for controllers that emulate the GS-232, which most do. Type the serial port (for example `COM5`) and baud rate, or leave the port blank and give a network address like `192.168.1.50:23`. Use this or rotctld for a network controller such as the AF6SA WRC, whichever protocol its manual lists (the WRC also has a PstRotator-compatible telnet mode, which is not the same as these).
+
+The settings box shows whether the connection is up. QRZero reconnects by itself if the controller goes away.
+
+With a rotator set up, the map shows the rotator's heading and **Turn SP** / **LP** buttons that turn the antenna to the short or long path of the station you're working.
+
+For another rotator program, or to send the heading somewhere else as well, add a UDP connection that sends on **Rotator turn request** (see *UDP connections and startup programs*). The Rotator pane works with that alone too, though it only shows the current heading when the rotator above is on.
 
 ## Rotator pane
 
@@ -80,4 +88,4 @@ There are several ways to turn the antenna:
 
 While the antenna is moving you'll see **Turning to 123°**. It clears once the heading is within 3° of where you asked for, or after a minute and a half if the rotator doesn't get there.
 
-If PstRotatorAz isn't set up yet, the pane says so and offers a button that opens **Settings → Radios and programs**, where you turn it on. If the heading shows `---`, QRZero isn't hearing back from PstRotatorAz: check that its UDP control is on.
+If no rotator is set up yet, the pane says so and offers a button that opens **Settings → Radios and programs**, where you turn it on. If the heading shows `---`, QRZero isn't hearing back from the rotator: check the status line in that settings box (for PstRotatorAz, that its UDP control is on).

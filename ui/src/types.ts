@@ -165,7 +165,12 @@ export interface Integrations {
   /** Look up auto-logged QSOs on QRZ and fill in what they left blank. */
   auto_log_lookup: boolean;
   rotator_enabled: boolean;
+  /** "pst" (PstRotatorAz), "rotctld" (Hamlib) or "gs232" (Yaesu GS-232). */
+  rotator_kind: string;
   rotator_addr: string;
+  rotator_tcp: string;
+  rotator_serial: string;
+  rotator_baud: number;
 }
 
 export interface IntegrationStatus { wsjtx: string | null; n1mm: string | null; rotator: string | null }

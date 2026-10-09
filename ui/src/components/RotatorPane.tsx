@@ -90,8 +90,8 @@ export default function RotatorPane({ ctx, act }: { ctx: PopContext; act: PaneAc
     return (
       <div className="rotator">
         <div className="rot-off">
-          <p>The rotator isn't set up yet. QRZero turns your antenna through PstRotatorAz, or another rotator program through a UDP connection.</p>
-          <button onClick={() => act.onSettings("radios")}>Set up PstRotatorAz…</button>
+          <p>The rotator isn't set up yet. QRZero turns your antenna directly (rotctld, GS-232) or through PstRotatorAz, or another rotator program through a UDP connection.</p>
+          <button onClick={() => act.onSettings("radios")}>Set up the rotator…</button>
         </div>
       </div>
     );
@@ -128,7 +128,7 @@ export default function RotatorPane({ ctx, act }: { ctx: PopContext; act: PaneAc
 
   const needle = heading !== null ? at(heading, 92) : null;
   const tail = heading !== null ? at(heading + 180, 14) : null;
-  const statusText = target ? `Turning to ${target.az}°` : heading === null ? "No heading from PstRotatorAz" : "";
+  const statusText = target ? `Turning to ${target.az}°` : heading === null ? "No heading from the rotator" : "";
 
   return (
     <div className="rotator">
