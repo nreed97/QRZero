@@ -61,14 +61,25 @@ pub struct QslConfig {
     /// Station callsigns uploaded to the eQSL account.
     pub eqsl_calls: Vec<String>,
     pub eqsl_rcvd_since: String,
-    /// Download new LoTW and eQSL confirmations once a day.
+    /// Download new eQSL confirmations once a day. (Older versions also
+    /// downloaded LoTW's with it; see `lotw_download_enabled`.)
     pub confirm_daily: bool,
+    /// Download new LoTW confirmations every `lotw_download_interval_min` minutes.
+    pub lotw_download_enabled: bool,
+    /// 0: not set yet (settings from an older version); `normalize` fills it.
+    pub lotw_download_interval_min: u32,
 }
 
 impl QslConfig {
     /// Gives a service without its own interval (settings saved by an older
     /// version) the interval it used so far, and keeps all of them in range.
     fn normalize(&mut self) {
+        if self.lotw_download_interval_min == 0 {
+            // Before this setting, "once a day" also downloaded LoTW.
+            self.lotw_download_interval_min = 24 * 60;
+            self.lotw_download_enabled = self.confirm_daily;
+        }
+        self.lotw_download_interval_min = self.lotw_download_interval_min.clamp(1, 7 * 24 * 60);
         let old = if self.interval_min == 0 { 15 } else { self.interval_min };
         for m in [&mut self.qrz_interval_min, &mut self.clublog_interval_min, &mut self.eqsl_interval_min] {
             if *m == 0 {
@@ -105,6 +116,8 @@ impl Default for QslConfig {
             eqsl_calls: Vec::new(),
             eqsl_rcvd_since: String::new(),
             confirm_daily: false,
+            lotw_download_enabled: false,
+            lotw_download_interval_min: 0,
         }
     }
 }
@@ -140,8 +153,6 @@ struct Inner {
     config: QslConfig,
     runs: BTreeMap<&'static str, Run>,
     downloads: BTreeMap<&'static str, Download>,
-    /// When confirmations were last downloaded automatically (Unix seconds).
-    last_auto_download: i64,
     /// QSOs a service refused this session, so they aren't retried every few minutes.
     refused: HashSet<(&'static str, i64)>,
 }
@@ -274,14 +285,15 @@ impl Qsl {
                         q.upload(svc).await;
                     }
                 }
-                let now = Utc::now().timestamp();
-                if cfg.confirm_daily && now - q.lock().last_auto_download > 24 * 3600 {
-                    q.lock().last_auto_download = now;
-                    if !cfg.lotw_username.is_empty() {
-                        q.download("lotw").await;
-                    }
-                    if !cfg.eqsl_username.is_empty() {
-                        q.download("eqsl").await;
+                for (svc, on, minutes, ready) in [
+                    ("lotw", cfg.lotw_download_enabled, cfg.lotw_download_interval_min, !cfg.lotw_username.is_empty()),
+                    ("eqsl", cfg.confirm_daily, 24 * 60, !cfg.eqsl_username.is_empty()),
+                ] {
+                    let key = if svc == "lotw" { "lotw-rcvd" } else { "eqsl-rcvd" };
+                    let since = *last.entry(key).or_insert(begin);
+                    if on && ready && since.elapsed() >= Duration::from_secs(60 * minutes as u64) {
+                        last.insert(key, std::time::Instant::now());
+                        q.download(svc).await;
                     }
                 }
             }
@@ -751,6 +763,10 @@ mod tests {
         let mut c: QslConfig = serde_json::from_str(r#"{"interval_min":40,"qrz_enabled":true}"#).unwrap();
         c.normalize();
         assert_eq!((c.qrz_interval_min, c.clublog_interval_min, c.eqsl_interval_min), (40, 40, 40));
+        assert!(!c.lotw_download_enabled && c.lotw_download_interval_min == 1440);
+        let mut d: QslConfig = serde_json::from_str(r#"{"confirm_daily":true}"#).unwrap();
+        d.normalize();
+        assert!(d.lotw_download_enabled, "daily LoTW download carries over");
         // Afterwards they are independent.
         c.clublog_interval_min = 5;
         c.normalize();

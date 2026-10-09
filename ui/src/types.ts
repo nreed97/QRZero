@@ -229,6 +229,8 @@ export interface QslConfig {
   eqsl_calls: string[];
   eqsl_rcvd_since: string;
   confirm_daily: boolean;
+  lotw_download_enabled: boolean;
+  lotw_download_interval_min: number;
 }
 export type QslService = "qrz" | "clublog" | "lotw" | "eqsl";
 export interface QslDownload { at: number; running: boolean; received: number; confirmed: number; unmatched: string[]; unmatched_count: number; error: string | null }

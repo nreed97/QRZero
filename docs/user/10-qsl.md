@@ -20,7 +20,7 @@ Log grid columns for all of this: **LoTW R**, **QSL R**, **QRZ R**, **OQRS** and
 
 ## Online services
 
-The **Online services** tab has one page per service: **LoTW**, **QRZ Logbook**, **Club Log** and **eQSL**. Pick one across the top. The daily confirmation download and **Save** stay at the bottom for all of them. QRZ Logbook, Club Log and eQSL each have their own **Upload new QSOs automatically** tick and **Every (min)** interval on their page, so one service can upload every 5 minutes while another is off or runs once an hour. After an upgrade each keeps the interval you had before. LoTW has no timer; it only uploads when you click **Sign and upload**. Rarely used LoTW options (upload by date range, moving from another logger) are under **Upload by date range, moving from another logger**.
+The **Online services** tab has one page per service: **LoTW**, **QRZ Logbook**, **Club Log** and **eQSL**. Pick one across the top. The daily eQSL confirmation download and **Save** stay at the bottom for all of them. QRZ Logbook, Club Log and eQSL each have their own **Upload new QSOs automatically** tick and **Every (min)** interval on their page, so one service can upload every 5 minutes while another is off or runs once an hour. After an upgrade each keeps the interval you had before. LoTW uploads only when you click **Sign and upload**, but it can download confirmations on a timer: tick **Download confirmations automatically** on its page and set **Every (min)** (once a day is 1440; on after an upgrade if you had the daily download on). The bottom tick downloads eQSL confirmations once a day. Rarely used LoTW options (upload by date range, moving from another logger) are under **Upload by date range, moving from another logger**.
 
 ## LoTW
 
@@ -62,7 +62,7 @@ Enter your Club Log email and password, a Club Log **API key** (request one from
 
 Enter your eQSL username and password, plus the **QTH nickname** if your eQSL account has more than one, and tick the callsigns to upload. Uploads work like QRZ and Club Log: on the timer, or with **Upload now**. **Download confirmations** fetches eQSLs from your eQSL inbox and sets **eQSL R** on the matching QSOs.
 
-Tick **Download LoTW and eQSL confirmations once a day** at the bottom to have this done for you.
+Tick **Download eQSL confirmations once a day** at the bottom to have this done for you.
 
 ## Cards to send
 

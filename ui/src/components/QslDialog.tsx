@@ -268,6 +268,10 @@ function Online({ callsigns, locations }: Props) {
             <button disabled={!!busy || !cfg.lotw_username} onClick={() => download("lotw")}>{busy === "lotw-rcvd" ? "Downloading…" : "Download confirmations"}</button>
             <DownloadLine d={o.downloads.lotw} />
           </div>
+          <div className="row">
+            <label className="check"><input type="checkbox" checked={cfg.lotw_download_enabled} onChange={(e) => set({ lotw_download_enabled: e.target.checked })} /> Download confirmations automatically</label>
+            <label className="f w-s"><span>Every (min)</span><input value={cfg.lotw_download_interval_min} disabled={!cfg.lotw_download_enabled} inputMode="numeric" onChange={(e) => set({ lotw_download_interval_min: Math.max(1, Number(e.target.value) || 1440) })} /></label>
+          </div>
         </fieldset>
         )}
 
@@ -363,7 +367,7 @@ function Online({ callsigns, locations }: Props) {
         )}
 
         <div className="row">
-          <label className="check"><input type="checkbox" checked={cfg.confirm_daily} onChange={(e) => set({ confirm_daily: e.target.checked })} /> Download LoTW and eQSL confirmations once a day</label>
+          <label className="check"><input type="checkbox" checked={cfg.confirm_daily} onChange={(e) => set({ confirm_daily: e.target.checked })} /> Download eQSL confirmations once a day</label>
           <span className="spacer" />
           {msg && <span className={msg.ok ? "ok" : "err"}>{msg.text}</span>}
           <button className="primary" onClick={save}>Save</button>
