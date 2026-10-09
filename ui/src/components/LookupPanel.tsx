@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { api } from "../api";
 import { localGet } from "../prefs";
+import { useAwardsOff } from "../awardsPref";
 import type { AwardHint, AwardKind, LookupResult, SlotGrid } from "../types";
 import type { EntryContext } from "./EntryPanel";
 import { useLiveNote } from "../notes";
@@ -8,7 +9,8 @@ import "../notes.css";
 
 export default function LookupPanel({ logId, result, entry, refreshKey }: { logId: number; result: LookupResult | null; entry: EntryContext; refreshKey?: number }) {
   const note = useLiveNote(entry.fields.CALL ?? "", result?.note ?? null);
-  const hints = useAwardHints(logId, result, entry, refreshKey);
+  const off = useAwardsOff();
+  const hints = useAwardHints(logId, result, entry, refreshKey)?.filter((h) => !off.includes(h.award)) ?? null;
   const slotsDxcc = String(entry.fields.DXCC ?? result?.station?.DXCC ?? result?.entity?.dxcc ?? "").trim();
   const slots = useDxccSlots(logId, result ? slotsDxcc : "", refreshKey);
   if (!result) {
@@ -60,7 +62,7 @@ export default function LookupPanel({ logId, result, entry, refreshKey }: { logI
         ))}
       </div>
       {hints && hints.length > 0 && <AwardHints hints={hints} band={entry.band} mode={entry.mode} />}
-      {slots && <DxccSlots grid={slots} name={result.entity?.name ?? s?.COUNTRY ?? `DXCC ${slotsDxcc}`} band={entry.band} mode={entry.mode} />}
+      {slots && !off.includes("dxcc") && <DxccSlots grid={slots} name={result.entity?.name ?? s?.COUNTRY ?? `DXCC ${slotsDxcc}`} band={entry.band} mode={entry.mode} />}
       </div>
     </section>
   );

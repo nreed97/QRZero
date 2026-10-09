@@ -18,6 +18,12 @@ On the **DXCC** tab a line under the toolbar also shows the **DXCC Challenge** (
 
 Each row is an entity, state, zone, prefix and so on. The columns are **Mixed**, then **CW**, **Phone** and **Digital**, then each band from 160 m to 6 m, plus 2 m and 70 cm. A green **C** means confirmed and an amber **W** means worked but not yet confirmed. The second header row shows confirmed and worked totals for each column, and the top right shows the overall total.
 
+## Choosing which awards to show
+
+Open **Settings…**, **Awards** and tick the awards you chase. An award you untick disappears from the Awards pane, from the award lines in the QSO panel, and (for DXCC) from the slot grid there. If you don't operate CW, untick **SKCC** and **CWops**. **Clear all** and **Select all** switch everything off or on at once.
+
+Hiding an award only hides it. Your log is not touched, and ticking the award again brings it back as it was. Every award is on to begin with, and so is any award added in a later version.
+
 ## What counts as confirmed
 
 Tick the sources that count under **Confirmed by**:

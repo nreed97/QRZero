@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { onLive } from "../live";
 import { localGet, localSet } from "../prefs";
+import { useAwardsOff } from "../awardsPref";
 import ClubAwards from "./ClubAwards";
 import type { AwardKind, AwardTable, QsoFilter, StationCallsign } from "../types";
 
@@ -57,6 +58,12 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
   const [table, setTable] = useState<AwardTable | null>(null);
   const [err, setErr] = useState("");
   const [stamp, setStamp] = useState(0);
+  const hidden = useAwardsOff();
+  const awards = AWARDS.filter((a) => !hidden.includes(a.key));
+  const clubs = CLUBS.filter((a) => !hidden.includes(a.key));
+  // The award last looked at may have been switched off in Settings: fall back to the first one still on.
+  const none = awards.length + clubs.length === 0;
+  const current: AwardKind | ClubKind = hidden.includes(opts.award) ? (awards[0]?.key ?? clubs[0]?.key ?? "dxcc") : opts.award;
 
   const set = (patch: Partial<Opts>) => {
     const next = { ...opts, ...patch };
@@ -65,8 +72,8 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
   };
 
   useEffect(() => {
-    if (isClub(opts.award)) return;
-    const kind = opts.award;
+    if (none || isClub(current)) return;
+    const kind = current;
     let live = true;
     setErr("");
     api
@@ -76,7 +83,7 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
     return () => {
       live = false;
     };
-  }, [logId, opts.award, opts.call, opts.lotw, opts.paper, opts.eqsl, stamp]);
+  }, [logId, none, current, opts.call, opts.lotw, opts.paper, opts.eqsl, stamp]);
 
   // Recount when QSOs are logged or confirmations arrive (at most every few seconds).
   useEffect(() => {
@@ -90,37 +97,41 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
     };
   }, []);
 
-  const club = isClub(opts.award) ? opts.award : null;
+  const club = isClub(current) ? current : null;
   const rows = useMemo(() => (table ? (opts.needed ? table.rows.filter((r) => r.cells.mixed !== "confirmed") : table.rows) : []), [table, opts.needed]);
-  const award = AWARDS.find((a) => a.key === opts.award) ?? AWARDS[0];
-  const summary = useMemo(() => (table && opts.award === "dxcc" ? dxccSummary(table) : null), [table, opts.award]);
+  const award = AWARDS.find((a) => a.key === current) ?? AWARDS[0];
+  const summary = useMemo(() => (table && current === "dxcc" ? dxccSummary(table) : null), [table, current]);
   const mixed = club ? undefined : table?.columns.find((c) => c.key === "mixed");
 
   const show = (key: string) => {
-    if (opts.award === "dxcc") onShowQsos({ dxcc: Number(key) });
-    else if (opts.award === "was") onShowQsos({ fields: { STATE: key } });
-    else if (opts.award === "waz") onShowQsos({ fields: { CQZ: key } });
-    else if (opts.award === "wac") onShowQsos({ fields: { CONT: key } });
-    else if (opts.award === "itu") onShowQsos({ fields: { ITUZ: key } });
-    else if (opts.award === "vucc") onShowQsos({ fields: { GRIDSQUARE: key } });
-    else if (opts.award === "iota") onShowQsos({ fields: { IOTA: key } });
-    else if (opts.award === "counties") onShowQsos({ fields: { CNTY: key } });
+    if (current === "dxcc") onShowQsos({ dxcc: Number(key) });
+    else if (current === "was") onShowQsos({ fields: { STATE: key } });
+    else if (current === "waz") onShowQsos({ fields: { CQZ: key } });
+    else if (current === "wac") onShowQsos({ fields: { CONT: key } });
+    else if (current === "itu") onShowQsos({ fields: { ITUZ: key } });
+    else if (current === "vucc") onShowQsos({ fields: { GRIDSQUARE: key } });
+    else if (current === "iota") onShowQsos({ fields: { IOTA: key } });
+    else if (current === "counties") onShowQsos({ fields: { CNTY: key } });
     else onShowQsos({ call: key });
   };
+
+  if (none) {
+    return <div className="ftx awards"><div className="ftx-msg small muted">All awards are switched off. Turn the ones you want back on in Settings, Awards.</div></div>;
+  }
 
   return (
     <div className="ftx awards">
       <div className="grid-tools">
-        <nav className="seg" aria-label="Award">
-          {AWARDS.map((a) => (
-            <button key={a.key} className={opts.award === a.key ? "on" : ""} onClick={() => set({ award: a.key })}>{a.name}</button>
+        {awards.length > 0 && <nav className="seg" aria-label="Award">
+          {awards.map((a) => (
+            <button key={a.key} className={current === a.key ? "on" : ""} onClick={() => set({ award: a.key })}>{a.name}</button>
           ))}
-        </nav>
-        <nav className="seg" aria-label="CW club award">
-          {CLUBS.map((a) => (
-            <button key={a.key} className={opts.award === a.key ? "on" : ""} onClick={() => set({ award: a.key })}>{a.name}</button>
+        </nav>}
+        {clubs.length > 0 && <nav className="seg" aria-label="CW club award">
+          {clubs.map((a) => (
+            <button key={a.key} className={current === a.key ? "on" : ""} onClick={() => set({ award: a.key })}>{a.name}</button>
           ))}
-        </nav>
+        </nav>}
         <select value={opts.call} onChange={(e) => set({ call: e.target.value })} aria-label="Callsign">
           <option value="">All my callsigns</option>
           {callsigns.map((c) => <option key={c.id}>{c.callsign}</option>)}
@@ -168,7 +179,7 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
               {rows.map((r) => (
                 <tr key={r.key} onClick={() => show(r.key)} title="Show these QSOs in the log">
                   <td className="name">
-                    {opts.award === "dxcc" || opts.award === "was" ? <span className="mono muted key">{r.key}</span> : null}
+                    {current === "dxcc" || current === "was" ? <span className="mono muted key">{r.key}</span> : null}
                     {r.name}
                   </td>
                   {table.columns.map((c) => {
@@ -189,7 +200,7 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
         </div>
       )}
       {!club && <div className="ftx-msg small muted">
-        {opts.award === "vucc" && "VUCC counts 4-character grid squares on 6 m and up. "}{opts.award === "counties" && "Counties come from the County field (like OH,Franklin), which LoTW and QRZ fill in. "}C confirmed, W worked but not confirmed. Click a row to see its QSOs in the log. Get confirmations with QSL, Download confirmations.
+        {current === "vucc" && "VUCC counts 4-character grid squares on 6 m and up. "}{current === "counties" && "Counties come from the County field (like OH,Franklin), which LoTW and QRZ fill in. "}C confirmed, W worked but not confirmed. Click a row to see its QSOs in the log. Get confirmations with QSL, Download confirmations.
       </div>}
     </div>
   );

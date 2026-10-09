@@ -10,6 +10,7 @@ import { confirmDelete } from "../display";
 import BackupsTab from "./BackupsTab";
 import { DISPLAY_DEFAULTS, beep, setDisplay, useDisplay } from "../display";
 import { MODES } from "../modes";
+import { AWARD_LIST, setAwardEnabled, setAwardsOff, useAwardsOff } from "../awardsPref";
 
 export interface GeneralPrefs { units: "km" | "mi" }
 
@@ -32,12 +33,12 @@ interface Props {
   initialTab?: string;
 }
 
-type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "udp" | "startup" | "cluster" | "logs" | "lookup" | "backups" | "general";
+type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "udp" | "startup" | "cluster" | "logs" | "lookup" | "awards" | "backups" | "general";
 
 /** The sections down the left of Settings, grouped. */
 const GROUPS: { name: string; tabs: Tab[] }[] = [
   { name: "Station", tabs: ["station", "locations", "equipment", "logs"] },
-  { name: "Logging", tabs: ["fields", "lookup"] },
+  { name: "Logging", tabs: ["fields", "lookup", "awards"] },
   { name: "Connections", tabs: ["radios", "udp", "cluster", "startup"] },
   { name: "Program", tabs: ["backups", "general"] },
 ];
@@ -53,6 +54,7 @@ const TAB_NAMES: Record<Tab, string> = {
   cluster: "DX cluster",
   logs: "Logs",
   lookup: "Callsign lookup",
+  awards: "Awards",
   backups: "Backups",
   general: "General",
 };
@@ -100,6 +102,7 @@ export default function SettingsDialog(props: Props) {
       {tab === "udp" && <UdpConnectionsTab />}
       {tab === "startup" && <StartupAppsTab />}
       {tab === "cluster" && <ClusterTab />}
+      {tab === "awards" && <AwardsTab />}
       {tab === "backups" && <BackupsTab />}
       {tab === "general" && <GeneralTab general={props.general} onGeneral={props.onGeneral} onWizard={props.onWizard} />}
       </div>
@@ -491,6 +494,37 @@ function ClusterTab() {
       <label className="check"><input type="checkbox" checked={cfg.auto_connect} onChange={(e) => setCfg({ ...cfg, auto_connect: e.target.checked })} /> Connect when QRZero starts</label>
       {msg && <p className={msg.ok ? "ok" : "err"}>{msg.text}</p>}
       <div className="buttons"><button className="primary" onClick={save}>Save</button></div>
+    </div>
+  );
+}
+
+function AwardsTab() {
+  const off = useAwardsOff();
+  const group = (g: "main" | "cw") => AWARD_LIST.filter((a) => a.group === g);
+  return (
+    <div className="general-tab">
+      <p className="muted">Tick the awards you chase. An award you untick disappears from the Awards pane and from the award hints in the QSO panel. Nothing is deleted from your log, and ticking it again brings it all back.</p>
+      <fieldset>
+        <legend>Awards</legend>
+        {group("main").map((a) => (
+          <label key={a.key} className="check">
+            <input type="checkbox" checked={!off.includes(a.key)} onChange={(e) => setAwardEnabled(a.key, e.target.checked)} /> <b>{a.name}</b> <span className="muted">{a.what}</span>
+          </label>
+        ))}
+      </fieldset>
+      <fieldset>
+        <legend>CW club awards</legend>
+        {group("cw").map((a) => (
+          <label key={a.key} className="check">
+            <input type="checkbox" checked={!off.includes(a.key)} onChange={(e) => setAwardEnabled(a.key, e.target.checked)} /> <b>{a.name}</b> <span className="muted">{a.what}</span>
+          </label>
+        ))}
+        <p className="small muted">If you don't operate CW, untick these. The SKCC and CWops boxes in the entry fields are set separately, under Entry fields.</p>
+      </fieldset>
+      <div className="row">
+        <button onClick={() => setAwardsOff([])}>Select all</button>
+        <button onClick={() => setAwardsOff(AWARD_LIST.map((a) => a.key))}>Clear all</button>
+      </div>
     </div>
   );
 }
