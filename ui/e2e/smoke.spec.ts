@@ -267,6 +267,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
 
   // QSL uploads: keys are saved, never shown back.
   await fromMenu(page, /^QSL:/);
+  await page.getByRole("button", { name: "QRZ Logbook" }).click();
   await page.getByLabel("QRZ API key for N0OLD").fill("ABCD-1234");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Saved.")).toBeVisible();

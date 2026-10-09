@@ -1,6 +1,6 @@
 # QSL: LoTW, QRZ, Club Log, eQSL and paper cards
 
-Choose **QSL** from the **☰** menu at the right of the top bar. It has four tabs: **Look up** (a call's QSOs and contact details), **Cards to send** (your card queue and label printing), **To reply to**, and the online services.
+Choose **QSL** from the **☰** menu at the right of the top bar. It has four tabs: **Look up** (a call's QSOs and contact details), **Cards to send** (your card queue and label printing), **To reply to**, and **Online services**.
 
 Each QSO keeps its upload status in the standard ADIF fields (`LOTW_QSL_SENT`, `QRZCOM_QSO_UPLOAD_STATUS`, `CLUBLOG_QSO_UPLOAD_STATUS`, `EQSL_QSL_SENT` and their dates), so exports and other loggers see what's been sent. Add the **LoTW S**, **eQSL S**, **QRZ**, **Club Log** and **QSL S** (card) columns to the log grid to see them.
 
@@ -17,6 +17,10 @@ QSOs count as confirmed when LoTW R, QSL R (card), eQSL R or QRZ R is Y (or V). 
 Club Log OQRS (online QSL request) has no ADIF field, so QRZero keeps your request in its own fields, `APP_QRZERO_OQRS` and `APP_QRZERO_OQRSDATE`. It doesn't talk to Club Log's OQRS queue; it's a reminder that you've asked. To mark many QSOs, select them in the log and pick **Paper QSL…, Mark OQRS requested**, or right-click.
 
 Log grid columns for all of this: **LoTW R**, **QSL R**, **QRZ R**, **OQRS** and **Confirmed** (letters for each confirming service: L LoTW, C card, E eQSL, Q QRZ).
+
+## Online services
+
+The **Online services** tab has one page per service: **LoTW**, **QRZ Logbook**, **Club Log** and **eQSL**. Pick one across the top. The upload interval, the daily confirmation download and **Save** stay at the bottom for all of them. Rarely used LoTW options (upload by date range, moving from another logger) are under **Upload by date range, moving from another logger**.
 
 ## LoTW
 

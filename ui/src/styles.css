@@ -600,3 +600,6 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 .ql-card dl > div { display: flex; gap: 8px; }
 .ql-card dt { width: 70px; flex: none; color: var(--muted); }
 .ql-card dd { margin: 0; white-space: pre-line; }
+.tabs.sub { margin-bottom: 8px; }
+.qsl details.more { margin: 6px 0; }
+.qsl details.more summary { cursor: pointer; color: var(--muted); }
