@@ -1,6 +1,6 @@
 # QSL: LoTW, QRZ, Club Log, eQSL and paper cards
 
-Choose **QSL** from the **☰** menu at the right of the top bar. The first tab has the online services; **Paper cards** has your card queue and label printing.
+Choose **QSL** from the **☰** menu at the right of the top bar. It has four tabs: **Look up** (a call's QSOs and contact details), **Cards to send** (your card queue and label printing), **To reply to**, and the online services.
 
 Each QSO keeps its upload status in the standard ADIF fields (`LOTW_QSL_SENT`, `QRZCOM_QSO_UPLOAD_STATUS`, `CLUBLOG_QSO_UPLOAD_STATUS`, `EQSL_QSL_SENT` and their dates), so exports and other loggers see what's been sent. Add the **LoTW S**, **eQSL S**, **QRZ**, **Club Log** and **QSL S** (card) columns to the log grid to see them.
 
@@ -60,11 +60,11 @@ Enter your eQSL username and password, plus the **QTH nickname** if your eQSL ac
 
 Tick **Download LoTW and eQSL confirmations once a day** at the bottom to have this done for you.
 
-## Paper cards
+## Cards to send
 
 Queue a card from the log: select the QSOs and pick **Paper QSL…, Queue a card to send**, or type Q in the **QSL sent** field when you log. QSOs where the other station asked for a card (R) show up too.
 
-The **Paper cards** tab lists everything waiting. Tick the ones to print and pick your label sheet:
+The **Cards to send** tab lists everything waiting. Tick the ones to print and pick your label sheet:
 
 - **Avery 5160 / L7160**: 30 small labels, two QSOs per label.
 - **Avery 5163 / L7163**: 10 large labels, five QSOs per label.
@@ -81,11 +81,13 @@ Cards arrive in the mail and don't always get answered right away. The **To repl
 - Each row shows the call, the date the card arrived (change it if it was earlier), a note you can type in (direct, via bureau, an address), and the newest QSOs you have with that station.
 - When you've replied, click **Replied**. Pick **Sent via bureau** or **Sent direct** to also mark those QSOs as card sent with today's date, or **Just remove** to only take the call off the list. The entry is deleted; no history is kept.
 
-## QSL lookup
+## Look up
 
-For answering cards or writing them in bulk: pick **QSL lookup…** from the **☰** menu, or press **Alt+Q**. Type a callsign and press **Enter**. You get that station's QSOs, newest first: date, UTC, MHz, mode, the RST you sent and received, your own callsign, and the card status (sent and received, with the bureau or direct route and date, and OQRS if you've asked). Above the list are the QSL manager (QSL via), name, QTH and address, taken from the newest QSO that has them.
+For answering cards or writing them in bulk: pick **QSL lookup…** from the **☰** menu, or press **Alt+Q**. This opens the QSL window on the **Look up** tab. Type a callsign and press **Enter**.
 
-The call box is emptied and ready for the next call after each lookup; **Esc** closes the window. The call is matched whole, so DL1ABC finds DL1ABC and its portable forms such as DL1ABC/P, but not DL1ABCD.
+The top half lists that station's QSOs, newest first: date, UTC, MHz, mode, the RST you sent and received, your own callsign, and the card status (sent and received, with the bureau or direct route and date, and OQRS if you've asked). The bottom half is the contact card: name, address, QTH, country, grid, zones, QSL via (the manager), email, how many cards you've sent and which services have confirmed. Each comes from the newest QSO that has it filled in, and empty ones are left out.
+
+Tick the QSOs for the card (QSOs whose card isn't sent yet start ticked) and use **Mark selected as** to queue a card, or record it as sent or received, by bureau or direct. **Add to reply list** puts the call on the **To reply to** tab. After each lookup the call box is empty and ready for the next call. The call is matched whole, so DL1ABC finds DL1ABC and its portable forms such as DL1ABC/P, but not DL1ABCD.
 
 ## What gets sent
 

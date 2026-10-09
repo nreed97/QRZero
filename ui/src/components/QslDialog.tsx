@@ -4,6 +4,7 @@ import { onLive } from "../live";
 import type { Location, QslConfig, QslDownload, QslOverview, QslRun, QslService, StationCallsign } from "../types";
 import Modal from "./Modal";
 import PaperQsl from "./PaperQsl";
+import QslLookup from "./QslLookup";
 import ReplyList from "./ReplyList";
 
 interface Props {
@@ -48,16 +49,17 @@ function RunLine({ run }: { run?: QslRun }) {
   );
 }
 
-export default function QslDialog(props: Props) {
-  const [tab, setTab] = useState<"online" | "paper" | "reply">("online");
+type Tab = "lookup" | "cards" | "reply" | "online";
+
+export default function QslDialog(props: Props & { tab?: Tab }) {
+  const [tab, setTab] = useState<Tab>(props.tab ?? "lookup");
+  const tabs: [Tab, string][] = [["lookup", "Look up"], ["cards", "Cards to send"], ["reply", "To reply to"], ["online", "LoTW, QRZ, Club Log, eQSL"]];
   return (
     <Modal title="QSL" onClose={props.onClose} wide>
       <nav className="tabs">
-        <button className={tab === "online" ? "active" : ""} onClick={() => setTab("online")}>LoTW, QRZ, Club Log, eQSL</button>
-        <button className={tab === "paper" ? "active" : ""} onClick={() => setTab("paper")}>Paper cards</button>
-        <button className={tab === "reply" ? "active" : ""} onClick={() => setTab("reply")}>To reply to</button>
+        {tabs.map(([k, label]) => <button key={k} className={tab === k ? "active" : ""} onClick={() => setTab(k)}>{label}</button>)}
       </nav>
-      {tab === "online" ? <Online {...props} /> : tab === "paper" ? <PaperQsl logId={props.logId} /> : <ReplyList logId={props.logId} />}
+      {tab === "lookup" ? <QslLookup logId={props.logId} /> : tab === "cards" ? <PaperQsl logId={props.logId} /> : tab === "reply" ? <ReplyList logId={props.logId} /> : <Online {...props} />}
     </Modal>
   );
 }

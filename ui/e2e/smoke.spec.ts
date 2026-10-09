@@ -273,11 +273,11 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByLabel("QRZ API key for N0OLD")).toHaveAttribute("placeholder", "API key saved");
   await page.getByRole("button", { name: "Close" }).click();
 
-  // Paper cards: queue one from the log, then find it in QSL, Paper cards.
+  // Paper cards: queue one from the log, then find it in QSL, Cards to send.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click();
   await page.getByLabel("Paper QSL").selectOption("queue");
   await fromMenu(page, /^QSL:/);
-  await page.getByRole("button", { name: "Paper cards" }).click();
+  await page.getByRole("button", { name: "Cards to send" }).click();
   await expect(page.locator(".paper-queue")).toContainText("K1ABC");
   await expect(page.getByRole("button", { name: "Print 1 label" })).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
@@ -297,10 +297,11 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
 
   // QSL lookup: type a call, Enter, results with the queued card.
   await fromMenu(page, /^QSL lookup/);
-  const lookup = page.getByRole("dialog", { name: "QSL lookup" });
+  const lookup = page.getByRole("dialog", { name: "QSL" });
   await lookup.getByLabel("Call").fill("k1abc");
   await lookup.getByLabel("Call").press("Enter");
   await expect(lookup.locator("tbody tr").first()).toContainText("queued");
+  await expect(lookup.locator(".ql-card")).toContainText("K1ABC");
   await page.keyboard.press("Escape");
 
   // OQRS: mark from the right-click menu, then see it in the editor.
