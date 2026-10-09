@@ -25,6 +25,24 @@ Each spot shows the time, frequency, call, country, a best guess at the mode (fr
 - Each spot is coloured by its mode group: a bar down its left edge and the mode in colour, blue for CW, green for digital and orange for phone (the key is in the toolbar). These are the same colours as the band plan strip on the band map. When the mode isn't known from the spot's frequency or comment, the spot is left uncoloured.
 - Stations on your watch list (see **Watch list**) are marked **Watched**, with the call in colour.
 
+## Needed now
+
+The **Needed now** pane (Layout menu; it starts as a tab beside Cluster) lists only the spots on the air that would be new for your log, best first: a **new entity**, then a **new band** for an entity you have worked, then a **new mode**. Within each group the newest spot is on top. It uses the same needed flags as the Cluster pane, so a spot shows here exactly when it would be flagged **New DXCC**, **New band** or **New mode** there. Click a spot to fill in the QSO panel and tune, just like clicking it in the Cluster pane.
+
+A call on the same band and mode is listed once, however many people spot it. Spots drop off after the time chosen in the pane (30 minutes to start with). It works for every mode: CW, phone and digital spots are ranked together, with the mode coloured as in the Cluster pane.
+
+### Alerts
+
+When a needed station is spotted, QRZero can play a sound and show a popup in the corner of the main window. Click the popup to tune to the station; it goes away by itself after a short while. A new entity gets a double beep, a new band or mode a single one.
+
+In **Settings**, **DX cluster**, under **Alerts for needed spots** (the **Alerts…** button in the pane takes you there):
+
+- **Play a sound** and **Show a popup** are switched on and off separately.
+- **Alert for** chooses how much alerts: new entities only, new entities and bands, or also new modes.
+- **Not again for the same call, band and mode within** sets how long before the same station can alert again (30 minutes to start with). A different band or mode is a different slot and alerts on its own. Spots the cluster sends when you first connect aren't alerted.
+
+The popups and the sound come from the main window only, so pop-out windows don't repeat them.
+
 ## Console
 
 **Console** shows what the node sends and lets you type commands, for example `sh/dx 20` for the last 20 spots or `dx 14025 K1ABC tnx qso` to spot a station.

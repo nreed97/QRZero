@@ -22,6 +22,7 @@ import Workspace from "./components/Workspace";
 import LayoutMenu from "./components/LayoutMenu";
 import { listen, openPopout, post, type BusMsg, type PopContext, type WindowId } from "./bus";
 import { DEFAULT_WORKSPACE, canPopOut, findPane, removePane, sanitize, showPane, type PaneId, type Workspace as WS, type Zone } from "./workspace";
+import NeededAlerts from "./components/NeededAlerts";
 import SetupWizard from "./components/SetupWizard";
 
 type Dialog = "import" | "export" | "settings" | "help" | "wizard" | "qsl" | "qsllookup" | null;
@@ -37,6 +38,7 @@ const HOME: Partial<Record<PaneId, [PaneId, Zone]>> = {
   bandmap: ["log", "center"],
   watch: ["lookup", "center"],
   dxped: ["watch", "center"],
+  needed: ["cluster", "center"],
   contests: ["dxped", "center"],
   propagation: ["map", "center"],
   rotator: ["map", "center"],
@@ -401,6 +403,7 @@ export default function App() {
         <MainMenu onPick={setDialog} />
       </header>
 
+      <NeededAlerts onPick={pick} />
       <Workspace
         ws={ws}
         onChange={setWs}
