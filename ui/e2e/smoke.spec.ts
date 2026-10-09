@@ -442,6 +442,8 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
     [adifField("CALL", call), adifField("QSO_DATE", date), adifField("TIME_ON", time), adifField("BAND", "20m"), adifField("MODE", "CW"), ...Object.entries(extra).map(([k, v]) => adifField(k, v)), "<EOR>"].join("");
   const clubAdif = ["<EOH>"];
   for (let n = 1; n <= 100; n++) clubAdif.push(cwQso(`W${n}SKC`, "20240201", "120000", { SKCC: `${n}${n % 2 ? "T" : ""}` }));
+  for (let n = 1; n <= 40; n++) clubAdif.push(cwQso(`K${n}FST`, "20240301", "120000", { FISTS: String(n), MY_DXCC: "291", DXCC: n <= 30 ? "291" : "223", ...(n === 1 ? { STATE: "OH" } : {}) }));
+  for (let n = 1; n <= 30; n++) clubAdif.push(cwQso(`K${n}NAQ`, "20240302", "120000", { NAQCC: String(n) }));
   for (let n = 1; n <= 10; n++) clubAdif.push(cwQso(`K${n}CWT`, "20240103", "130500", { CWOPS: String(1000 + n) }));
   await page.getByRole("tab", { name: "Awards" }).click();
   await page.request.post(`/api/logs/${logId}/import`, { headers, data: Buffer.from(clubAdif.join("\n")) });
@@ -450,6 +452,16 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(centurion).toContainText("100");
   await expect(centurion).toContainText("x1");
   await expect(centurion).toContainText("2024-02-01");
+  await page.getByRole("button", { name: "NAQCC" }).click();
+  const friendship = page.locator(".club-table tbody tr", { hasText: "Friendship Club" }).first();
+  await expect(friendship).toContainText("30");
+  await expect(friendship).toContainText("170 more");
+  await page.screenshot({ path: "e2e-results/awards-naqcc.png" });
+  await page.getByRole("button", { name: "FISTS" }).click();
+  // 30 members at home (1 point) and 10 abroad (2 points) make 50 points.
+  await expect(page.getByText("40 different members, 50 points")).toBeVisible();
+  await expect(page.locator(".club-table", { hasText: "Silver Century" })).toContainText("50 more");
+  await page.screenshot({ path: "e2e-results/awards-fists.png" });
   await page.getByRole("button", { name: "CWops" }).click();
   await expect(page.locator(".club-table", { hasText: "ACA" })).toContainText("2024");
   const cwtYear = page.locator(".club-table", { hasText: "Medal" }).locator("tbody tr", { hasText: "2024" });
@@ -459,20 +471,27 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // Awards you don't chase can be switched off in Settings; they leave the Awards pane.
   await fromMenu(page, "Settings…");
   await page.getByRole("button", { name: "Awards", exact: true }).click();
+  await page.screenshot({ path: "e2e-results/settings-awards-on.png" });
   await page.getByRole("checkbox", { name: /^SKCC/ }).uncheck();
   await page.getByRole("checkbox", { name: /^CWops/ }).uncheck();
+  await page.getByRole("checkbox", { name: /^NAQCC/ }).uncheck();
+  await page.getByRole("checkbox", { name: /^FISTS/ }).uncheck();
   await page.screenshot({ path: "e2e-results/settings-awards.png" });
   await page.getByRole("button", { name: "Close" }).click();
   await page.getByRole("tab", { name: "Awards" }).click();
   await expect(page.getByRole("button", { name: "WAZ" })).toBeVisible();
   await expect(page.getByRole("button", { name: "SKCC" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "CWops" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "NAQCC" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "FISTS" })).toHaveCount(0);
   await page.screenshot({ path: "e2e-results/awards-no-cw.png" });
   await fromMenu(page, "Settings…");
   await page.getByRole("button", { name: "Awards", exact: true }).click();
   await page.getByRole("button", { name: "Select all" }).click();
   await page.getByRole("button", { name: "Close" }).click();
   await expect(page.getByRole("button", { name: "SKCC" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "NAQCC" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "FISTS" })).toBeVisible();
   await page.getByRole("tab", { name: "Log", exact: true }).click();
 
   // The user guide opens from the top bar.

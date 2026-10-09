@@ -22,9 +22,11 @@ const AWARDS: { key: AwardKind; name: string; what: string; row: string }[] = [
 const CLUBS: { key: ClubKind; name: string }[] = [
   { key: "skcc", name: "SKCC" },
   { key: "cwops", name: "CWops" },
+  { key: "naqcc", name: "NAQCC" },
+  { key: "fists", name: "FISTS" },
 ];
 
-type ClubKind = "skcc" | "cwops";
+type ClubKind = "skcc" | "cwops" | "naqcc" | "fists";
 const isClub = (k: string): k is ClubKind => CLUBS.some((c) => c.key === k);
 
 /** Awards with a fixed list, so unworked rows are shown (the rest only list what you have worked). */

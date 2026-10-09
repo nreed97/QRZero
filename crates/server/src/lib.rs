@@ -624,13 +624,15 @@ struct ClubQuery {
     cwt_tagged: bool,
 }
 
-/// SKCC, CWops and CWT medal progress, counted from the CW QSOs with club numbers.
+/// SKCC, CWops, CWT medal, NAQCC and FISTS progress, counted from the CW QSOs with club numbers.
 async fn club_awards(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Query<ClubQuery>) -> ApiResult<qrzero_core::cwclubs::ClubAwards> {
+    let cty = s.hub.cty();
     let calls: Vec<String> = q.calls.split(',').map(|c| c.trim().to_ascii_uppercase()).filter(|c| !c.is_empty()).collect();
     let opts = qrzero_core::cwclubs::CwtOptions { region: q.region, tagged_only: q.cwt_tagged };
     let out = db(&s, move |st| {
         let mut tally = qrzero_core::cwclubs::ClubTally::default();
-        st.for_each_club_qso(id, &calls, |qso| tally.add(qso))?;
+        let my_dxcc = |c: &str| cty_facts(cty.as_deref(), c).dxcc;
+        st.for_each_club_qso(id, &calls, my_dxcc, |qso| tally.add(qso))?;
         Ok(tally.finish(opts))
     })
     .await?;

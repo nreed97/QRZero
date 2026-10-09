@@ -258,6 +258,17 @@ export interface ClubAwards {
     was: number;
     was_bands: Record<string, number>;
   };
+  naqcc: { members: number; awards: ClubLevel[] };
+  fists: {
+    members: number;
+    points: number;
+    home: number;
+    abroad: number;
+    unknown: number;
+    tiers: { key: string; name: string; points_needed: number; earned: boolean; to_go: number; achieved: string | null }[];
+    was: number;
+    was_bands: Record<string, number>;
+  };
   cwt: { per_point: number; thresholds: [number, number, number]; years: { year: number; sessions: number; points: number; medal: string; next: number }[] };
 }
 /** What a QSO would add to one award: its row and the cells it falls in (mixed, mode group, band). */

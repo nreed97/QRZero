@@ -568,13 +568,13 @@ impl Store {
         Ok(())
     }
 
-    /// Calls `f` with the CW club facts of every CW QSO in the log (SKCC and CWops
-    /// numbers, time, band and place), optionally only for some station callsigns.
-    pub fn for_each_club_qso(&self, log_id: i64, callsigns: &[String], mut f: impl FnMut(&ClubQso)) -> Result<()> {
+    /// Calls `f` with the CW club facts of every CW QSO in the log (club
+    /// numbers, time, band and place; `my_dxcc` gives the entity of a station callsign), optionally only for some station callsigns.
+    pub fn for_each_club_qso(&self, log_id: i64, callsigns: &[String], my_dxcc: impl Fn(&str) -> Option<u32>, mut f: impl FnMut(&ClubQso)) -> Result<()> {
         let marks = vec!["?"; callsigns.len()].join(", ");
         let calls = if callsigns.is_empty() { String::new() } else { format!(" AND station_callsign IN ({marks})") };
         let mut stmt = self.conn.prepare(&format!(
-            "SELECT call, time_on, band, IFNULL(submode, mode), dxcc, fields FROM qsos WHERE log_id = ?{calls}"
+            "SELECT call, time_on, band, IFNULL(submode, mode), dxcc, fields, station_callsign FROM qsos WHERE log_id = ?{calls}"
         ))?;
         let mut args: Vec<Value> = vec![log_id.into()];
         args.extend(callsigns.iter().map(|c| Value::from(c.to_ascii_uppercase())));
@@ -586,6 +586,12 @@ impl Store {
             SKCC: Option<std::borrow::Cow<'a, str>>,
             #[serde(borrow)]
             CWOPS: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            NAQCC: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            FISTS: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            MY_DXCC: Option<std::borrow::Cow<'a, str>>,
             #[serde(borrow)]
             STATE: Option<std::borrow::Cow<'a, str>>,
             #[serde(borrow)]
@@ -608,6 +614,13 @@ impl Store {
                 state: facts.STATE.map(|s| s.trim().to_ascii_uppercase()).filter(|s| !s.is_empty()),
                 skcc: facts.SKCC.as_deref().and_then(crate::cwclubs::parse_skcc),
                 cwops: facts.CWOPS.as_deref().and_then(crate::cwclubs::parse_cwops),
+                naqcc: facts.NAQCC.as_deref().and_then(crate::cwclubs::parse_member_number),
+                fists: facts.FISTS.as_deref().and_then(crate::cwclubs::parse_member_number),
+                my_dxcc: facts
+                    .MY_DXCC
+                    .as_deref()
+                    .and_then(|d| d.trim().parse().ok())
+                    .or_else(|| r.get::<_, Option<String>>(6).ok().flatten().and_then(|c| my_dxcc(&c))),
                 cwt_tagged: contest.contains("CWT") || contest.contains("CWOPS"),
             };
             f(&q);

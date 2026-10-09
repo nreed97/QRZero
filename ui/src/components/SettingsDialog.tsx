@@ -519,7 +519,7 @@ function AwardsTab() {
             <input type="checkbox" checked={!off.includes(a.key)} onChange={(e) => setAwardEnabled(a.key, e.target.checked)} /> <b>{a.name}</b> <span className="muted">{a.what}</span>
           </label>
         ))}
-        <p className="small muted">If you don't operate CW, untick these. The SKCC and CWops boxes in the entry fields are set separately, under Entry fields.</p>
+        <p className="small muted">If you don't operate CW, untick these. The SKCC, NAQCC, FISTS and CWops boxes in the entry fields are set separately, under Entry fields.</p>
       </fieldset>
       <div className="row">
         <button onClick={() => setAwardsOff([])}>Select all</button>
