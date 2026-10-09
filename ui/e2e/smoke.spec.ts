@@ -221,6 +221,12 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   }
   await page.getByRole("tab", { name: "Log", exact: true }).click();
   await fromMenu(page, "Settings…");
+  // General is the first section and opens by default; the search box jumps to a setting.
+  await expect(page.getByRole("heading", { name: "General" })).toBeVisible();
+  await page.getByLabel("Search settings").fill("rotor");
+  await page.getByRole("option", { name: /Control a rotator/ }).click();
+  await expect(page.getByRole("heading", { name: "Radios and programs" })).toBeVisible();
+  await expect(page.locator(".setting-hit")).toContainText("Control a rotator");
   await page.getByRole("button", { name: "Radios and programs" }).click();
   await expect(page.getByLabel("Listen to WSJT-X / JTDX")).toBeChecked();
 
