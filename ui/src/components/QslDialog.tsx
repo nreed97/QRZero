@@ -363,11 +363,13 @@ function Online({ callsigns, locations }: Props) {
             <button disabled={!!busy || !cfg.eqsl_username} onClick={() => download("eqsl")}>{busy === "eqsl-rcvd" ? "Downloading…" : "Download confirmations"}</button>
             <DownloadLine d={o.downloads.eqsl} />
           </div>
+          <div className="row">
+            <label className="check"><input type="checkbox" checked={cfg.confirm_daily} onChange={(e) => set({ confirm_daily: e.target.checked })} /> Download eQSL confirmations once a day</label>
+          </div>
         </fieldset>
         )}
 
         <div className="row">
-          <label className="check"><input type="checkbox" checked={cfg.confirm_daily} onChange={(e) => set({ confirm_daily: e.target.checked })} /> Download eQSL confirmations once a day</label>
           <span className="spacer" />
           {msg && <span className={msg.ok ? "ok" : "err"}>{msg.text}</span>}
           <button className="primary" onClick={save}>Save</button>
