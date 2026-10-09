@@ -508,6 +508,18 @@ table.list th { text-align: left; font-size: 12px; font-weight: 600; padding: 2p
   .sheet-dk1202 .label-to { font-size: 16pt; margin-bottom: 3pt; }
   .sheet-dk1202 .label td { font-size: 11pt; }
   .sheet-dk1202 .label-foot { font-size: 10pt; margin-top: 4pt; }
+  .sheet-dk22223 .label { position: relative; padding: 2.5mm 3mm; font-family: Consolas, "DejaVu Sans Mono", "Courier New", monospace; }
+  .card-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3mm; }
+  .card-head span { font-size: 7.5pt; }
+  .card-head b { font-size: 21pt; }
+  .sheet-dk22223 .label table { border-top: 0; }
+  .sheet-dk22223 .label th { font-size: 7.5pt; font-weight: bold; text-transform: none; border-bottom: 0.7mm solid #000; padding-bottom: 0.5mm; }
+  .sheet-dk22223 .label td { font-size: 10.5pt; padding-top: 1mm; }
+  .sheet-dk22223 .label th:nth-child(1), .sheet-dk22223 .label td:nth-child(1) { width: 26%; }
+  .sheet-dk22223 .label th:nth-child(2), .sheet-dk22223 .label td:nth-child(2) { width: 17%; }
+  .sheet-dk22223 .label th:nth-child(3), .sheet-dk22223 .label td:nth-child(3) { width: 20%; }
+  .sheet-dk22223 .label th:nth-child(4), .sheet-dk22223 .label td:nth-child(4) { width: 19%; }
+  .card-foot { position: absolute; left: 3mm; right: 3mm; bottom: 2.5mm; border-top: 0.7mm solid #000; padding-top: 1mm; font-size: 8pt; }
   .label { overflow: hidden; padding: 0.08in 0.12in; box-sizing: border-box; }
   .label-to { font-size: 11pt; }
   .sheet-5163 .label-to { font-size: 14pt; margin-bottom: 2pt; }

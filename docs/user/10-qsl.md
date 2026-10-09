@@ -72,7 +72,8 @@ The **Cards to send** tab lists everything waiting. Tick the ones to print and p
 
 - **Avery 5160 / L7160**: 30 small labels, two QSOs per label.
 - **Avery 5163 / L7163**: 10 large labels, five QSOs per label.
-- **Brother QL-700** rolls: **DK-1201** (29 x 90 mm) and **DK-1209** (29 x 62 mm) with two QSOs per label, or **DK-1202** (62 x 100 mm) with five. Each label is its own page. In the print dialog choose your QL-700, set the paper to the matching DK size, and leave scaling at 100%.
+- **Brother QL-700, DK-22223 50 mm tape, 4 in long** (the default): one label for the fill-in block on the back of a card. It reads "CONFIRMING QSO WITH", the call in large type, then Date, UTC, MHz, Mode and RST for up to four QSOs, newest first; more QSOs with the same station go on another label. **Bottom line** adds an optional line under a rule, such as your power or rig.
+- Other **Brother QL-700** rolls: **DK-1201** (29 x 90 mm) and **DK-1209** (29 x 62 mm) with two QSOs per label, or **DK-1202** (62 x 100 mm) with five. Each label is its own page. For any QL-700 size, choose your QL-700 in the print dialog, set the paper to the matching size (for DK-22223, a custom 50 mm x 101.6 mm), and leave scaling at 100%.
 
 Several QSOs with the same station share a label. **Skip labels** leaves the first few labels empty, for a sheet you've used part of. Click **Print**, and when the labels are on the cards click **Sent via bureau** or **Sent direct** to mark them sent with today's date.
 
