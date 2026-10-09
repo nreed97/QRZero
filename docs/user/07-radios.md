@@ -6,7 +6,7 @@ QRZero can read the frequency and mode from your radios and tune them. Each radi
 | --- | --- | --- |
 | Hamlib rigctld | Almost any radio Hamlib supports. Start `rigctld` first (for example `rigctld -m 2028 -r COM3 -s 38400`). | Host and port (default 127.0.0.1:4532) |
 | TCI | ExpertSDR (SunSDR, ANAN with Thetis TCI), and Flex radios through a TCI bridge. Every receiver or **slice** shows up as its own radio. | Host and port (default 127.0.0.1:40001) |
-| Kenwood / Elecraft / Flex CAT | Kenwood, Elecraft K3/K4/KX, and the SmartSDR CAT ports of a Flex. | Serial port (COM3) and baud |
+| Kenwood / Elecraft / Flex CAT | Kenwood, Elecraft K3/K4/KX, and the SmartSDR CAT ports of a Flex. | Serial port (COM3 on Windows, `/dev/cu.usbserial-…` on a Mac, `/dev/ttyUSB0` on Linux) and baud |
 | Yaesu CAT | FT-991A, FTDX10, FTDX101, FT-710 and other recent Yaesu radios. | Serial port and baud |
 | Icom CI-V | Icom radios over USB or a CI-V interface. | Serial port, baud and the CI-V address (IC-7300 is 94, IC-7610 is 98, IC-705 is A4) |
 
@@ -72,7 +72,7 @@ QRZero can talk to a rotator directly or through PstRotatorAz. In **Settings →
 
 - **PstRotatorAz (UDP)**: the existing link; in PstRotatorAz turn on UDP Control (port 12000).
 - **Hamlib rotctld (TCP)**: give the address of a running `rotctld`, normally `127.0.0.1:4533`. This covers any rotator Hamlib supports.
-- **Yaesu GS-232 (serial or TCP)**: for controllers that emulate the GS-232, which most do. Type the serial port (for example `COM5`) and baud rate, or leave the port blank and give a network address like `192.168.1.50:23`. Use this or rotctld for a network controller such as the AF6SA WRC, whichever protocol its manual lists (the WRC also has a PstRotator-compatible telnet mode, which is not the same as these).
+- **Yaesu GS-232 (serial or TCP)**: for controllers that emulate the GS-232, which most do. Type the serial port (for example `COM5`, or `/dev/cu.usbserial-1` on a Mac) and baud rate, or leave the port blank and give a network address like `192.168.1.50:23`. Use this or rotctld for a network controller such as the AF6SA WRC, whichever protocol its manual lists (the WRC also has a PstRotator-compatible telnet mode, which is not the same as these).
 
 GS-232 replies don't need a line break at the end, which is how the WRC answers. If the controller answers with something QRZero can't read as a heading, the status line shows what it said. The settings box shows whether the connection is up. QRZero reconnects by itself if the controller goes away.
 

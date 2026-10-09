@@ -76,7 +76,7 @@ Under **Settings → Startup programs**, list the programs you always run with Q
 
 - **Program**: the full path, for example `C:\Program Files (x86)\PstRotatorAz\PstRotatorAz.exe`. Quotes around it are fine.
 - **Arguments**: anything that goes after the program name, typed as you would in a shortcut.
-- **Not if running**: leave the program alone when one with the same file name is already running, so restarting QRZero doesn't start a second copy. This check works on Windows only; elsewhere the program is always started.
+- **Not if running**: leave the program alone when one with the same file name is already running, so restarting QRZero doesn't start a second copy. This check works on Windows only (not on a Mac or Linux); elsewhere the program is always started.
 - **Launch now** starts it straight away, to try it out.
 
 Programs start one after another in the background, each in its own folder (many Windows programs look for their settings there), without a console window, and they keep running when QRZero closes. QRZero doesn't wait for them, so a slow or missing program never holds it up. If one can't be started, **Last start** says why, for example a mistyped path.

@@ -1457,6 +1457,9 @@ fn bind_udp(listen: &str, multicast: &str) -> anyhow::Result<UdpSocket> {
     let bind = match group {
         Some(g) => {
             sock.set_reuse_address(true)?;
+            // macOS only lets several programs share a UDP port with SO_REUSEPORT as well.
+            #[cfg(target_os = "macos")]
+            sock.set_reuse_port(true)?;
             if !g.is_multicast() {
                 anyhow::bail!("{g} isn't a multicast address (224.0.0.0 to 239.255.255.255)");
             }
