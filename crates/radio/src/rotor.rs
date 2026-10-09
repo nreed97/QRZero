@@ -12,6 +12,9 @@ pub const ROTCTLD_PORT: u16 = 4533;
 
 const POLL: Duration = Duration::from_secs(1);
 const READ_TIMEOUT: Duration = Duration::from_millis(1500);
+/// GS-232 controllers answer within milliseconds and may not end the reply with a line break, so a
+/// short quiet period after the first bytes marks the end of a reply.
+const GS232_TIMEOUT: Duration = Duration::from_millis(400);
 const RETRY: Duration = Duration::from_secs(3);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -115,7 +118,7 @@ fn read_line(io: &mut dyn Read) -> std::io::Result<String> {
 trait Io: Read + Write + Send {}
 impl<T: Read + Write + Send> Io for T {}
 
-fn open(link: &Link) -> Result<Box<dyn Io>, String> {
+fn open(link: &Link, timeout: Duration) -> Result<Box<dyn Io>, String> {
     match link {
         Link::Tcp(addr) => {
             let sa = addr
@@ -124,12 +127,12 @@ fn open(link: &Link) -> Result<Box<dyn Io>, String> {
                 .next()
                 .ok_or_else(|| format!("{addr}: no such address"))?;
             let s = TcpStream::connect_timeout(&sa, Duration::from_secs(3)).map_err(|e| format!("{addr}: {e}"))?;
-            s.set_read_timeout(Some(READ_TIMEOUT)).map_err(|e| e.to_string())?;
+            s.set_read_timeout(Some(timeout)).map_err(|e| e.to_string())?;
             let _ = s.set_nodelay(true);
             Ok(Box::new(s))
         }
         Link::Serial { path, baud } => {
-            let p = serialport::new(path, *baud).timeout(READ_TIMEOUT).open().map_err(|e| format!("{path}: {e}"))?;
+            let p = serialport::new(path, *baud).timeout(timeout).open().map_err(|e| format!("{path}: {e}"))?;
             Ok(Box::new(p))
         }
     }
@@ -164,87 +167,15 @@ fn poll(io: &mut dyn Io, p: Protocol) -> std::io::Result<Option<f64>> {
     Ok(None)
 }
 
-/// One request on a fresh TCP connection, for controllers that answer once and hang up (the AF6SA WRC
-/// does): send, then read until they close the connection or go quiet. Returns what they said.
-fn exchange(addr: &str, request: &str, want_reply: bool) -> Result<String, String> {
-    let mut io = open(&Link::Tcp(addr.to_string()))?;
-    io.write_all(request.as_bytes()).and_then(|_| io.flush()).map_err(|e| e.to_string())?;
-    let mut out = Vec::new();
-    let mut buf = [0u8; 128];
-    // Controllers that reply take a moment; for commands without a reply just give a short grace.
-    loop {
-        match io.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => {
-                out.extend_from_slice(&buf[..n]);
-                if out.len() > 400 || out.contains(&b'\n') {
-                    break;
-                }
-            }
-            Err(e) if matches!(e.kind(), ErrorKind::TimedOut | ErrorKind::WouldBlock) => break,
-            Err(e) if e.kind() == ErrorKind::Interrupted => {}
-            Err(e) => return Err(e.to_string()),
-        }
-        if !want_reply {
-            break;
-        }
-    }
-    Ok(String::from_utf8_lossy(&out).into_owned())
-}
-
-/// Heading from a GS-232 reply that may hold several lines.
-fn heading_in(reply: &str) -> Option<f64> {
-    reply.split(['\r', '\n']).find_map(parse_gs232).map(|a| a % 360.0)
-}
-
-/// GS-232 over TCP: a new connection for every poll and every command.
-fn run_per_exchange(addr: String, rx: mpsc::Receiver<Cmd>, on_event: impl Fn(Event)) {
-    let mut last_status = String::new();
-    let mut say = |t: String| {
-        if t != last_status {
-            on_event(Event::Status(t.clone()));
-            last_status = t;
-        }
-    };
-    loop {
-        match exchange(&addr, poll_command(Protocol::Gs232), true) {
-            Ok(reply) => match heading_in(&reply) {
-                Some(az) => {
-                    say("connected".into());
-                    on_event(Event::Heading(az));
-                }
-                None if reply.trim().is_empty() => say("connected, but the rotator isn't answering".into()),
-                None => say(format!("connected, but can't read a heading from {:?}", reply.trim())),
-            },
-            Err(e) => say(format!("can't connect to {e}")),
-        }
-        let mut wait = POLL;
-        loop {
-            match rx.recv_timeout(wait) {
-                Ok(cmd) => {
-                    if let Err(e) = exchange(&addr, &encode(Protocol::Gs232, cmd), false) {
-                        say(format!("can't connect to {e}"));
-                    }
-                    wait = Duration::from_millis(400);
-                }
-                Err(RecvTimeoutError::Timeout) => break,
-                Err(RecvTimeoutError::Disconnected) => return,
-            }
-        }
-    }
-}
-
 /// Starts the connection thread. It reconnects on its own and ends when the returned sender is dropped.
 pub fn spawn(cfg: Config, on_event: impl Fn(Event) + Send + 'static) -> Sender<Cmd> {
     let (tx, rx) = mpsc::channel::<Cmd>();
     std::thread::Builder::new()
         .name("rotator".into())
         .spawn(move || {
-            if let (Protocol::Gs232, Link::Tcp(addr)) = (cfg.protocol, &cfg.link) {
-                return run_per_exchange(addr.clone(), rx, on_event);
-            }
             'outer: loop {
-                let mut io = match open(&cfg.link) {
+                let timeout = if cfg.protocol == Protocol::Gs232 { GS232_TIMEOUT } else { READ_TIMEOUT };
+                let mut io = match open(&cfg.link, timeout) {
                     Ok(io) => io,
                     Err(e) => {
                         on_event(Event::Status(format!("can't connect to {e}")));
@@ -271,6 +202,10 @@ pub fn spawn(cfg: Config, on_event: impl Fn(Event) + Send + 'static) -> Sender<C
                         }
                         Err(e) => {
                             on_event(Event::Status(format!("connection lost: {e}")));
+                            // Don't hammer a controller that only takes one connection at a time.
+                            if let Err(RecvTimeoutError::Disconnected) = rx.recv_timeout(Duration::from_secs(1)) {
+                                return;
+                            }
                             continue 'outer;
                         }
                     }
@@ -348,7 +283,8 @@ mod tests {
                         az = c.split(' ').nth(1).unwrap().parse().unwrap();
                         "RPRT 0\n".into()
                     }
-                    (Protocol::Gs232, "C") => format!("+0{az:03}\r\n"),
+                    // Like the WRC: five bytes, no line break; turn commands get no reply.
+                    (Protocol::Gs232, "C") => format!("+0{az:03}"),
                     (Protocol::Gs232, c) if c.starts_with('M') => {
                         az = c[1..].parse().unwrap();
                         String::new()
@@ -382,38 +318,14 @@ mod tests {
         assert!(wait_heading(200.0), "{:?}", seen.lock().unwrap());
     }
 
-    /// A WRC-like box: one request per connection, replies `+0aaa` with no line break, then hangs up.
-    #[test]
-    fn gs232_connection_per_request_without_line_break() {
-        let l = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = l.local_addr().unwrap().to_string();
-        let az = Arc::new(Mutex::new(90u32));
-        let a2 = az.clone();
-        std::thread::spawn(move || {
-            while let Ok((mut s, _)) = l.accept() {
-                let mut buf = [0u8; 16];
-                let n = s.read(&mut buf).unwrap_or(0);
-                let req = String::from_utf8_lossy(&buf[..n]).to_string();
-                if req.starts_with('C') {
-                    let _ = s.write_all(format!("+0{:03}", *a2.lock().unwrap()).as_bytes());
-                } else if let Some(v) = req.strip_prefix('M') {
-                    *a2.lock().unwrap() = v.trim().parse().unwrap();
-                }
-            }
-        });
-        let (ev_tx, ev_rx) = mpsc::channel();
-        let tx = spawn(Config { protocol: Protocol::Gs232, link: Link::Tcp(addr) }, move |e| {
-            let _ = ev_tx.send(e);
-        });
-        let wait = |want: f64| (0..40).any(|_| matches!(ev_rx.recv_timeout(Duration::from_millis(500)), Ok(Event::Heading(a)) if a == want));
-        assert!(wait(90.0));
-        tx.send(Cmd::Turn(200.0)).unwrap();
-        assert!(wait(200.0));
-    }
-
     #[test]
     fn rotctld_polls_and_turns() {
         run(Protocol::Rotctld);
+    }
+
+    #[test]
+    fn gs232_polls_and_turns() {
+        run(Protocol::Gs232);
     }
 
 }
