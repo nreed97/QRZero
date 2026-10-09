@@ -114,7 +114,15 @@ function FistsTables({ data }: { data: Data["fists"] }) {
   );
 }
 
-function CwopsTables({ data, cwt, opts, set }: { data: Data["cwops"]; cwt: Data["cwt"]; opts: ClubOpts; set: (p: Partial<ClubOpts>) => void }) {
+function CwopsTables({ data, cwt, opts, set, logId, refresh }: { data: Data["cwops"]; cwt: Data["cwt"]; opts: ClubOpts; set: (p: Partial<ClubOpts>) => void; logId: number; refresh: () => void }) {
+  const [extraYear, setExtraYear] = useState(String(cwt.years[0]?.year ?? new Date().getFullYear()));
+  const [extraPoints, setExtraPoints] = useState("");
+  const [extraErr, setExtraErr] = useState("");
+  const saveExtra = (year: number, points: number) =>
+    api
+      .putCwtExtra(logId, year, points)
+      .then(() => (setExtraErr(""), setExtraPoints(""), refresh()))
+      .catch((e) => setExtraErr(e.message));
   return (
     <>
       <div className="club-head">CWops member awards <span className="muted small">({data.members} different members worked on CW)</span></div>
@@ -160,7 +168,7 @@ function CwopsTables({ data, cwt, opts, set }: { data: Data["cwops"]; cwt: Data[
           <tr>
             <th className="name">Year</th>
             <th title="CWT hours (Wed 1300 and 1900, Thu 0300 and 0700 UTC) with at least one QSO">Hours</th>
-            <th>Points</th>
+            <th title="Hours with enough contacts, plus the points you added for CWTs worked elsewhere">Points</th>
             <th>Medal</th>
             <th>To next</th>
           </tr>
@@ -170,7 +178,7 @@ function CwopsTables({ data, cwt, opts, set }: { data: Data["cwops"]; cwt: Data[
             <tr key={y.year}>
               <td className="name">{y.year}</td>
               <td>{y.sessions}</td>
-              <td>{y.points}</td>
+              <td>{y.points}{y.extra ? <span className="muted"> (incl. {y.extra} added)</span> : null}</td>
               <td className={y.medal ? "confirmed" : ""}>{y.medal || "none yet"}</td>
               <td>{y.next ? `${y.next} points` : ""}</td>
             </tr>
@@ -178,6 +186,43 @@ function CwopsTables({ data, cwt, opts, set }: { data: Data["cwops"]; cwt: Data[
           {cwt.years.length === 0 && <tr><td className="muted name" colSpan={5}>No CW QSOs in a CWT hour yet.</td></tr>}
         </tbody>
       </table>
+      <div className="grid-tools">
+        <span className="muted small">CWTs worked outside this log, points for</span>
+        <input type="number" value={extraYear} min={2000} max={2100} style={{ width: 70 }} onChange={(e) => setExtraYear(e.target.value)} aria-label="Year for added CWT points" />
+        <input type="number" value={extraPoints} min={0} max={1000} placeholder="points" style={{ width: 70 }} onChange={(e) => setExtraPoints(e.target.value)} aria-label="Added CWT points" />
+        <button disabled={!extraYear || extraPoints === ""} onClick={() => saveExtra(Number(extraYear), Number(extraPoints))}>Set</button>
+        <span className="muted small">0 removes them</span>
+        {extraErr && <span className="err small">{extraErr}</span>}
+      </div>
+      {cwt.years.map((y) => (
+        <details key={y.year} className="club-sessions">
+          <summary>{y.year}: every CWT hour with a QSO ({y.sessions} hours, {y.points} points)</summary>
+          <table className="award-table club-table">
+            <thead>
+              <tr>
+                <th className="name">Date (UTC)</th>
+                <th>Hour</th>
+                <th title="QSOs logged in the hour">QSOs</th>
+                <th title="Different call and band pairs: these count towards the point">Contacts</th>
+                <th title="QSOs logged within 5 minutes before or after the hour, which are not counted">Just outside</th>
+                <th>Point</th>
+              </tr>
+            </thead>
+            <tbody>
+              {y.detail.map((d) => (
+                <tr key={`${d.date}-${d.hour}`} className={d.point ? "" : "muted"}>
+                  <td className="name">{d.date}</td>
+                  <td>{String(d.hour).padStart(2, "0")}00Z</td>
+                  <td>{d.qsos}</td>
+                  <td>{d.contacts}</td>
+                  <td>{d.near || ""}</td>
+                  <td className={d.point ? "confirmed" : ""}>{d.point ? "yes" : "no"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      ))}
       <div className="ftx-msg small muted">
         A CWT point is one hour with {cwt.per_point} or more contacts (the same call counts again on another band, not on the same band). Medals: bronze {cwt.thresholds[0]}, silver {cwt.thresholds[1]}, gold {cwt.thresholds[2]} points in a year.
         Without the box ticked, every CW QSO in a CWT hour counts, so QSOs you logged by hand count too. CWops members are counted by the number in the CWops field. ACA counts one contact per member per year, and CMA, DXCC and states count members on any date since 2010 (CMA) or ever.
@@ -192,6 +237,7 @@ export default function ClubAwards({ logId, kind, call, stamp }: { logId: number
   const [opts, setOpts] = useState<ClubOpts>({ region: "na_eu", cwtTagged: false });
   const [data, setData] = useState<Data | null>(null);
   const [err, setErr] = useState("");
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -203,7 +249,7 @@ export default function ClubAwards({ logId, kind, call, stamp }: { logId: number
     return () => {
       live = false;
     };
-  }, [logId, call, opts.region, opts.cwtTagged, stamp]);
+  }, [logId, call, opts.region, opts.cwtTagged, stamp, tick]);
 
   return (
     <div className="award-scroll">
@@ -211,7 +257,7 @@ export default function ClubAwards({ logId, kind, call, stamp }: { logId: number
       {data && kind === "skcc" && <LevelTables data={data.skcc} club="SKCC" notes={SKCC_NOTES} />}
       {data && kind === "naqcc" && <LevelTables data={data.naqcc} club="NAQCC" notes={NAQCC_NOTES} />}
       {data && kind === "fists" && <FistsTables data={data.fists} />}
-      {data && kind === "cwops" && <CwopsTables data={data.cwops} cwt={data.cwt} opts={opts} set={(p) => setOpts({ ...opts, ...p })} />}
+      {data && kind === "cwops" && <CwopsTables data={data.cwops} cwt={data.cwt} opts={opts} set={(p) => setOpts({ ...opts, ...p })} logId={logId} refresh={() => setTick((n) => n + 1)} />}
     </div>
   );
 }

@@ -234,6 +234,7 @@ fn router(state: Shared) -> Router {
         .route("/logs/{id}/paper-queue", get(paper_queue))
         .route("/logs/{id}/awards/{award}", get(award))
         .route("/logs/{id}/club-awards", get(club_awards))
+        .route("/logs/{id}/cwt-extra", put(put_cwt_extra))
         .route("/logs/{id}/lookup/{call}", get(lookup))
         .route("/logs/{id}/award-hints", get(award_hints))
         .route("/logs/{id}/replies", get(list_replies).post(add_reply))
@@ -631,12 +632,48 @@ async fn club_awards(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Que
     let opts = qrzero_core::cwclubs::CwtOptions { region: q.region, tagged_only: q.cwt_tagged };
     let out = db(&s, move |st| {
         let mut tally = qrzero_core::cwclubs::ClubTally::default();
+        tally.set_cwt_extra(load_cwt_extra(st, id));
         let my_dxcc = |c: &str| cty_facts(cty.as_deref(), c).dxcc;
         st.for_each_club_qso(id, &calls, my_dxcc, |qso| tally.add(qso))?;
         Ok(tally.finish(opts))
     })
     .await?;
     Ok(Json(out))
+}
+
+/// CWT points added by hand for a log, by year.
+fn load_cwt_extra(st: &Store, log_id: i64) -> std::collections::BTreeMap<i32, usize> {
+    st.get_setting(&format!("cwt_extra.{log_id}"))
+        .ok()
+        .flatten()
+        .and_then(|v| serde_json::from_str(&v).ok())
+        .unwrap_or_default()
+}
+
+#[derive(Deserialize)]
+struct CwtExtraBody {
+    year: i32,
+    /// Points earned outside this log; 0 removes the year's entry.
+    points: usize,
+}
+
+/// Sets the CWT points added by hand for one year, and returns them all.
+async fn put_cwt_extra(State(s): State<Shared>, Path(id): Path<i64>, Json(b): Json<CwtExtraBody>) -> ApiResult<std::collections::BTreeMap<i32, usize>> {
+    if !(2000..=2100).contains(&b.year) || b.points > 1000 {
+        return Err(ApiError(StatusCode::BAD_REQUEST, "year or points out of range".into()));
+    }
+    let all = db(&s, move |st| {
+        let mut all = load_cwt_extra(st, id);
+        if b.points == 0 {
+            all.remove(&b.year);
+        } else {
+            all.insert(b.year, b.points);
+        }
+        st.set_setting(&format!("cwt_extra.{id}"), &serde_json::to_string(&all).unwrap_or_default())?;
+        Ok(all)
+    })
+    .await?;
+    Ok(Json(all))
 }
 
 #[derive(Deserialize)]

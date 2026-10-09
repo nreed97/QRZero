@@ -196,17 +196,36 @@ pub struct CwtOptions {
     pub tagged_only: bool,
 }
 
+/// One CWT hour with at least one QSO.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct CwtSession {
+    /// UTC date (YYYY-MM-DD) and starting hour (13, 19, 3 or 7).
+    pub date: String,
+    pub hour: u32,
+    /// QSOs logged in the hour.
+    pub qsos: usize,
+    /// Different call and band pairs among them: what counts.
+    pub contacts: usize,
+    /// QSOs logged within 5 minutes before or after the hour, which do not count.
+    pub near: usize,
+    pub point: bool,
+}
+
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct CwtYear {
     pub year: i32,
     /// CWT hours with at least one QSO.
     pub sessions: usize,
-    /// Hours with enough contacts for a point.
+    /// Points in all: hours with enough contacts, plus `extra`.
     pub points: usize,
+    /// Points added by hand for CWTs worked outside this log.
+    pub extra: usize,
     /// "gold", "silver", "bronze" or empty.
     pub medal: String,
     /// Points still needed for the next medal; 0 at gold.
     pub next: usize,
+    /// Every counted hour of the year, oldest first.
+    pub detail: Vec<CwtSession>,
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
@@ -276,6 +295,8 @@ fn cwt_thresholds(region: Region) -> (usize, [usize; 3]) {
 #[derive(Default)]
 pub struct ClubTally {
     qsos: Vec<ClubQso>,
+    /// CWT points earned outside this log, by year.
+    cwt_extra: BTreeMap<i32, usize>,
 }
 
 impl ClubTally {
@@ -283,9 +304,14 @@ impl ClubTally {
         self.qsos.push(q.clone());
     }
 
+    /// CWT points earned outside this log (another logger, portable operating), by year.
+    pub fn set_cwt_extra(&mut self, extra: BTreeMap<i32, usize>) {
+        self.cwt_extra = extra;
+    }
+
     pub fn finish(mut self, cwt: CwtOptions) -> ClubAwards {
         self.qsos.sort_by_key(|q| q.time);
-        ClubAwards { skcc: skcc(&self.qsos), cwops: cwops(&self.qsos), cwt: cwt_medals(&self.qsos, cwt), naqcc: naqcc(&self.qsos), fists: fists(&self.qsos) }
+        ClubAwards { skcc: skcc(&self.qsos), cwops: cwops(&self.qsos), cwt: cwt_medals(&self.qsos, cwt, &self.cwt_extra), naqcc: naqcc(&self.qsos), fists: fists(&self.qsos) }
     }
 }
 
@@ -542,27 +568,56 @@ fn fists(qsos: &[ClubQso]) -> Fists {
     }
 }
 
-fn cwt_medals(qsos: &[ClubQso], opts: CwtOptions) -> Cwt {
+fn cwt_medals(qsos: &[ClubQso], opts: CwtOptions, extra: &BTreeMap<i32, usize>) -> Cwt {
+    #[derive(Default)]
+    struct Hour<'a> {
+        pairs: HashSet<(&'a str, &'a str)>,
+        qsos: usize,
+        near: usize,
+    }
+    /// QSOs this close outside an hour are reported, not counted.
+    const NEAR: i64 = 300;
     let (per_point, thresholds) = cwt_thresholds(opts.region);
-    let mut sessions: HashMap<(i64, u32), HashSet<(&str, &str)>> = HashMap::new();
+    let mut sessions: HashMap<(i64, u32), Hour> = HashMap::new();
+    let mut outside: Vec<(i64, u32)> = Vec::new();
     for q in qsos.iter().filter(|q| !opts.tagged_only || q.cwt_tagged) {
         if let Some(s) = cwt_session(q.time) {
             // The same call on another band is a new contact, as in the test's own dupe rule.
-            sessions.entry(s).or_default().insert((q.call.as_str(), q.band.as_deref().unwrap_or_default()));
+            let h = sessions.entry(s).or_default();
+            h.pairs.insert((q.call.as_str(), q.band.as_deref().unwrap_or_default()));
+            h.qsos += 1;
+        } else if let Some(s) = cwt_session(q.time + NEAR).or_else(|| cwt_session(q.time - NEAR)) {
+            outside.push(s);
         }
     }
-    let mut years: BTreeMap<i32, (usize, usize)> = BTreeMap::new();
-    for ((day, _), calls) in &sessions {
-        let e = years.entry(utc(day * 86_400).year()).or_default();
-        e.0 += 1;
-        if calls.len() >= per_point {
-            e.1 += 1;
+    for s in outside {
+        if let Some(h) = sessions.get_mut(&s) {
+            h.near += 1;
         }
+    }
+    let mut years: BTreeMap<i32, Vec<CwtSession>> = BTreeMap::new();
+    for (&(day, hour), h) in &sessions {
+        let date = utc(day * 86_400);
+        years.entry(date.year()).or_default().push(CwtSession {
+            date: date.format("%Y-%m-%d").to_string(),
+            hour,
+            qsos: h.qsos,
+            contacts: h.pairs.len(),
+            near: h.near,
+            point: h.pairs.len() >= per_point,
+        });
+    }
+    for &year in extra.keys() {
+        years.entry(year).or_default();
     }
     let years = years
         .into_iter()
         .rev()
-        .map(|(year, (sessions, points))| {
+        .map(|(year, mut detail)| {
+            detail.sort_by(|a, b| (&a.date, a.hour).cmp(&(&b.date, b.hour)));
+            let extra = extra.get(&year).copied().unwrap_or(0);
+            let logged = detail.iter().filter(|d| d.point).count();
+            let points = logged + extra;
             let medal = if points >= thresholds[2] {
                 "gold"
             } else if points >= thresholds[1] {
@@ -573,7 +628,7 @@ fn cwt_medals(qsos: &[ClubQso], opts: CwtOptions) -> Cwt {
                 ""
             };
             let next = thresholds.iter().find(|&&t| points < t).map_or(0, |t| t - points);
-            CwtYear { year, sessions, points, medal: medal.into(), next }
+            CwtYear { year, sessions: detail.len(), points, extra, medal: medal.into(), next, detail }
         })
         .collect();
     Cwt { per_point, thresholds, years }
@@ -768,6 +823,63 @@ mod tests {
     }
 
     #[test]
+    fn cwt_covers_all_four_hours_every_week_of_a_year() {
+        // Ten contacts in every CWT hour of 2024: 52 Wednesdays and 52 Thursdays, two hours each.
+        let mut tally = ClubTally::default();
+        let mut day = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+        while day.year() == 2024 {
+            for h in 0..24u32 {
+                for i in 0..10 {
+                    let time = day.and_hms_opt(h, i * 5, 0).unwrap().and_utc().timestamp();
+                    tally.add(&ClubQso { call: format!("W{i}AA"), time, band: Some("40m".into()), ..Default::default() });
+                }
+            }
+            day = day.succ_opt().unwrap();
+        }
+        let y = &tally.finish(CwtOptions::default()).cwt.years[0];
+        assert_eq!((y.year, y.sessions, y.points, y.medal.as_str()), (2024, 208, 208, "gold"));
+        let hours: HashSet<(&str, u32)> = y.detail.iter().map(|d| (d.date.as_str(), d.hour)).collect();
+        assert_eq!(hours.len(), 208);
+        for d in &y.detail {
+            let wd = NaiveDate::parse_from_str(&d.date, "%Y-%m-%d").unwrap().weekday().num_days_from_monday();
+            assert!(matches!((wd, d.hour), (2, 13 | 19) | (3, 3 | 7)), "{d:?}");
+        }
+    }
+
+    #[test]
+    fn cwt_session_detail_reports_dupes_and_near_misses() {
+        let mut tally = ClubTally::default();
+        let base = t(2024, 1, 3, 13);
+        // 9 different calls and a repeat on the same band: 10 QSOs, 9 contacts, no point.
+        for i in 0..9 {
+            tally.add(&ClubQso { call: format!("W{i}AA"), time: base + i * 60, band: Some("20m".into()), ..Default::default() });
+        }
+        tally.add(&ClubQso { call: "W0AA".into(), time: base + 600, band: Some("20m".into()), ..Default::default() });
+        // One QSO logged 12 seconds after the hour: reported as near, not counted.
+        tally.add(&ClubQso { call: "W9AA".into(), time: base + 3600 + 12, band: Some("20m".into()), ..Default::default() });
+        let y = &tally.finish(CwtOptions::default()).cwt.years[0];
+        let d = &y.detail[0];
+        assert_eq!((d.date.as_str(), d.hour, d.qsos, d.contacts, d.near, d.point), ("2024-01-03", 13, 10, 9, 1, false));
+        assert_eq!(y.points, 0);
+    }
+
+    #[test]
+    fn cwt_extra_points_add_to_the_year_and_medal() {
+        let mut tally = ClubTally::default();
+        let base = t(2024, 1, 3, 13);
+        for i in 0..10 {
+            tally.add(&ClubQso { call: format!("W{i}AA"), time: base + i * 60, band: Some("20m".into()), ..Default::default() });
+        }
+        // 49 more points from elsewhere make 50: bronze. A year with no QSOs at all still shows.
+        tally.set_cwt_extra(BTreeMap::from([(2024, 49), (2023, 7)]));
+        let cwt = tally.finish(CwtOptions::default()).cwt;
+        let y24 = cwt.years.iter().find(|y| y.year == 2024).unwrap();
+        assert_eq!((y24.points, y24.extra, y24.medal.as_str(), y24.next), (50, 49, "bronze", 30));
+        let y23 = cwt.years.iter().find(|y| y.year == 2023).unwrap();
+        assert_eq!((y23.points, y23.sessions, y23.medal.as_str()), (7, 0, ""));
+    }
+
+    #[test]
     fn cwt_tagged_only_and_other_continents() {
         let mut tally = ClubTally::default();
         for i in 0..6 {
@@ -776,7 +888,7 @@ mod tests {
         }
         let other = CwtOptions { region: Region::Other, tagged_only: false };
         let strict = CwtOptions { region: Region::Other, tagged_only: true };
-        let again = ClubTally { qsos: tally.qsos.clone() };
+        let again = ClubTally { qsos: tally.qsos.clone(), ..Default::default() };
         assert_eq!(tally.finish(other).cwt.years[0].points, 1);
         assert!(again.finish(strict).cwt.years[0].points == 0);
     }

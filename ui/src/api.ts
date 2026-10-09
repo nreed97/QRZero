@@ -77,6 +77,8 @@ export const api = {
     const q = new URLSearchParams({ calls: o.calls.join(","), region: o.region, cwt_tagged: String(o.cwtTagged) });
     return json<ClubAwards>("GET", `/logs/${logId}/club-awards?${q}`);
   },
+  /** Sets the CWT points added by hand for a year (0 removes them). */
+  putCwtExtra: (logId: number, year: number, points: number) => json<Record<string, number>>("PUT", `/logs/${logId}/cwt-extra`, { year, points }),
   awardHints: (logId: number, o: { call: string; band: string; mode: string; state: string; cqz: string; dxcc: string; grid?: string; iota?: string; cnty?: string; lotw: boolean; paper: boolean; eqsl: boolean }) => {
     const q = new URLSearchParams(Object.entries(o).map(([k, v]) => [k, String(v)]));
     return json<AwardHint[]>("GET", `/logs/${logId}/award-hints?${q}`);
