@@ -230,6 +230,7 @@ fn router(state: Shared) -> Router {
         .route("/logs/{id}/awards/{award}", get(award))
         .route("/logs/{id}/lookup/{call}", get(lookup))
         .route("/logs/{id}/award-hints", get(award_hints))
+        .route("/logs/{id}/dxcc-slots", get(dxcc_slots))
         .route("/logs/{id}/notes", get(list_notes))
         .route("/logs/{id}/notes/{call}", get(get_note).put(put_note).delete(delete_note))
         .route(
@@ -652,6 +653,28 @@ async fn award_hints(State(s): State<Shared>, Path(log_id): Path<i64>, Query(q):
         }
     }
     Ok(Json(hints))
+}
+
+#[derive(Deserialize)]
+struct SlotsQuery {
+    dxcc: u32,
+    #[serde(default)]
+    lotw: bool,
+    #[serde(default)]
+    paper: bool,
+    #[serde(default)]
+    eqsl: bool,
+}
+
+/// Band-by-mode slots worked, confirmed or needed for one DXCC entity.
+async fn dxcc_slots(State(s): State<Shared>, Path(log_id): Path<i64>, Query(q): Query<SlotsQuery>) -> ApiResult<qrzero_core::awards::SlotGrid> {
+    let counts = Counts { lotw: q.lotw, paper: q.paper, eqsl: q.eqsl };
+    let hub = s.hub.clone();
+    let grid = tokio::task::spawn_blocking(move || hub.dxcc_slots(log_id, q.dxcc, counts))
+        .await
+        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(ApiError::from)?;
+    Ok(Json(grid))
 }
 
 async fn paper_queue(State(s): State<Shared>, Path(id): Path<i64>) -> ApiResult<Vec<Qso>> {

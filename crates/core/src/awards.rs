@@ -603,12 +603,14 @@ pub struct AwardIndex {
     nums: Vec<HashMap<u32, Cells>>,
     /// Rows by text (prefix, continent, grid, IOTA, county) for each award.
     texts: Vec<HashMap<String, Cells>>,
+    /// DXCC band-by-mode-group slots: for each entity, `AWARD_BANDS.len() * 3` cells (band-major, CW/Phone/Digital).
+    dxcc_slots: HashMap<u32, Vec<u8>>,
     qsos: usize,
 }
 
 impl Default for AwardIndex {
     fn default() -> Self {
-        AwardIndex { nums: vec![HashMap::new(); AWARDS.len()], texts: vec![HashMap::new(); AWARDS.len()], qsos: 0 }
+        AwardIndex { nums: vec![HashMap::new(); AWARDS.len()], texts: vec![HashMap::new(); AWARDS.len()], dxcc_slots: HashMap::new(), qsos: 0 }
     }
 }
 
@@ -621,6 +623,14 @@ pub enum HintStatus {
     /// Worked, but not confirmed by a counted source.
     Worked,
     Confirmed,
+}
+
+/// One entity's DXCC slots: a status for each band and mode group.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct SlotGrid {
+    pub bands: Vec<&'static str>,
+    /// One row per band: CW, Phone, Digital.
+    pub cells: Vec<[HintStatus; 3]>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
@@ -659,6 +669,12 @@ impl AwardIndex {
     pub fn add(&mut self, q: &AwardQso) {
         self.qsos += 1;
         let bits = qso_bits(q);
+        if let (Some(d), Some(b), Some(m)) = (q.dxcc, q.band.as_deref(), q.mode.as_deref().and_then(mode_col)) {
+            if let Some(bi) = AWARD_BANDS.iter().position(|x| x.eq_ignore_ascii_case(b.trim())) {
+                let cells = self.dxcc_slots.entry(d).or_insert_with(|| vec![0; AWARD_BANDS.len() * 3]);
+                cells[bi * 3 + (m - COL_CW)] |= bits;
+            }
+        }
         let mode = q.mode.as_deref().and_then(mode_col);
         let band = q.band.as_deref().and_then(band_col);
         for award in AWARDS {
@@ -669,6 +685,22 @@ impl AwardIndex {
                 cells[i] |= bits;
             }
         }
+    }
+
+    /// Which band and mode-group slots are worked, confirmed or still needed for a DXCC entity.
+    pub fn dxcc_slots(&self, dxcc: u32, counts: Counts) -> SlotGrid {
+        let mask = counts_mask(counts);
+        let have = self.dxcc_slots.get(&dxcc);
+        let cells = (0..AWARD_BANDS.len())
+            .map(|b| {
+                std::array::from_fn(|m| match have.map_or(0, |h| h[b * 3 + m]) {
+                    0 => HintStatus::New,
+                    v if v & mask != 0 => HintStatus::Confirmed,
+                    _ => HintStatus::Worked,
+                })
+            })
+            .collect();
+        SlotGrid { bands: AWARD_BANDS.to_vec(), cells }
     }
 
     /// How many QSOs went in.
@@ -1169,6 +1201,22 @@ mod tests {
         for x in &h {
             assert_eq!(statuses(x), [("mixed", HintStatus::New), ("cw", HintStatus::New), ("20m", HintStatus::New)]);
         }
+    }
+
+    #[test]
+    fn dxcc_slot_grid() {
+        use HintStatus::*;
+        let mut idx = AwardIndex::default();
+        idx.add(&AwardQso { dxcc: Some(230), lotw: true, ..q("DL1ABC", "20m", "CW") });
+        idx.add(&AwardQso { dxcc: Some(230), ..q("DL2XYZ", "40m", "USB") });
+        idx.add(&AwardQso { dxcc: Some(230), ..q("DL2XYZ", "2m", "FT8") });
+        idx.add(&AwardQso { dxcc: Some(291), ..q("W1AW", "20m", "CW") });
+        let g = idx.dxcc_slots(230, lotw_only());
+        let row = |b: &str| g.cells[g.bands.iter().position(|x| *x == b).unwrap()];
+        assert_eq!(row("20m"), [Confirmed, New, New]);
+        assert_eq!(row("40m"), [New, Worked, New]);
+        assert_eq!(row("10m"), [New, New, New]);
+        assert_eq!(idx.dxcc_slots(5, lotw_only()).cells[0], [New, New, New], "unworked entity");
     }
 
     #[test]

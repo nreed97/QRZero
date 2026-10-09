@@ -254,6 +254,17 @@ kbd { font: 11px var(--mono); opacity: 0.75; margin-left: 4px; }
 .award-hints .ah-text { min-width: 0; }
 .award-hints .ah-new { color: var(--new); font-weight: 700; }
 
+.dxcc-slots { margin: 6px 0 2px; font-size: 12px; border-top: 1px solid var(--line); padding-top: 4px; }
+.dxcc-slots .ah-title { color: var(--muted); font-size: 11px; margin-bottom: 2px; }
+.dxcc-slots table { border-collapse: collapse; }
+.dxcc-slots th, .dxcc-slots td { border: 1px solid var(--line); padding: 0 3px; min-width: 22px; text-align: center; font: 12px var(--mono); }
+.dxcc-slots th { font-weight: 400; color: var(--muted); }
+.dxcc-slots th:first-child { text-align: left; min-width: 0; border-color: transparent; }
+.dxcc-slots th.cur { font-weight: 700; color: var(--text); }
+.dxcc-slots td.worked { color: var(--muted); }
+.dxcc-slots td.confirmed { font-weight: 700; }
+.dxcc-slots td.cur { outline: 2px solid var(--new); outline-offset: -2px; }
+
 /* Map */
 .map-box { flex: 1; min-height: 150px; position: relative; overflow: hidden; }
 .map-box svg { position: absolute; inset: 0; display: block; }

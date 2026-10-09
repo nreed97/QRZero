@@ -246,6 +246,9 @@ export interface AwardTable { award: AwardKind; columns: AwardColumn[]; rows: Aw
 /** What a QSO would add to one award: its row and the cells it falls in (mixed, mode group, band). */
 export interface AwardHint { award: AwardKind; key: string; name: string; cells: { column: string; status: "new" | AwardStatus }[] }
 
+/** DXCC slots of one entity: per band (row), the status of CW, Phone and Digital. */
+export interface SlotGrid { bands: string[]; cells: ("new" | AwardStatus)[][] }
+
 /** A station note, stored under the base call. Times are Unix seconds. */
 export interface Note {
   call: string;

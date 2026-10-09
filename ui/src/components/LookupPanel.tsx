@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { api } from "../api";
 import { localGet } from "../prefs";
-import type { AwardHint, AwardKind, LookupResult } from "../types";
+import type { AwardHint, AwardKind, LookupResult, SlotGrid } from "../types";
 import type { EntryContext } from "./EntryPanel";
 import { useLiveNote } from "../notes";
 import "../notes.css";
@@ -9,6 +9,8 @@ import "../notes.css";
 export default function LookupPanel({ logId, result, entry, refreshKey }: { logId: number; result: LookupResult | null; entry: EntryContext; refreshKey?: number }) {
   const note = useLiveNote(entry.fields.CALL ?? "", result?.note ?? null);
   const hints = useAwardHints(logId, result, entry, refreshKey);
+  const slotsDxcc = String(entry.fields.DXCC ?? result?.station?.DXCC ?? result?.entity?.dxcc ?? "").trim();
+  const slots = useDxccSlots(logId, result ? slotsDxcc : "", refreshKey);
   if (!result) {
     return (
       <section className="panel lookup">
@@ -58,6 +60,7 @@ export default function LookupPanel({ logId, result, entry, refreshKey }: { logI
         ))}
       </div>
       {hints && hints.length > 0 && <AwardHints hints={hints} band={entry.band} mode={entry.mode} />}
+      {slots && <DxccSlots grid={slots} name={result.entity?.name ?? s?.COUNTRY ?? `DXCC ${slotsDxcc}`} band={entry.band} mode={entry.mode} />}
       </div>
     </section>
   );
@@ -161,6 +164,69 @@ function AwardHints({ hints, band, mode }: { hints: AwardHint[]; band: string; m
           </div>
         ))
       )}
+    </div>
+  );
+}
+
+/** The band-by-mode slots of the entity, refetched when the entity or the log changes. */
+function useDxccSlots(logId: number, dxcc: string, refreshKey?: number): SlotGrid | null {
+  const [grid, setGrid] = useState<SlotGrid | null>(null);
+  useEffect(() => {
+    if (!/^\d+$/.test(dxcc)) {
+      setGrid(null);
+      return;
+    }
+    let live = true;
+    const c = localGet("qrzero.awards", { lotw: true, paper: true, eqsl: false });
+    api
+      .dxccSlots(logId, { dxcc, lotw: c.lotw, paper: c.paper, eqsl: c.eqsl })
+      .then((g) => live && setGrid(g))
+      .catch(() => live && setGrid(null));
+    return () => {
+      live = false;
+    };
+  }, [logId, dxcc, refreshKey]);
+  return grid;
+}
+
+const SLOT_MODES = ["CW", "Phone", "Digital"];
+const PHONE_MODES = ["SSB", "USB", "LSB", "AM", "FM", "DIGITALVOICE", "C4FM", "DSTAR", "DMR"];
+function modeGroupIndex(mode: string): number {
+  const m = mode.trim().toUpperCase();
+  return !m ? -1 : m === "CW" ? 0 : PHONE_MODES.includes(m) ? 1 : 2;
+}
+
+/** DXCC slots for the entity: W = worked, C = confirmed, blank = still needed. */
+function DxccSlots({ grid, name, band, mode }: { grid: SlotGrid; name: string; band: string; mode: string }) {
+  const mi = modeGroupIndex(mode);
+  const bi = grid.bands.indexOf(band);
+  const mark = { new: "", worked: "W", confirmed: "C" } as const;
+  return (
+    <div className="dxcc-slots" aria-label="DXCC slots">
+      <div className="ah-title">{name} slots (W worked, C confirmed, blank needed)</div>
+      <table>
+        <thead>
+          <tr>
+            <th />
+            {grid.bands.map((b, i) => (
+              <th key={b} className={i === bi ? "cur" : ""}>{b.replace("m", "")}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {SLOT_MODES.map((m, j) => (
+            <tr key={m}>
+              <th className={j === mi ? "cur" : ""}>{m}</th>
+              {grid.bands.map((b, i) => {
+                const st = grid.cells[i][j];
+                return (
+                  <td key={b} className={`${st}${i === bi && j === mi ? " cur" : ""}`} title={`${b} ${m}: ${st === "new" ? "needed" : st}`}>{mark[st]}</td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
