@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../api";
-import { CUSTOM_PREFIX, DEFAULT_LAYOUT, ENTRY_FIELDS, fieldDef, type EntryLayout } from "../fields";
+import { CUSTOM_PREFIX, DEFAULT_LAYOUT, ENTRY_FIELDS, fieldDef, type EntryLayout, type ModeLayouts } from "../fields";
 import { confirmedText, OQRS, OQRS_DATE } from "../confirmations";
 import { BANDS, MODES, bandForFreq } from "../modes";
 import { usePref } from "../prefs";
@@ -140,6 +140,7 @@ export default function QsoEditor({ qso, locations, equipment, callsigns, onClos
   const [rawOpen, setRawOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [layout] = usePref<EntryLayout>("entry_layout", DEFAULT_LAYOUT);
+  const [modeLayouts] = usePref<ModeLayouts>("entry_layouts", {});
 
   const changed = useMemo(() => changedKeys(base.fields, draft.fields), [base, draft.fields]);
   const locChanged = draft.locationId !== base.location_id;
@@ -355,9 +356,9 @@ export default function QsoEditor({ qso, locations, equipment, callsigns, onClos
 
   const customLabels = useMemo(() => {
     const m = new Map<string, string>();
-    for (const item of layout.rows.flat()) if (item.key.startsWith(CUSTOM_PREFIX)) m.set(item.key, fieldDef(item).label);
+    for (const item of [layout, ...Object.values(modeLayouts)].flatMap((l) => l.rows.flat())) if (item.key.startsWith(CUSTOM_PREFIX)) m.set(item.key, fieldDef(item).label);
     return m;
-  }, [layout]);
+  }, [layout, modeLayouts]);
   const otherLabel = (k: string) =>
     customLabels.get(k) ?? (k.startsWith(CUSTOM_PREFIX) ? k.slice(CUSTOM_PREFIX.length).replace(/_/g, " ") : ENTRY_FIELDS.find((e) => e.key === k)?.label ?? k);
   const others = Object.keys(f)

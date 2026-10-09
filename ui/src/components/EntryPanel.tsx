@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { beep, getDisplay } from "../display";
-import { BANDS, MODES, bandForFreq, choiceFor } from "../modes";
+import { BANDS, MODES, bandForFreq, choiceFor, modeGroup } from "../modes";
 import { antennaForBand, hasBands } from "../antennas";
-import { fieldDef, freshValues, type EntryLayout } from "../fields";
+import { fieldDef, freshValues, type EntryLayout, type ModeLayouts } from "../fields";
 import { localGet, localSet } from "../prefs";
 import QrzPageLink from "./QrzPageLink";
 import type { Equipment, Fields, Location, LookupResult, Radio } from "../types";
@@ -21,6 +21,8 @@ interface Props {
   stationCall: string;
   location: Location | null;
   layout: EntryLayout;
+  /** Layouts used instead of `layout` for a group of modes (CW, phone, digital). */
+  modeLayouts: ModeLayouts;
   equipment: Equipment[];
   onLogged: () => void;
   onLookup: (r: LookupResult | null) => void;
@@ -71,13 +73,15 @@ const PER_QSO = new Set(["COMMENT", "QSLMSG", "STX", "SRX", "STX_STRING", "SRX_S
 // Picked equipment ids; -1 is "none", and antenna 0 is "Auto (by band)".
 interface Gear { rig?: number; antenna?: number; amplifier?: number }
 
-export default function EntryPanel({ logId, stationCall, location, layout, equipment, onLogged, onLookup, onContext, onHelp, radios, radioKey, onRadio, prefill, copy }: Props) {
+export default function EntryPanel({ logId, stationCall, location, layout: baseLayout, modeLayouts, equipment, onLogged, onLookup, onContext, onHelp, radios, radioKey, onRadio, prefill, copy }: Props) {
   const prefs = useRef(localGet("qrzero.entry", { freq: "", band: "20m", mode: "CW", last: {} as Fields })).current;
   const [freq, setFreq] = useState(prefs.freq);
   // The receive frequency while the radio is in split; empty otherwise. `freq` is then the transmit frequency.
   const [freqRx, setFreqRx] = useState("");
   const [band, setBand] = useState(prefs.band);
   const [mode, setMode] = useState(prefs.mode);
+  const group = modeGroup(choiceFor(mode).submode ?? choiceFor(mode).mode) || modeGroup(choiceFor(mode).mode);
+  const layout = (group && modeLayouts[group]) || baseLayout;
   const [rstSent, setRstSent] = useState(choiceFor(prefs.mode).rst);
   const [rstRcvd, setRstRcvd] = useState(choiceFor(prefs.mode).rst);
   const [call, setCall] = useState("");
@@ -98,6 +102,24 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
   const callRef = useRef<HTMLInputElement>(null);
   const lookedUp = useRef("");
   const lookupSeq = useRef(0);
+
+  // A different mode group can show different fields: drop the values of fields that went away
+  // (so they aren't logged unseen), start the new ones from their defaults, and refill from the lookup.
+  const layoutRef = useRef(layout);
+  useEffect(() => {
+    if (layoutRef.current === layout) return;
+    const from = new Set(layoutRef.current.rows.flat().map((i) => i.key));
+    layoutRef.current = layout;
+    const to = new Set(layout.rows.flat().map((i) => i.key));
+    setForm((f) => {
+      const next: Fields = {};
+      for (const [k, v] of Object.entries(f)) if (to.has(k)) next[k] = v;
+      for (const [k, v] of Object.entries(freshValues(layout, f))) if (!from.has(k) && !(k in next)) next[k] = v;
+      return next;
+    });
+    setTouched((t) => new Set([...t].filter((k) => to.has(k))));
+    if (call.trim().length >= 3) void runLookup(call, true);
+  }, [layout]);
 
   const visibleKeys = useMemo(() => new Set(layout.rows.flat().map((i) => i.key)), [layout]);
   const byKind = (kind: string) => equipment.filter((e) => e.kind === kind);

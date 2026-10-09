@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { ClusterConfig, ClusterNode, CtyStatus, Equipment, Fields, IntegrationStatus, Integrations, Location, Log, Settings, StationCallsign } from "../types";
-import type { EntryLayout } from "../fields";
+import type { EntryLayout, ModeLayouts } from "../fields";
 import Modal from "./Modal";
 import EquipmentTree from "./EquipmentTree";
 import EntryFieldsEditor from "./EntryFieldsEditor";
@@ -24,6 +24,8 @@ interface Props {
   equipment: Equipment[];
   layout: EntryLayout;
   onLayout: (l: EntryLayout) => void;
+  modeLayouts: ModeLayouts;
+  onModeLayouts: (l: ModeLayouts) => void;
   general: GeneralPrefs;
   onGeneral: (g: GeneralPrefs) => void;
   onWizard: () => void;
@@ -92,7 +94,7 @@ export default function SettingsDialog(props: Props) {
           <EquipmentTree locations={props.locations} equipment={props.equipment} onChanged={props.onChanged} />
         </>
       )}
-      {tab === "fields" && <EntryFieldsEditor layout={props.layout} onChange={props.onLayout} />}
+      {tab === "fields" && <EntryFieldsEditor layout={props.layout} onChange={props.onLayout} modeLayouts={props.modeLayouts} onModeLayouts={props.onModeLayouts} />}
       {tab === "lookup" && <LookupTab />}
       {tab === "radios" && <RadiosTab />}
       {tab === "udp" && <UdpConnectionsTab />}
