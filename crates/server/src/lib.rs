@@ -230,6 +230,8 @@ fn router(state: Shared) -> Router {
         .route("/logs/{id}/awards/{award}", get(award))
         .route("/logs/{id}/lookup/{call}", get(lookup))
         .route("/logs/{id}/award-hints", get(award_hints))
+        .route("/logs/{id}/replies", get(list_replies).post(add_reply))
+        .route("/logs/{id}/replies/{call}", axum::routing::put(put_reply).delete(delete_reply))
         .route("/logs/{id}/dxcc-slots", get(dxcc_slots))
         .route("/logs/{id}/notes", get(list_notes))
         .route("/logs/{id}/notes/{call}", get(get_note).put(put_note).delete(delete_note))
@@ -847,6 +849,54 @@ async fn lookup(State(s): State<Shared>, Path((log_id, call)): Path<(i64, String
         tokio::task::spawn_blocking(move || hub.send_lookup(&call, station.as_ref(), entity.as_ref()));
     }
     Ok(Json(result))
+}
+
+#[derive(Serialize)]
+struct ReplyRow {
+    #[serde(flatten)]
+    entry: ReplyEntry,
+    /// The newest QSOs with this station, to see what the card is about.
+    qsos: Vec<Qso>,
+}
+
+/// The reply list, each entry with up to 8 of its newest QSOs (indexed exact-call search).
+async fn list_replies(State(s): State<Shared>, Path(log_id): Path<i64>) -> ApiResult<Vec<ReplyRow>> {
+    db(&s, move |st| {
+        st.list_replies(log_id)?
+            .into_iter()
+            .map(|entry| {
+                let filter = QsoFilter { exact_call: Some(entry.call.clone()), ..Default::default() };
+                let (_, qsos) = st.search(log_id, &filter, Sort::Newest, 0, 8)?;
+                Ok(ReplyRow { entry, qsos })
+            })
+            .collect()
+    })
+    .await
+    .map(Json)
+}
+
+#[derive(Deserialize)]
+struct ReplyAdd {
+    call: String,
+}
+
+/// Puts a call on the list, leaving an existing entry (and its note) alone.
+async fn add_reply(State(s): State<Shared>, Path(log_id): Path<i64>, Json(b): Json<ReplyAdd>) -> ApiResult<bool> {
+    db(&s, move |st| st.add_reply_if_new(log_id, &b.call)).await.map(|_| Json(true))
+}
+
+#[derive(Deserialize)]
+struct ReplyBody {
+    received: String,
+    note: String,
+}
+
+async fn put_reply(State(s): State<Shared>, Path((log_id, call)): Path<(i64, String)>, Json(b): Json<ReplyBody>) -> ApiResult<bool> {
+    db(&s, move |st| st.save_reply(log_id, &call, &b.received, &b.note)).await.map(|_| Json(true))
+}
+
+async fn delete_reply(State(s): State<Shared>, Path((log_id, call)): Path<(i64, String)>) -> ApiResult<bool> {
+    db(&s, move |st| st.delete_reply(log_id, &call)).await.map(Json)
 }
 
 #[derive(Deserialize)]

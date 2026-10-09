@@ -130,6 +130,17 @@ pub struct WorkedBefore {
     pub dxcc_modes: Vec<String>,
 }
 
+/// A card received and not yet answered.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplyEntry {
+    pub call: String,
+    /// Date the card arrived, YYYY-MM-DD.
+    pub received: String,
+    pub note: String,
+    /// Unix seconds.
+    pub created_at: i64,
+}
+
 /// A note the operator keeps about a station, stored under its base call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Note {

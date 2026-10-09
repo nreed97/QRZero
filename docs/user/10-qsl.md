@@ -63,6 +63,14 @@ Several QSOs with the same station share a label. **Skip labels** leaves the fir
 
 When a card arrives, select its QSOs in the log and pick **Paper QSL…, Card received via bureau** (or direct).
 
+## Cards to reply to
+
+Cards arrive in the mail and don't always get answered right away. The **To reply to** tab is a list of the calls you still owe a reply.
+
+- Right-click QSOs in the log and pick **Add to reply list**, or type a call in **Add a call** and press Enter. A call is listed once, however often you add it.
+- Each row shows the call, the date the card arrived (change it if it was earlier), a note you can type in (direct, via bureau, an address), and the newest QSOs you have with that station.
+- When you've replied, click **Replied**. Pick **Sent via bureau** or **Sent direct** to also mark those QSOs as card sent with today's date, or **Just remove** to only take the call off the list. The entry is deleted; no history is kept.
+
 ## QSL lookup
 
 For answering cards or writing them in bulk: pick **QSL lookup…** from the **☰** menu, or press **Alt+Q**. Type a callsign and press **Enter**. You get that station's QSOs, newest first: date, UTC, MHz, mode, the RST you sent and received, your own callsign, and the card status (sent and received, with the bureau or direct route and date, and OQRS if you've asked). Above the list are the QSL manager (QSL via), name, QTH and address, taken from the newest QSO that has them.

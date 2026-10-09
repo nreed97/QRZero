@@ -83,3 +83,20 @@ fn list_searches_by_substring_newest_first_and_pages() {
     assert_eq!(rows.len(), 1);
     assert_eq!(st.list_notes(log, "%", 0, 10).unwrap().0, 0);
 }
+
+#[test]
+fn reply_list_add_update_and_remove() {
+    let (st, log) = setup();
+    assert!(st.list_replies(log).unwrap().is_empty());
+    st.add_reply_if_new(log, " dl1abc ").unwrap();
+    st.save_reply(log, "DL1ABC", "2026-10-01", "send direct").unwrap();
+    st.add_reply_if_new(log, "DL1ABC").unwrap(); // keeps the note
+    st.save_reply(log, "K1ABC", "2026-09-20", "").unwrap();
+    let rows = st.list_replies(log).unwrap();
+    assert_eq!(rows.iter().map(|r| r.call.as_str()).collect::<Vec<_>>(), ["K1ABC", "DL1ABC"]);
+    assert_eq!(rows[1].note, "send direct");
+    assert_eq!(rows[1].received, "2026-10-01");
+    assert!(st.delete_reply(log, "dl1abc").unwrap());
+    assert!(!st.delete_reply(log, "DL1ABC").unwrap());
+    assert!(st.save_reply(log, "  ", "", "").is_err());
+}

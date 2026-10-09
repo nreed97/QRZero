@@ -68,3 +68,26 @@ async fn notes_round_trip_and_show_in_lookup() {
     let (status, _) = api.call(Method::PUT, &format!("/logs/{log}/notes/%2F"), Some(json!({"text": "x"}))).await;
     assert_eq!(status, 400);
 }
+
+#[tokio::test]
+async fn reply_list_with_qsos() {
+    let api = Api::new().await;
+    let log = api.ok(Method::GET, "/logs", None).await[0]["id"].as_i64().unwrap();
+    api.ok(
+        Method::POST,
+        &format!("/logs/{log}/qsos"),
+        Some(json!({"fields": {"CALL": "DL1ABC", "QSO_DATE": "20260101", "TIME_ON": "1200", "BAND": "20m", "MODE": "CW", "STATION_CALLSIGN": "K1TEST"}})),
+    )
+    .await;
+    api.ok(Method::POST, &format!("/logs/{log}/replies"), Some(json!({"call": "dl1abc"}))).await;
+    api.ok(Method::PUT, &format!("/logs/{log}/replies/DL1ABC"), Some(json!({"received": "2026-10-01", "note": "direct"}))).await;
+    // Adding again keeps the note.
+    api.ok(Method::POST, &format!("/logs/{log}/replies"), Some(json!({"call": "DL1ABC"}))).await;
+    let rows = api.ok(Method::GET, &format!("/logs/{log}/replies"), None).await;
+    assert_eq!(rows.as_array().unwrap().len(), 1);
+    assert_eq!(rows[0]["call"], "DL1ABC");
+    assert_eq!(rows[0]["note"], "direct");
+    assert_eq!(rows[0]["qsos"].as_array().unwrap().len(), 1);
+    assert!(api.ok(Method::DELETE, &format!("/logs/{log}/replies/DL1ABC"), None).await.as_bool().unwrap());
+    assert!(api.ok(Method::GET, &format!("/logs/{log}/replies"), None).await.as_array().unwrap().is_empty());
+}

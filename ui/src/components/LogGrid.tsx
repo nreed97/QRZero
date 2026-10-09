@@ -240,6 +240,19 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
     }
   };
 
+  const addToReplyList = async (ids: number[]) => {
+    const want = new Set(ids);
+    const calls = [...new Set([...pages.current.values()].flat().filter((q) => want.has(q.id)).map((q) => q.fields.CALL).filter((c): c is string => !!c))];
+    try {
+      for (const c of calls) await api.addReply(logId, c);
+      setError("");
+      setNotice(`Added ${calls.join(", ")} to the reply list (QSL, To reply to).`);
+    } catch (e) {
+      setNotice("");
+      setError((e as Error).message);
+    }
+  };
+
   const one = (v: string) => (v ? [v] : undefined);
 
   const setWidth = (key: string, px: number) => {
@@ -435,6 +448,7 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
               <button role="menuitem" onClick={act(() => void markPaper("sent-b", ids))}>Card sent via bureau ({what})</button>
               <button role="menuitem" onClick={act(() => void markPaper("sent-d", ids))}>Card sent direct ({what})</button>
               <button role="menuitem" onClick={act(() => void markPaper("rcvd-b", ids))}>Card received ({what})</button>
+              <button role="menuitem" onClick={act(() => void addToReplyList(ids))}>Add {what} to reply list</button>
               <hr />
               <button role="menuitem" onClick={act(onExportSelected)}>Export {what}…</button>
               <button role="menuitem" onClick={act(() => void deleteSelected())}>Delete {what}…</button>

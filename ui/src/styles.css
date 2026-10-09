@@ -511,6 +511,9 @@ table.list th { text-align: left; font-size: 12px; font-weight: 600; padding: 2p
   .label-foot { font-size: 7.5pt; margin-top: 1pt; }
   .sheet-5163 .label-foot { font-size: 9pt; margin-top: 3pt; }
 }
+.reply-table th { text-align: left; font-weight: 600; padding: 3px 5px; border-bottom: 1px solid var(--line); }
+.reply-table td { vertical-align: top; }
+.reply-table input:not([type=date]) { width: 100%; }
 .paper-queue th { text-align: left; font-weight: 600; padding: 3px 5px; border-bottom: 1px solid var(--line); }
 
 /* Awards */

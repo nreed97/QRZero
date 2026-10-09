@@ -257,6 +257,15 @@ export interface Note {
   updated_at: number;
 }
 
+/** A card received and not yet answered, with the newest QSOs with that station. */
+export interface ReplyEntry {
+  call: string;
+  received: string;
+  note: string;
+  created_at: number;
+  qsos: Qso[];
+}
+
 export type WatchKind = "call" | "prefix" | "entity";
 export interface WatchEntry { id: number; kind: WatchKind; value: string; name: string; bands: string[]; modes: string[]; note: string; enabled: boolean }
 export interface WatchHit {
