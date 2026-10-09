@@ -45,6 +45,8 @@ export interface Prefill {
   freq_hz?: number;
   /** Split: transmit here, receive on freq_hz. */
   tx_freq_hz?: number;
+  /** From the FTx monitor: choose the radio of the instance that decoded it (or one on that band) and don't retune. */
+  ftx?: { rig_key: string | null };
 }
 
 /** MHz as typed in the entry panel: 14.025 or 14.07412. */
@@ -243,7 +245,15 @@ export default function EntryPanel({ logId, stationCall, location, layout, equip
     setStart(new Date());
     if (prefill.grid) setForm((f) => ({ ...f, GRIDSQUARE: prefill.grid! }));
     const m = prefill.mode && MODES.some((x) => x.label === prefill.mode) ? prefill.mode : null;
-    if (radio?.can_tune && prefill.freq_hz) {
+    if (prefill.ftx) {
+      // The program is already on the band: pick the slice it decoded on (or one already on that band), never QSY.
+      const onBand = (r: typeof radio) => !!r && r.connected && !!prefill.band && bandForFreq(r.freq_hz / 1e6) === prefill.band;
+      const target = radios.find((r) => r.key === prefill.ftx!.rig_key) ?? (onBand(radio) ? radio : radios.find(onBand));
+      if (target && target.key !== radio?.key) onRadio(target.key);
+      else if (!target && radio?.source !== "wsjtx") {
+        if (prefill.band) setBand(prefill.band);
+      }
+    } else if (radio?.can_tune && prefill.freq_hz) {
       // A spot that says where it listens sets split; any other spot turns a split left over from the last one off.
       const split = prefill.tx_freq_hz ? { tx_freq_hz: prefill.tx_freq_hz } : radio.split ? { split: false } : undefined;
       api.tune(radio.key, prefill.freq_hz, m ?? undefined, split).catch((e) => setStatus({ text: `Couldn't tune: ${(e as Error).message}`, kind: "err" }));

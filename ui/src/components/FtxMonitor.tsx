@@ -18,6 +18,8 @@ export interface DecodePick {
   freq_hz: number;
   /** Where the DX listens, from a spot's comment. */
   tx_freq_hz?: number;
+  /** Set for FTx decodes: the picked radio is never retuned, only chosen. */
+  ftx?: { rig_key: string | null };
 }
 
 interface Filters {
@@ -146,7 +148,7 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
   const pick = (d: FtxDecode) => {
     if (d.tx) return;
     setSelected(d.seq);
-    if (d.call) onPick({ call: d.call, grid: d.grid, band: d.band, mode: d.mode, freq_hz: d.freq_hz });
+    if (d.call) onPick({ call: d.call, grid: d.grid, band: d.band, mode: d.mode, freq_hz: d.freq_hz, ftx: { rig_key: byId.get(d.instance)?.rig_key ?? null } });
   };
 
   const answer = async (d: FtxDecode) => {

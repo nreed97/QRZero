@@ -222,7 +222,7 @@ export default function App() {
     setWs({ ...cur, root: showPane(cur.root, "log") });
   };
 
-  const pick = (p: DecodePick) => setPrefill({ nonce: Date.now(), call: p.call, grid: p.grid, band: p.band, mode: p.mode, freq_hz: p.freq_hz, tx_freq_hz: p.tx_freq_hz });
+  const pick = (p: DecodePick) => setPrefill({ nonce: Date.now(), call: p.call, grid: p.grid, band: p.band, mode: p.mode, freq_hz: p.freq_hz, tx_freq_hz: p.tx_freq_hz, ftx: p.ftx });
 
   const refreshGrid = () => {
     setRefreshKey((k) => k + 1);
