@@ -45,6 +45,8 @@ pub struct Planned {
     pub start: String,
     pub end: String,
     pub note: String,
+    /// The entity's name as the calendar gives it (the country file is tried first).
+    pub entity: String,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -250,7 +252,11 @@ impl Dxped {
             let entries = matched
                 .iter()
                 .enumerate()
-                .map(|(i, p)| WatchEntry { id: i as u64 + 1, kind: WatchKind::Call, value: p.call.clone(), ..WatchEntry::default() })
+                .map(|(i, p)| {
+                    // The calendar sometimes gives only a prefix (TF, 7P8) before the call is known.
+                    let kind = if p.call.len() <= 3 { WatchKind::Prefix } else { WatchKind::Call };
+                    WatchEntry { id: i as u64 + 1, kind, value: p.call.clone(), ..WatchEntry::default() }
+                })
                 .collect();
             st.matcher = Some(Watch::new(entries));
             st.matched = matched;
@@ -305,7 +311,7 @@ impl Dxped {
                     "end": p.end,
                     "note": p.note,
                     "active": is_active(&p, today),
-                    "entity": entity.as_ref().map(|e| e.name.clone()),
+                    "entity": entity.as_ref().map(|e| e.name.clone()).or_else(|| Some(p.entity.clone()).filter(|n| !n.is_empty())),
                     "prefix": entity.as_ref().map(|e| e.prefix.clone()),
                     "dxcc": dxcc,
                     "need": need,
@@ -408,49 +414,97 @@ fn year(tok: &str) -> Option<i32> {
     tok.parse::<i32>().ok().filter(|y| (2000..=2100).contains(y))
 }
 
-fn callsign_like(t: &str) -> bool {
-    (3..=14).contains(&t.len())
-        && t.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '/')
-        && t.chars().any(|c| c.is_ascii_digit())
-        && t.chars().any(|c| c.is_ascii_uppercase())
-        && !t.starts_with('/')
-        && !t.ends_with('/')
+/// What a call on the calendar can be: a full call (V51WH), a bare prefix (TF, 7P8) or a
+/// call with a slash.
+fn call_like(t: &str) -> bool {
+    (2..=14).contains(&t.len()) && t.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '/') && t.chars().any(|c| c.is_ascii_uppercase())
 }
 
+/// The page is HTML: one paragraph per operation, fields separated by <br>. Turn that
+/// into lines of plain text, one per field.
 fn plain(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
+    let mut tag = String::new();
     let mut in_tag = false;
     for c in text.chars() {
         match c {
-            '<' => in_tag = true,
+            '<' => {
+                in_tag = true;
+                tag.clear();
+            }
             '>' if in_tag => {
                 in_tag = false;
-                out.push(' ');
+                let name = tag.trim_start_matches('/').split(|c: char| !c.is_ascii_alphanumeric()).next().unwrap_or("").to_ascii_lowercase();
+                match name.as_str() {
+                    // A paragraph break is marked, so one operation's fields never run into the next.
+                    "p" | "tr" | "li" | "div" | "h1" | "h2" | "h3" => out.push_str("\n\u{1}\n"),
+                    "br" => out.push('\n'),
+                    _ => out.push(' '),
+                }
             }
-            _ if !in_tag => out.push(c),
-            _ => {}
+            _ if in_tag => tag.push(c),
+            _ => out.push(c),
         }
     }
     out.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
 }
 
-/// Reads NG3K's plain-text list: lines that start with a date range ("Oct 08-Oct 20",
-/// "Oct 8-20 2026", "Dec 28 2026-Jan 10 2027") followed by the call and notes.
-/// Anything else on the page is skipped.
+/// Reads NG3K's ADXO page (adxoplain.html). Each operation is a paragraph:
+///
+/// ```text
+/// Oct 1-11, 2026
+/// DXCC: Lesotho
+/// Callsign: 7P8
+/// QSL: As Directed
+/// Info: By ZS6LZ; HF; SOTA And POTA
+/// ```
+///
+/// The date line is "Aug 25-Oct 10, 2026", "Oct 1-11, 2026" or "Dec 15, 2026-Jan 3, 2027".
+/// Paragraphs without a date line and a call are skipped (month and year headings, links).
 pub fn parse_adxo(text: &str, today: NaiveDate) -> Vec<Planned> {
-    let mut out = Vec::new();
+    let mut out: Vec<Planned> = Vec::new();
+    let mut cur: Option<(NaiveDate, NaiveDate)> = None;
+    let (mut call, mut entity, mut info) = (String::new(), String::new(), String::new());
+    let mut flush = |cur: &mut Option<(NaiveDate, NaiveDate)>, call: &mut String, entity: &mut String, info: &mut String| {
+        if let Some((s, e)) = cur.take() {
+            let c = std::mem::take(call);
+            if call_like(&c) && !out.iter().any(|o| o.call == c && o.start == s.to_string()) {
+                out.push(Planned { call: c, start: s.to_string(), end: e.to_string(), entity: std::mem::take(entity), note: info.chars().take(200).collect(), ..Planned::default() });
+            }
+        }
+        call.clear();
+        entity.clear();
+        info.clear();
+    };
     for line in plain(text).lines() {
-        let spaced = line.replace([',', '\u{a0}'], " ").replace(['-', '\u{2013}', '\u{2014}'], " - ");
-        let toks: Vec<&str> = spaced.split_whitespace().collect();
-        let Some(p) = parse_line(&toks, today) else { continue };
-        if !out.iter().any(|o: &Planned| o.call == p.call && o.start == p.start) {
-            out.push(p);
+        if line.starts_with('\u{1}') {
+            flush(&mut cur, &mut call, &mut entity, &mut info);
+            continue;
+        }
+        let line = line.split_whitespace().collect::<Vec<_>>().join(" ");
+        if line.is_empty() {
+            continue;
+        }
+        if let Some(v) = line.strip_prefix("DXCC:") {
+            entity = v.trim().to_string();
+        } else if let Some(v) = line.strip_prefix("Callsign:") {
+            // A new-entry marker or a link's text can follow the call.
+            call = v.split_whitespace().next().unwrap_or("").to_ascii_uppercase();
+        } else if let Some(v) = line.strip_prefix("Info:") {
+            info = v.trim().to_string();
+        } else if let Some(range) = parse_dates(&line, today) {
+            flush(&mut cur, &mut call, &mut entity, &mut info);
+            cur = Some(range);
         }
     }
+    flush(&mut cur, &mut call, &mut entity, &mut info);
     out
 }
 
-fn parse_line(t: &[&str], today: NaiveDate) -> Option<Planned> {
+/// "Aug 25-Oct 10, 2026", "Oct 1-11", "Dec 15, 2026-Jan 3, 2027": the whole line is the range.
+fn parse_dates(line: &str, today: NaiveDate) -> Option<(NaiveDate, NaiveDate)> {
+    let spaced = line.replace([',', '\u{a0}'], " ").replace(['-', '\u{2013}', '\u{2014}'], " - ");
+    let t: Vec<&str> = spaced.split_whitespace().collect();
     let sm = month(t.first()?)?;
     let sd = day(t.get(1)?)?;
     let mut i = 2;
@@ -477,21 +531,13 @@ fn parse_line(t: &[&str], today: NaiveDate) -> Option<Planned> {
         ey = Some(y);
         i += 1;
     }
-    let call_at = t[i..].iter().position(|x| callsign_like(x))? + i;
-    let call = t[call_at].to_string();
-    let note = t[call_at + 1..].join(" ");
-
+    if i != t.len() {
+        return None;
+    }
     let (start, end) = match (sy, ey) {
         (Some(sy), Some(ey)) => (NaiveDate::from_ymd_opt(sy, sm, sd)?, NaiveDate::from_ymd_opt(ey, em, ed)?),
-        (Some(sy), None) => {
-            let s = NaiveDate::from_ymd_opt(sy, sm, sd)?;
-            let e = NaiveDate::from_ymd_opt(sy + i32::from(em < sm), em, ed)?;
-            (s, e)
-        }
-        (None, Some(ey)) => {
-            let e = NaiveDate::from_ymd_opt(ey, em, ed)?;
-            (NaiveDate::from_ymd_opt(ey - i32::from(em < sm), sm, sd)?, e)
-        }
+        (Some(sy), None) => (NaiveDate::from_ymd_opt(sy, sm, sd)?, NaiveDate::from_ymd_opt(sy + i32::from(em < sm), em, ed)?),
+        (None, Some(ey)) => (NaiveDate::from_ymd_opt(ey - i32::from(em < sm), sm, sd)?, NaiveDate::from_ymd_opt(ey, em, ed)?),
         (None, None) => {
             // No year given: take the reading that puts the start nearest today.
             let wraps = i32::from(em < sm);
@@ -500,10 +546,7 @@ fn parse_line(t: &[&str], today: NaiveDate) -> Option<Planned> {
                 .min_by_key(|(s, _)| (*s - today).num_days().abs())?
         }
     };
-    if end < start {
-        return None;
-    }
-    Some(Planned { id: 0, call, start: start.to_string(), end: end.to_string(), note: note.chars().take(200).collect() })
+    (end >= start).then_some((start, end))
 }
 
 #[cfg(test)]
@@ -514,40 +557,46 @@ mod tests {
         NaiveDate::from_ymd_opt(y, m, day).unwrap()
     }
 
+    const SAMPLE: &str = include_str!("dxped_adxo_sample.html");
+
     #[test]
-    fn reads_the_date_forms() {
-        let page = "ADXO header text\n\
-            Oct 08-Oct 20, 2026  ZL9CI  Auckland Is. QSL: LoTW\n\
-            Oct 10-25      5X1T    Uganda, CW and SSB\n\
-            <b>Dec 28 2026-Jan 10 2027</b> VP8/G4ABC South Georgia\n\
-            Nov 02 - Nov 09 3Y0K Bouvet\n\
-            Nothing here\n\
-            Sep 30-Oct 02 DL1ABC\n";
-        let list = parse_adxo(page, d(2026, 10, 8));
-        let got: Vec<_> = list.iter().map(|p| (p.call.as_str(), p.start.as_str(), p.end.as_str())).collect();
+    fn reads_the_real_page_layout() {
+        let list = parse_adxo(SAMPLE, d(2026, 10, 9));
+        let got: Vec<_> = list.iter().map(|p| (p.call.as_str(), p.start.as_str(), p.end.as_str(), p.entity.as_str())).collect();
         assert_eq!(
             got,
             [
-                ("ZL9CI", "2026-10-08", "2026-10-20"),
-                ("5X1T", "2026-10-10", "2026-10-25"),
-                ("VP8/G4ABC", "2026-12-28", "2027-01-10"),
-                ("3Y0K", "2026-11-02", "2026-11-09"),
-                ("DL1ABC", "2026-09-30", "2026-10-02"),
+                ("V51WH", "2026-08-25", "2026-10-10", "Namibia"),
+                ("8Q7JH", "2026-09-20", "2026-10-10", "Maldives"),
+                ("FW1P", "2026-09-26", "2026-10-17", "Wallis & Futuna"),
+                ("7P8", "2026-10-01", "2026-10-11", "Lesotho"),
+                ("SV5", "2026-10-03", "2026-10-10", "Dodecanese"),
+                ("TF", "2026-10-07", "2026-10-17", "Iceland"),
+                ("VP2MAW", "2026-10-10", "2026-10-20", "Montserrat"),
+                ("3D2HM", "2026-10-10", "2026-10-22", "Fiji"),
+                ("6W", "2026-10-28", "2026-11-09", "Senegal"),
+                ("VP9", "2026-10-17", "2026-10-20", "Bermuda"),
+                ("VK9XY", "2026-11-16", "2026-12-04", "Christmas I"),
             ]
         );
-        assert!(list[0].note.starts_with("Auckland Is."));
+        assert!(list[0].note.starts_with("By DK2WH fm nr Omaruru; 160-6m"), "{}", list[0].note);
     }
 
     #[test]
-    fn year_wraps_without_a_year() {
-        let list = parse_adxo("Dec 28-Jan 10 VP8LP South Georgia", d(2027, 1, 5));
-        assert_eq!((list[0].start.as_str(), list[0].end.as_str()), ("2026-12-28", "2027-01-10"));
-        assert!(parse_adxo("Oct 20-Oct 10 K1ABC", d(2026, 10, 8)).iter().all(|p| p.end >= p.start));
+    fn reads_the_date_forms() {
+        let para = |dates: &str| format!("<p>\n{dates}\n<br>DXCC: X<br>Callsign: <strong>K1ABC</strong><br>Info: i\n</p>");
+        let one = |dates: &str| parse_adxo(&para(dates), d(2027, 1, 5)).into_iter().map(|p| (p.start, p.end)).collect::<Vec<_>>();
+        assert_eq!(one("Dec 15, 2026-Jan 3, 2027"), [("2026-12-15".to_string(), "2027-01-03".to_string())]);
+        assert_eq!(one("Dec 28-Jan 10"), [("2026-12-28".to_string(), "2027-01-10".to_string())]);
+        assert_eq!(one("Oct 1-11, 2026"), [("2026-10-01".to_string(), "2026-10-11".to_string())]);
+        assert!(one("Oct 20-Oct 10, 2026").is_empty());
+        assert!(one("2026").is_empty());
     }
 
     #[test]
-    fn skips_lines_without_a_call_or_dates() {
-        assert!(parse_adxo("Oct 08-Oct 20 Auckland Island\nZL9CI Oct 08-20\nOctober news", d(2026, 10, 8)).is_empty());
+    fn skips_paragraphs_without_dates_or_a_call() {
+        let page = "<p>\n<strong>October</strong>\n</p>\n<p>\nOct 1-11, 2026\n<br>DXCC: Lesotho<br>Info: no call\n</p>\n<p>\n<br>Callsign: K1ABC\n</p>";
+        assert!(parse_adxo(page, d(2026, 10, 9)).is_empty());
     }
 
     #[test]
