@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import type { ClusterConfig, ClusterNode, CtyStatus, Equipment, Fields, IntegrationStatus, Integrations, Location, Log, Settings, StationCallsign } from "../types";
 import type { EntryLayout, ModeLayouts } from "../fields";
@@ -13,6 +13,7 @@ import { DISPLAY_DEFAULTS, beep, setDisplay, useDisplay } from "../display";
 import { MODES } from "../modes";
 import { NEED_NAME, type NeedRank } from "../needed";
 import { setNeededConfig, useNeededConfig } from "../neededPrefs";
+import { SETTING_ENTRIES, type SettingEntry } from "../settingsIndex";
 import { AWARD_LIST, setAwardEnabled, setAwardsOff, useAwardsOff } from "../awardsPref";
 
 export interface GeneralPrefs { units: "km" | "mi" }
@@ -40,10 +41,10 @@ type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "udp" |
 
 /** The sections down the left of Settings, grouped. */
 const GROUPS: { name: string; tabs: Tab[] }[] = [
+  { name: "Program", tabs: ["general", "backups", "keyboard"] },
   { name: "Station", tabs: ["station", "locations", "equipment", "logs"] },
   { name: "Logging", tabs: ["fields", "lookup", "awards"] },
   { name: "Connections", tabs: ["radios", "udp", "cluster", "startup"] },
-  { name: "Program", tabs: ["backups", "keyboard", "general"] },
 ];
 
 const TAB_NAMES: Record<Tab, string> = {
@@ -64,7 +65,7 @@ const TAB_NAMES: Record<Tab, string> = {
 };
 
 export default function SettingsDialog(props: Props) {
-  const [tab, setTab] = useState<Tab>(props.initialTab && props.initialTab in TAB_NAMES ? (props.initialTab as Tab) : "station");
+  const [tab, setTab] = useState<Tab>(props.initialTab && props.initialTab in TAB_NAMES ? (props.initialTab as Tab) : "general");
   const [error, setError] = useState("");
   const guard = (fn: () => Promise<unknown>) => async () => {
     setError("");
@@ -76,10 +77,80 @@ export default function SettingsDialog(props: Props) {
     }
   };
 
+  const [query, setQuery] = useState("");
+  const [jump, setJump] = useState<SettingEntry | null>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const q = query.trim().toLowerCase();
+  const matches = useMemo(() => {
+    if (!q) return [];
+    const all: SettingEntry[] = [
+      ...(Object.keys(TAB_NAMES) as Tab[]).map((t) => ({ tab: t, label: TAB_NAMES[t], words: "section" })),
+      ...SETTING_ENTRIES,
+    ];
+    const terms = q.split(/\s+/);
+    return all.filter((e) => {
+      const hay = `${e.label} ${e.words ?? ""} ${TAB_NAMES[e.tab as Tab]}`.toLowerCase();
+      return terms.every((t) => hay.includes(t));
+    }).slice(0, 30);
+  }, [q]);
+
+  const go = (e: SettingEntry) => {
+    setTab(e.tab as Tab);
+    setError("");
+    setQuery("");
+    setJump(e);
+  };
+
+  // After jumping, wait for the page to render (some load their data first), then scroll to and flash the setting.
+  useEffect(() => {
+    if (!jump) return;
+    let tries = 0;
+    const needle = (jump.find ?? "").toLowerCase();
+    const timer = window.setInterval(() => {
+      tries++;
+      const root = pageRef.current;
+      const el = needle && root
+        ? Array.from(root.querySelectorAll<HTMLElement>("label, legend, th, h4, button")).find((n) => (n.textContent ?? "").toLowerCase().includes(needle))
+        : null;
+      if (el) {
+        window.clearInterval(timer);
+        el.scrollIntoView({ block: "center" });
+        el.classList.add("setting-hit");
+        window.setTimeout(() => el.classList.remove("setting-hit"), 2500);
+      } else if (tries > 15) {
+        window.clearInterval(timer);
+      }
+    }, 80);
+    return () => window.clearInterval(timer);
+  }, [jump]);
+
   return (
     <Modal title="Settings" onClose={props.onClose} wide className="settings">
       <nav className="settings-nav" aria-label="Settings sections">
-        {GROUPS.map((g) => (
+        <input
+          type="search"
+          className="settings-search"
+          placeholder="Search settings"
+          aria-label="Search settings"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && matches[0]) go(matches[0]);
+            if (e.key === "Escape" && query) { e.stopPropagation(); setQuery(""); }
+          }}
+        />
+        {q && (
+          <div className="settings-results" role="listbox" aria-label="Search results">
+            {matches.length === 0 && <div className="none">No settings match.</div>}
+            {matches.map((m, i) => (
+              <button key={i} role="option" aria-selected={false} onClick={() => go(m)}>
+                {m.label}
+                <span className="where">{TAB_NAMES[m.tab as Tab]}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {!q && GROUPS.map((g) => (
           <div key={g.name} className="group">
             <div className="head">{g.name}</div>
             {g.tabs.map((t) => (
@@ -88,7 +159,7 @@ export default function SettingsDialog(props: Props) {
           </div>
         ))}
       </nav>
-      <div className="settings-page">
+      <div className="settings-page" ref={pageRef}>
       <h3 className="settings-title">{TAB_NAMES[tab]}</h3>
       {error && <p className="err">{error}</p>}
       {tab === "station" && <StationTab {...props} guard={guard} />}

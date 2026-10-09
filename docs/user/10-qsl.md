@@ -20,7 +20,7 @@ Log grid columns for all of this: **LoTW R**, **QSL R**, **QRZ R**, **OQRS** and
 
 ## Online services
 
-The **Online services** tab has one page per service: **LoTW**, **QRZ Logbook**, **Club Log** and **eQSL**. Pick one across the top. The daily eQSL confirmation download and **Save** stay at the bottom for all of them. QRZ Logbook, Club Log and eQSL each have their own **Upload new QSOs automatically** tick and **Every (min)** interval on their page, so one service can upload every 5 minutes while another is off or runs once an hour. After an upgrade each keeps the interval you had before. LoTW uploads only when you click **Sign and upload**, but it can download confirmations on a timer: tick **Download confirmations automatically** on its page and set **Every (min)** (once a day is 1440; on after an upgrade if you had the daily download on). The bottom tick downloads eQSL confirmations once a day. Rarely used LoTW options (upload by date range, moving from another logger) are under **Upload by date range, moving from another logger**.
+The **Online services** tab has one page per service: **LoTW**, **QRZ Logbook**, **Club Log** and **eQSL**. Pick one across the top. **Save** stays at the bottom for all of them. QRZ Logbook, Club Log and eQSL each have their own **Upload new QSOs automatically** tick and **Every (min)** interval on their page, so one service can upload every 5 minutes while another is off or runs once an hour. After an upgrade each keeps the interval you had before. LoTW uploads only when you click **Sign and upload**, but it can download confirmations on a timer: tick **Download confirmations automatically** on its page and set **Every (min)** (once a day is 1440; on after an upgrade if you had the daily download on).  Rarely used LoTW options (upload by date range, moving from another logger) are under **Upload by date range, moving from another logger**.
 
 ## LoTW
 
@@ -62,7 +62,7 @@ Enter your Club Log email and password, a Club Log **API key** (request one from
 
 Enter your eQSL username and password, plus the **QTH nickname** if your eQSL account has more than one, and tick the callsigns to upload. Uploads work like QRZ and Club Log: on the timer, or with **Upload now**. **Download confirmations** fetches eQSLs from your eQSL inbox and sets **eQSL R** on the matching QSOs.
 
-Tick **Download eQSL confirmations once a day** at the bottom to have this done for you.
+Tick **Download eQSL confirmations once a day** on the eQSL page to have this done for you.
 
 ## Cards to send
 
@@ -74,6 +74,8 @@ The **Cards to send** tab lists everything waiting. Tick the ones to print and p
 - **Avery 5163 / L7163**: 10 large labels, five QSOs per label.
 - **Brother QL-700, DK-22223 50 mm tape, 4 in long** (the default): one label for the fill-in block on the back of a card. It reads "CONFIRMING QSO WITH", the call in large type, then Date, UTC, MHz, Mode and RST for up to four QSOs, newest first; more QSOs with the same station go on another label. **Bottom line** adds an optional line under a rule, such as your power or rig.
 - Other **Brother QL-700** rolls: **DK-1201** (29 x 90 mm) and **DK-1209** (29 x 62 mm) with two QSOs per label, or **DK-1202** (62 x 100 mm) with five. Each label is its own page. For any QL-700 size, choose your QL-700 in the print dialog, set the paper to the matching size (for DK-22223, a custom 50 mm x 101.6 mm), and leave scaling at 100%.
+
+**Group by** sorts the queue into piles for a bulk mailing, each with its card and station count: **Bureau (country)** makes one pile per country for your outgoing bureau (cards for a QSL manager get a pile per manager), and **QSL manager** makes one pile per manager, with the cards that have no manager together. Labels print pile by pile in the order shown, and the tick box on a pile's heading picks or unpicks the whole pile. Group by is remembered.
 
 Several QSOs with the same station share a label. **Skip labels** leaves the first few labels empty, for a sheet you've used part of. Click **Print**, and when the labels are on the cards click **Sent via bureau** or **Sent direct** to mark them sent with today's date.
 

@@ -221,6 +221,12 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   }
   await page.getByRole("tab", { name: "Log", exact: true }).click();
   await fromMenu(page, "Settings…");
+  // General is the first section and opens by default; the search box jumps to a setting.
+  await expect(page.getByRole("heading", { name: "General" })).toBeVisible();
+  await page.getByLabel("Search settings").fill("rotor");
+  await page.getByRole("option", { name: /Control a rotator/ }).click();
+  await expect(page.getByRole("heading", { name: "Radios and programs" })).toBeVisible();
+  await expect(page.locator(".setting-hit")).toContainText("Control a rotator");
   await page.getByRole("button", { name: "Radios and programs" }).click();
   await expect(page.getByLabel("Listen to WSJT-X / JTDX")).toBeChecked();
 
@@ -281,6 +287,11 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "Cards to send" }).click();
   await expect(page.locator(".paper-queue")).toContainText("K1ABC");
   await expect(page.getByRole("button", { name: "Print 1 label" })).toBeVisible();
+  await page.getByLabel("Group by").selectOption("manager");
+  await expect(page.locator(".paper-queue .pile")).toContainText("1 card, 1 station");
+  await page.getByLabel("Group by").selectOption("bureau");
+  await expect(page.locator(".paper-queue .pile")).toContainText("1 card");
+  await page.getByLabel("Group by").selectOption("none");
   await page.getByRole("button", { name: "Close" }).click();
 
   // Reply list: add from the log's right-click menu, jot a note, mark it replied.
@@ -466,6 +477,11 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.locator(".club-table", { hasText: "ACA" })).toContainText("2024");
   const cwtYear = page.locator(".club-table", { hasText: "Medal" }).locator("tbody tr", { hasText: "2024" });
   await expect(cwtYear).toContainText("none yet");
+  // Points from CWTs worked outside the log are added by hand.
+  await page.getByLabel("Year for added CWT points").fill("2024");
+  await page.getByLabel("Added CWT points", { exact: true }).fill("5");
+  await page.getByRole("button", { name: "Set", exact: true }).click();
+  await expect(cwtYear).toContainText("incl. 5 added");
   await page.getByRole("tab", { name: "Log", exact: true }).click();
 
   // Awards you don't chase can be switched off in Settings; they leave the Awards pane.
@@ -498,6 +514,14 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await fromMenu(page, /^Help/);
   await expect(page.getByRole("heading", { name: "Getting started" })).toBeVisible();
   await page.screenshot({ path: "e2e-results/help.png" });
+  // Links between pages work, and the search box finds text on any page and jumps to it.
+  await page.locator("article.doc").getByRole("link", { name: "Radios and rig control" }).click();
+  await expect(page.getByRole("heading", { name: "Radios and rig control", level: 1 })).toBeVisible();
+  await page.getByLabel("Search the guide").fill("ci-v address");
+  await page.screenshot({ path: "e2e-results/help-search.png" });
+  await page.getByLabel("Search results").getByRole("button").first().click();
+  await expect(page.locator("article.doc mark").first()).toBeVisible();
+  await page.screenshot({ path: "e2e-results/help-search-page.png" });
 });
 
 /** A WSJT-X UDP datagram: magic, schema 2, message type and instance id, then the fields. */

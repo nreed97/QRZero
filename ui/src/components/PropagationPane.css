@@ -37,3 +37,16 @@
 .prop-more { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 12px; }
 .prop-sun { border-top: 1px solid var(--line); padding-top: 5px; font-size: 12px; display: flex; flex-direction: column; gap: 1px; }
 .prop-sunline .mono { font-weight: 600; }
+
+.prop-forecast { border-top: 1px solid var(--line); padding-top: 5px; font-size: 12px; display: flex; flex-direction: column; gap: 3px; }
+.prop-forecast-title { font-weight: 600; }
+.prop-forecast-title .muted { font-weight: 400; }
+.prop-fc { border-collapse: separate; border-spacing: 1px; font-size: 11px; }
+.prop-fc th { color: var(--muted); font-weight: 400; width: 12px; padding: 0; text-align: left; overflow: visible; white-space: nowrap; }
+.prop-fc th.now { color: var(--text); text-decoration: underline; text-decoration-color: var(--accent); }
+.prop-fc td.mono { padding-right: 6px; color: var(--muted); }
+.prop-fc td.fc { width: 12px; height: 11px; padding: 0; background: var(--panel-2); }
+.prop-fc td.fc.good { background: var(--ok); }
+.prop-fc td.fc.fair { background: var(--new); opacity: 0.75; }
+.prop-fc td.fc.now { outline: 1px solid var(--text); outline-offset: -1px; }
+.prop-fc-note { font-size: 11px; }

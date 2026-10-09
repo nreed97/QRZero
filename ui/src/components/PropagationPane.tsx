@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import type { PopContext } from "../bus";
 import type { LatLon } from "../geo";
+import { forecastDay, type SpaceWeather } from "../forecast";
 import { fmtUtc, sunTimes } from "../sun";
 import type { PropagationReport } from "../types";
 import type { PaneActions } from "./SharedPanes";
@@ -195,6 +196,54 @@ function hhmm(iso: string) {
   return Number.isNaN(d.getTime()) ? "" : `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
 }
 
+
+const CHANCE_WORD = { good: "likely open", fair: "marginal", closed: "closed" } as const;
+
+/** Likely open bands by hour (UTC) from your QTH to the other station, from a small built-in model. */
+function Forecast({ home, dx, label, values, now }: { home: LatLon; dx: LatLon; label: string; values: Record<string, string>; now: Date }) {
+  const sfiNow = num(values.solarflux);
+  const ssnNow = num(values.sunspots);
+  const kNow = num(values.kindex);
+  const day = now.toISOString().slice(0, 10);
+  const f = useMemo(() => {
+    if (sfiNow === null) return null;
+    const w: SpaceWeather = { sfi: sfiNow, ssn: ssnNow ?? undefined, k: kNow ?? undefined };
+    return forecastDay(new Date(`${day}T00:00Z`), home, dx, w);
+  }, [home, dx, sfiNow, ssnNow, kNow, day]);
+  if (!f) return <div className="muted prop-sunline">The forecast needs the solar flux, which the feed didn't give.</div>;
+  const hour = now.getUTCHours();
+  const open = f.bands.filter((_, i) => f.grid[i][hour] === "good").map((b) => b.name);
+  return (
+    <div className="prop-forecast">
+      <div className="prop-forecast-title">
+        Band forecast to {label}, UTC
+        <span className="muted"> · now: {open.length ? open.join(" ") : "nothing likely"}</span>
+      </div>
+      <table className="prop-fc" aria-label="Band forecast by hour">
+        <thead>
+          <tr>
+            <th />
+            {Array.from({ length: 24 }, (_, h) => (
+              <th key={h} className={h === hour ? "now" : ""}>{h % 3 === 0 ? String(h).padStart(2, "0") : ""}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {f.bands.map((b, i) => (
+            <tr key={b.name}>
+              <td className="mono">{b.name}</td>
+              {f.grid[i].map((c, h) => (
+                <td key={h} className={`fc ${c}${h === hour ? " now" : ""}`} title={`${b.name} at ${String(h).padStart(2, "0")}:00Z: ${CHANCE_WORD[c]}`} />
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="muted prop-fc-note">Green likely open, amber marginal. A rough estimate from the solar flux and K index, the sun over the path and the day's date, not a full prediction; 6m and sporadic E are not covered.</div>
+    </div>
+  );
+}
+
 /** Solar numbers and band conditions from N0NBH, plus sunrise and sunset at both ends. */
 export default function PropagationPane({ ctx }: { ctx: PopContext; act: PaneActions }) {
   const [report, setReport] = useState<PropagationReport | null>(null);
@@ -329,6 +378,14 @@ export default function PropagationPane({ ctx }: { ctx: PopContext; act: PaneAct
           {ctx.home ? <SunLine who="at your QTH" pos={ctx.home} now={now} /> : <div className="muted prop-sunline">Set a grid for your location to see sunrise and sunset.</div>}
           {ctx.dx && <SunLine who={`at ${ctx.dxLabel || "the other station"}`} pos={ctx.dx} now={now} />}
         </div>
+
+        {data && ctx.home && (
+          ctx.dx ? (
+            <Forecast home={ctx.home} dx={ctx.dx} label={ctx.dxLabel || "the other station"} values={data.values} now={now} />
+          ) : (
+            <div className="muted prop-sunline">Enter a call or pick an entity to see which bands are likely open to it.</div>
+          )
+        )}
       </div>
     </section>
   );

@@ -2,12 +2,16 @@
 
 Open **Settings…** from the **☰** menu at the right of the top bar. Its sections are listed down the left, in four groups:
 
+- **Program**: General (colours, text size, units, formats, reports, setup wizard), Backups, Keyboard
 - **Station**: Callsigns, Locations, Equipment, Logs
 - **Logging**: Entry fields, Callsign lookup, Awards
 - **Connections**: Radios and programs (WSJT-X, JTDX, N1MM, PstRotatorAz, country file), UDP connections, DX cluster, Startup programs
-- **Program**: Backups, Keyboard, General (colours, text size, units, formats, reports, setup wizard)
 
-Click a section to show it on the right.
+Click a section to show it on the right. Settings opens on **General**.
+
+### Searching settings
+
+Type in the **Search settings** box at the top left to find a setting by its name or a word about it, for example *rotor*, *backup*, *colours* or *QRZ*. Section names match too. The list shows each match with the section it is in. Click one (or press **Enter** for the first) and Settings jumps to that section, scrolls to the setting and outlines it for a moment. **Esc** or the **×** clears the search.
 
 ## Station callsigns
 
