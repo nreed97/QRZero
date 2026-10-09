@@ -216,8 +216,10 @@ pub struct CwtYear {
     pub year: i32,
     /// CWT hours with at least one QSO.
     pub sessions: usize,
-    /// Hours with enough contacts for a point.
+    /// Points in all: hours with enough contacts, plus `extra`.
     pub points: usize,
+    /// Points added by hand for CWTs worked outside this log.
+    pub extra: usize,
     /// "gold", "silver", "bronze" or empty.
     pub medal: String,
     /// Points still needed for the next medal; 0 at gold.
@@ -293,6 +295,8 @@ fn cwt_thresholds(region: Region) -> (usize, [usize; 3]) {
 #[derive(Default)]
 pub struct ClubTally {
     qsos: Vec<ClubQso>,
+    /// CWT points earned outside this log, by year.
+    cwt_extra: BTreeMap<i32, usize>,
 }
 
 impl ClubTally {
@@ -300,9 +304,14 @@ impl ClubTally {
         self.qsos.push(q.clone());
     }
 
+    /// CWT points earned outside this log (another logger, portable operating), by year.
+    pub fn set_cwt_extra(&mut self, extra: BTreeMap<i32, usize>) {
+        self.cwt_extra = extra;
+    }
+
     pub fn finish(mut self, cwt: CwtOptions) -> ClubAwards {
         self.qsos.sort_by_key(|q| q.time);
-        ClubAwards { skcc: skcc(&self.qsos), cwops: cwops(&self.qsos), cwt: cwt_medals(&self.qsos, cwt), naqcc: naqcc(&self.qsos), fists: fists(&self.qsos) }
+        ClubAwards { skcc: skcc(&self.qsos), cwops: cwops(&self.qsos), cwt: cwt_medals(&self.qsos, cwt, &self.cwt_extra), naqcc: naqcc(&self.qsos), fists: fists(&self.qsos) }
     }
 }
 
@@ -559,7 +568,7 @@ fn fists(qsos: &[ClubQso]) -> Fists {
     }
 }
 
-fn cwt_medals(qsos: &[ClubQso], opts: CwtOptions) -> Cwt {
+fn cwt_medals(qsos: &[ClubQso], opts: CwtOptions, extra: &BTreeMap<i32, usize>) -> Cwt {
     #[derive(Default)]
     struct Hour<'a> {
         pairs: HashSet<(&'a str, &'a str)>,
@@ -598,12 +607,17 @@ fn cwt_medals(qsos: &[ClubQso], opts: CwtOptions) -> Cwt {
             point: h.pairs.len() >= per_point,
         });
     }
+    for &year in extra.keys() {
+        years.entry(year).or_default();
+    }
     let years = years
         .into_iter()
         .rev()
         .map(|(year, mut detail)| {
             detail.sort_by(|a, b| (&a.date, a.hour).cmp(&(&b.date, b.hour)));
-            let points = detail.iter().filter(|d| d.point).count();
+            let extra = extra.get(&year).copied().unwrap_or(0);
+            let logged = detail.iter().filter(|d| d.point).count();
+            let points = logged + extra;
             let medal = if points >= thresholds[2] {
                 "gold"
             } else if points >= thresholds[1] {
@@ -614,7 +628,7 @@ fn cwt_medals(qsos: &[ClubQso], opts: CwtOptions) -> Cwt {
                 ""
             };
             let next = thresholds.iter().find(|&&t| points < t).map_or(0, |t| t - points);
-            CwtYear { year, sessions: detail.len(), points, medal: medal.into(), next, detail }
+            CwtYear { year, sessions: detail.len(), points, extra, medal: medal.into(), next, detail }
         })
         .collect();
     Cwt { per_point, thresholds, years }
@@ -850,6 +864,22 @@ mod tests {
     }
 
     #[test]
+    fn cwt_extra_points_add_to_the_year_and_medal() {
+        let mut tally = ClubTally::default();
+        let base = t(2024, 1, 3, 13);
+        for i in 0..10 {
+            tally.add(&ClubQso { call: format!("W{i}AA"), time: base + i * 60, band: Some("20m".into()), ..Default::default() });
+        }
+        // 49 more points from elsewhere make 50: bronze. A year with no QSOs at all still shows.
+        tally.set_cwt_extra(BTreeMap::from([(2024, 49), (2023, 7)]));
+        let cwt = tally.finish(CwtOptions::default()).cwt;
+        let y24 = cwt.years.iter().find(|y| y.year == 2024).unwrap();
+        assert_eq!((y24.points, y24.extra, y24.medal.as_str(), y24.next), (50, 49, "bronze", 30));
+        let y23 = cwt.years.iter().find(|y| y.year == 2023).unwrap();
+        assert_eq!((y23.points, y23.sessions, y23.medal.as_str()), (7, 0, ""));
+    }
+
+    #[test]
     fn cwt_tagged_only_and_other_continents() {
         let mut tally = ClubTally::default();
         for i in 0..6 {
@@ -858,7 +888,7 @@ mod tests {
         }
         let other = CwtOptions { region: Region::Other, tagged_only: false };
         let strict = CwtOptions { region: Region::Other, tagged_only: true };
-        let again = ClubTally { qsos: tally.qsos.clone() };
+        let again = ClubTally { qsos: tally.qsos.clone(), ..Default::default() };
         assert_eq!(tally.finish(other).cwt.years[0].points, 1);
         assert!(again.finish(strict).cwt.years[0].points == 0);
     }

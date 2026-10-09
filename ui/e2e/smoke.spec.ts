@@ -466,6 +466,11 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.locator(".club-table", { hasText: "ACA" })).toContainText("2024");
   const cwtYear = page.locator(".club-table", { hasText: "Medal" }).locator("tbody tr", { hasText: "2024" });
   await expect(cwtYear).toContainText("none yet");
+  // Points from CWTs worked outside the log are added by hand.
+  await page.getByLabel("Year for added CWT points").fill("2024");
+  await page.getByLabel("Added CWT points", { exact: true }).fill("5");
+  await page.getByRole("button", { name: "Set", exact: true }).click();
+  await expect(cwtYear).toContainText("incl. 5 added");
   await page.getByRole("tab", { name: "Log", exact: true }).click();
 
   // Awards you don't chase can be switched off in Settings; they leave the Awards pane.

@@ -251,7 +251,7 @@ export interface AwardColumn { key: string; worked: number; confirmed: number }
 export interface AwardTable { award: AwardKind; columns: AwardColumn[]; rows: AwardRow[]; total: number }
 /** One CWT hour: QSOs logged, different call-and-band contacts (what counts), QSOs just outside the hour. */
 export interface CwtSession { date: string; hour: number; qsos: number; contacts: number; near: number; point: boolean }
-export interface CwtYear { year: number; sessions: number; points: number; medal: string; next: number; detail: CwtSession[] }
+export interface CwtYear { year: number; sessions: number; points: number; extra: number; medal: string; next: number; detail: CwtSession[] }
 /** SKCC award with endorsement levels (Centurion, Tribune, Senator). */
 export interface ClubLevel { key: string; name: string; rule: string; count: number; step: number; level: number; next: number; achieved: string | null; bands: Record<string, number>; note: string | null }
 export interface ClubAwards {
