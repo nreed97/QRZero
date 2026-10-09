@@ -127,10 +127,10 @@ pub struct Cwops {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Region {
-    /// North America or Europe: 10 different calls make a point.
+    /// North America or Europe: 10 contacts make a point.
     #[default]
     NaEu,
-    /// Anywhere else: 5 different calls make a point.
+    /// Anywhere else: 5 contacts make a point.
     Other,
 }
 
@@ -146,7 +146,7 @@ pub struct CwtYear {
     pub year: i32,
     /// CWT hours with at least one QSO.
     pub sessions: usize,
-    /// Hours with enough different calls for a point.
+    /// Hours with enough contacts for a point.
     pub points: usize,
     /// "gold", "silver", "bronze" or empty.
     pub medal: String,
@@ -156,7 +156,7 @@ pub struct CwtYear {
 
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct Cwt {
-    /// Different calls needed in one hour for a point.
+    /// Contacts needed in one hour for a point (a call counts again on another band).
     pub per_point: usize,
     /// Points for bronze, silver and gold.
     pub thresholds: [usize; 3],
@@ -204,7 +204,7 @@ fn cwt_session(t: i64) -> Option<(i64, u32)> {
     }
 }
 
-/// Different calls per point, and points for bronze, silver and gold.
+/// Different call and band pairs per point, and points for bronze, silver and gold.
 fn cwt_thresholds(region: Region) -> (usize, [usize; 3]) {
     match region {
         Region::NaEu => (10, [50, 80, 120]),
@@ -401,10 +401,11 @@ fn cwops(qsos: &[ClubQso]) -> Cwops {
 
 fn cwt_medals(qsos: &[ClubQso], opts: CwtOptions) -> Cwt {
     let (per_point, thresholds) = cwt_thresholds(opts.region);
-    let mut sessions: HashMap<(i64, u32), HashSet<&str>> = HashMap::new();
+    let mut sessions: HashMap<(i64, u32), HashSet<(&str, &str)>> = HashMap::new();
     for q in qsos.iter().filter(|q| !opts.tagged_only || q.cwt_tagged) {
         if let Some(s) = cwt_session(q.time) {
-            sessions.entry(s).or_default().insert(q.call.as_str());
+            // The same call on another band is a new contact, as in the test's own dupe rule.
+            sessions.entry(s).or_default().insert((q.call.as_str(), q.band.as_deref().unwrap_or_default()));
         }
     }
     let mut years: BTreeMap<i32, (usize, usize)> = BTreeMap::new();
@@ -600,6 +601,27 @@ mod tests {
         assert_eq!(all.years.len(), 1);
         let y = &all.years[0];
         assert_eq!((y.year, y.sessions, y.points, y.medal.as_str(), y.next), (2024, 2, 1, "", 49));
+    }
+
+    #[test]
+    fn cwt_same_call_counts_on_another_band_only() {
+        let mut tally = ClubTally::default();
+        let base = t(2024, 1, 3, 13);
+        // 5 calls on 20m, then the same 5 again on 20m (dupes) and then on 15m (new contacts).
+        for (n, band) in [(0, "20m"), (1, "20m"), (2, "15m")] {
+            for i in 0..5 {
+                tally.add(&ClubQso { call: format!("W{i}AA"), time: base + (n * 5 + i) * 60, band: Some(band.into()), ..Default::default() });
+            }
+        }
+        let y = &tally.finish(CwtOptions::default()).cwt.years[0];
+        assert_eq!(y.points, 1); // 5 on 20m + 5 on 15m = 10
+        let mut tally = ClubTally::default();
+        for n in 0..2 {
+            for i in 0..5 {
+                tally.add(&ClubQso { call: format!("W{i}AA"), time: base + (n * 5 + i) * 60, band: Some("20m".into()), ..Default::default() });
+            }
+        }
+        assert_eq!(tally.finish(CwtOptions::default()).cwt.years[0].points, 0);
     }
 
     #[test]

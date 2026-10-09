@@ -134,7 +134,7 @@ function CwopsTables({ data, cwt, opts, set }: { data: Data["cwops"]; cwt: Data[
         </tbody>
       </table>
       <div className="ftx-msg small muted">
-        A CWT point is one hour with {cwt.per_point} or more different calls. Medals: bronze {cwt.thresholds[0]}, silver {cwt.thresholds[1]}, gold {cwt.thresholds[2]} points in a year.
+        A CWT point is one hour with {cwt.per_point} or more contacts (the same call counts again on another band, not on the same band). Medals: bronze {cwt.thresholds[0]}, silver {cwt.thresholds[1]}, gold {cwt.thresholds[2]} points in a year.
         Without the box ticked, every CW QSO in a CWT hour counts, so QSOs you logged by hand count too. CWops members are counted by the number in the CWops field. ACA counts one contact per member per year, and CMA, DXCC and states count members on any date since 2010 (CMA) or ever.
         Members must have been active members when you worked them; QRZero cannot check that. WAE and the other CWops awards are not tracked.
       </div>
