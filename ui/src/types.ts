@@ -305,6 +305,19 @@ export interface DxpedItem {
 }
 export interface DxpedList { items: DxpedItem[]; fetched_at: number | null; error: string | null; url: string }
 export interface DxpedPlanned { id: number; call: string; start: string; end: string; note: string }
+export interface ContestItem {
+  title: string;
+  /** Unix seconds (UTC). */
+  start: number;
+  end: number;
+  active: boolean;
+  /** "CW", "PHONE" and/or "DIGITAL"; empty when the contest's name doesn't say. */
+  modes: string[];
+  link: string;
+  /** The dates as the calendar words them. */
+  when: string;
+}
+export interface ContestList { items: ContestItem[]; fetched_at: number | null; error: string | null; url: string }
 export interface CtyEntityInfo { prefix: string; name: string; dxcc: number | null; cont: string }
 
 /** N0NBH solar data as /api/propagation returns it. */

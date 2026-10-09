@@ -12,6 +12,7 @@ import MapPanel, { type MapView } from "./MapPanel";
 import WorkedPane from "./WorkedPane";
 import BandMapPane from "./BandMapPane";
 import WatchPane from "./WatchPane";
+import ContestsPane from "./ContestsPane";
 import DxpedPane from "./DxpedPane";
 import PropagationPane from "./PropagationPane";
 import RotatorPane from "./RotatorPane";
@@ -82,6 +83,8 @@ export default function SharedPane({ id, ctx, act }: { id: PaneId; ctx: PopConte
       return <WatchPane ctx={ctx} act={act} />;
     case "dxped":
       return <DxpedPane act={act} />;
+    case "contests":
+      return <ContestsPane />;
     case "propagation":
       return <PropagationPane ctx={ctx} act={act} />;
     case "rotator":
