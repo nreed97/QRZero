@@ -436,6 +436,26 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByText("Restart QRZero to finish restoring.")).toHaveCount(0);
   await page.getByRole("button", { name: "Close" }).click();
 
+  // CW club awards: 100 SKCC members make a Centurion; ten calls in a CWT hour make a CWops test point.
+  const adifField = (name: string, v: string) => `<${name}:${v.length}>${v}`;
+  const cwQso = (call: string, date: string, time: string, extra: Record<string, string>) =>
+    [adifField("CALL", call), adifField("QSO_DATE", date), adifField("TIME_ON", time), adifField("BAND", "20m"), adifField("MODE", "CW"), ...Object.entries(extra).map(([k, v]) => adifField(k, v)), "<EOR>"].join("");
+  const clubAdif = ["<EOH>"];
+  for (let n = 1; n <= 100; n++) clubAdif.push(cwQso(`W${n}SKC`, "20240201", "120000", { SKCC: `${n}${n % 2 ? "T" : ""}` }));
+  for (let n = 1; n <= 10; n++) clubAdif.push(cwQso(`K${n}CWT`, "20240103", "130500", { CWOPS: String(1000 + n) }));
+  await page.getByRole("tab", { name: "Awards" }).click();
+  await page.request.post(`/api/logs/${logId}/import`, { headers, data: Buffer.from(clubAdif.join("\n")) });
+  await page.getByRole("button", { name: "SKCC" }).click();
+  const centurion = page.locator(".club-table tbody tr", { hasText: "Centurion" }).first();
+  await expect(centurion).toContainText("100");
+  await expect(centurion).toContainText("x1");
+  await expect(centurion).toContainText("2024-02-01");
+  await page.getByRole("button", { name: "CWops" }).click();
+  await expect(page.locator(".club-table", { hasText: "ACA" })).toContainText("2024");
+  const cwtYear = page.locator(".club-table", { hasText: "Medal" }).locator("tbody tr", { hasText: "2024" });
+  await expect(cwtYear).toContainText("none yet");
+  await page.getByRole("tab", { name: "Log", exact: true }).click();
+
   // The user guide opens from the top bar.
   await fromMenu(page, /^Help/);
   await expect(page.getByRole("heading", { name: "Getting started" })).toBeVisible();

@@ -12,6 +12,8 @@ The **Awards** pane, a tab next to the log to start with, shows how far you are 
 - **IOTA**: Islands on the Air references (like EU-005), from the QSO's IOTA field.
 - **Counties**: US counties (USA-CA, 3077 of them), from the County field (like `OH,Franklin`). Downloading LoTW confirmations or a QRZ lookup can fill it in.
 
+- **SKCC** and **CWops**: the CW club awards, described under **CW club awards** below. They have their own buttons next to the others.
+
 On the **DXCC** tab a line under the toolbar also shows the **DXCC Challenge** (confirmed and worked entity-band slots on 160 to 6 m, 1000 needed) and **5BDXCC** (entities confirmed on 80, 40, 20, 15 and 10 m, 100 needed).
 
 Each row is an entity, state, zone, prefix and so on. The columns are **Mixed**, then **CW**, **Phone** and **Digital**, then each band from 160 m to 6 m, plus 2 m and 70 cm. A green **C** means confirmed and an amber **W** means worked but not yet confirmed. The second header row shows confirmed and worked totals for each column, and the top right shows the overall total.
@@ -29,6 +31,30 @@ Tick the sources that count under **Confirmed by**:
 - **Not yet confirmed** hides rows that are already confirmed.
 - Pick one of your callsigns to count only QSOs made with it. Most awards are issued to one callsign.
 - Click a row to see its QSOs in the log. Click the button above the log (for example **DXCC 291 ×**) to show everything again.
+
+## CW club awards
+
+The **SKCC** and **CWops** buttons count from the club numbers you log on CW QSOs (the SKCC and CWops boxes in the entry panel, see **Logging**). Only CW QSOs count. Members are counted by their number, not their call, because calls change hands. Confirmations don't apply: both clubs run on your log. You can pick one of your callsigns as with the other awards.
+
+QRZero uses the numbers and SKCC suffixes exactly as logged. It has no member list, so it cannot check that a number is real, that a member was active when you worked them, or that both of you used a straight key, bug or sideswiper (SKCC requires that). Check those before you apply; the clubs' own award managers are the authority.
+
+**SKCC**
+
+- **Centurion**: 100 different SKCC members, QSOs from 2002-03-01. Every further 100 is another level (x2, x3, up to x10 shown here). *Since* is the date of the QSO that made 100.
+- **Tribune**: 50 different Centurions, Tribunes or Senators, taken from the suffix (C, T or S) in the QSO. Only QSOs from the day you became a Centurion count, and from 2007-03-01. Every further 50 is another level.
+- **Senator**: 200 different Tribunes or Senators, from the day you reached Tribune x8 (400 Tribune members) and from 2013-08-01. Members used for Tribune can count again. Every further 200 is another level.
+
+The first table shows each award's members, level, how many more members the next level needs, and the date it was first reached. The second shows the members counted on each band, for the single-band endorsements. Rag Chew, Triple Key, the WAS awards and the other SKCC awards are not tracked yet.
+
+**CWops**
+
+- **ACA** (Annual Competition Award): different CWops members contacted in each calendar year. One contact per member per year counts.
+- **ACMA** (Annual Cumulative Membership Award, from 2024): members contacted on each band in the year, added up.
+- **CMA** (Cumulative Membership Award): different members contacted on each band since 2010-01-03, with the total of all bands.
+- **DXCC** and **US states**: different entities and states where you have worked a member, for all bands and per band (100 entities, or all 50 states, for the awards).
+- **CWT medals**: points for the weekly CWops tests, which run for an hour on Wednesday 1300 and 1900 UTC and Thursday 0300 and 0700 UTC. An hour with 10 or more different calls is a point (5 or more if you operate from outside North America and Europe; pick where you operate from). A year's points earn bronze (50, or 24), silver (80, or 40) and gold (120, or 60). Unless you tick **Only QSOs logged as a CWops test**, every CW QSO in those hours counts, including ones you typed in by hand; ticking it counts only QSOs whose contest ID (from N1MM or an import) names a CWT or CWops test.
+
+WAE and the other CWops awards are not tracked yet.
 
 ## While you log
 

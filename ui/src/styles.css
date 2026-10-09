@@ -603,3 +603,6 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 .tabs.sub { margin-bottom: 8px; }
 .qsl details.more { margin: 6px 0; }
 .qsl details.more summary { cursor: pointer; color: var(--muted); }
+.club-table { margin: 6px; }
+.club-table td.name.small { white-space: normal; min-width: 260px; }
+.club-head { margin: 8px 8px 0; font-weight: 600; }
