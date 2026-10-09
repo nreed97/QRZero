@@ -42,3 +42,11 @@ These are broad estimates for the whole world. Your own path, antenna and noise 
 At the bottom, QRZero works out sunrise and sunset at your location (from the grid of the location in the top bar), in UTC, and says whether it's daylight or dark there now. When the other station's position is known (from their grid or a lookup), it shows theirs too. Paths along the grey line, where it's dawn or dusk at one or both ends, are often the best for long-distance contacts on the low bands.
 
 The Map pane shows the same sunrise and sunset times, plus the times when the grey line is over both ends of the path. It shades the night side of the Earth with the same calculation, moving once a minute, so you can see the grey line.
+
+## Band forecast
+
+When your location and the other station's position are both known (type a call or pick an entity), the pane ends with a **Band forecast**: a small grid of bands (160m to 10m) against the 24 hours of today in UTC. **Green** means the band is likely open between you and them in that hour, **amber** means marginal, and an empty box means closed. The current hour is outlined, and the line above the grid lists the bands that look good right now.
+
+It is a quick estimate worked out on your own computer, with nothing extra to download or fetch. It uses the solar flux (and sunspot number and K index when the feed gives them) to estimate how high the F2 layer can carry signals, the height of the sun along the path to see which hops are in daylight, and the daytime absorption that shuts the low bands around midday. A geomagnetic storm (K of 4 and up) lowers the odds on paths that pass near the poles.
+
+Treat it as a guide to when to look, not a promise. It doesn't know about sporadic E or 6m, aurora, or the state of the path right now, and it doesn't try to match a full prediction program such as VOACAP.
