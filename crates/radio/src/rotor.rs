@@ -138,7 +138,9 @@ fn open(link: &Link, timeout: Duration) -> Result<Box<dyn Io>, String> {
     }
 }
 
-fn poll(io: &mut dyn Io, p: Protocol) -> std::io::Result<Option<f64>> {
+/// `bad` gets the last reply that couldn't be read as a heading.
+fn poll(io: &mut dyn Io, p: Protocol, bad: &mut String) -> std::io::Result<Option<f64>> {
+    bad.clear();
     io.write_all(poll_command(p).as_bytes())?;
     io.flush()?;
     // A few lines may be left over from earlier commands (RPRT 0, blank replies): look through them.
@@ -150,9 +152,13 @@ fn poll(io: &mut dyn Io, p: Protocol) -> std::io::Result<Option<f64>> {
                     if line.trim() == "RPRT 0" {
                         continue;
                     }
+                    *bad = line;
                     return Ok(None);
                 }
-                let az: f64 = line.trim().parse().map_err(|_| ErrorKind::InvalidData)?;
+                let Ok(az) = line.trim().parse::<f64>() else {
+                    *bad = line;
+                    return Ok(None);
+                };
                 // The second line is the elevation; leave it for the next poll's cleanup.
                 let _ = read_line(io);
                 return Ok(az.is_finite().then_some(az.rem_euclid(360.0)));
@@ -161,6 +167,7 @@ fn poll(io: &mut dyn Io, p: Protocol) -> std::io::Result<Option<f64>> {
                 if let Some(az) = parse_gs232(&line) {
                     return Ok(Some(az % 360.0));
                 }
+                *bad = line;
             }
         }
     }
@@ -187,13 +194,18 @@ pub fn spawn(cfg: Config, on_event: impl Fn(Event) + Send + 'static) -> Sender<C
                 };
                 on_event(Event::Status("connected".into()));
                 let mut silent = 0;
+                let mut bad = String::new();
                 loop {
-                    match poll(io.as_mut(), cfg.protocol) {
+                    match poll(io.as_mut(), cfg.protocol, &mut bad) {
                         Ok(Some(az)) => {
                             silent = 0;
                             on_event(Event::Heading(az));
                         }
-                        Ok(None) => {}
+                        Ok(None) => {
+                            if !bad.is_empty() {
+                                on_event(Event::Status(format!("connected, but can't read a heading from {:?}", bad.trim())));
+                            }
+                        }
                         Err(e) if matches!(e.kind(), ErrorKind::TimedOut | ErrorKind::WouldBlock) => {
                             silent += 1;
                             if silent == 3 {
