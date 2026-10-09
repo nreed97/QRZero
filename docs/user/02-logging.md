@@ -92,7 +92,7 @@ The map shows your location (from its grid, or latitude/longitude) and the stati
 - **SP**: the beam heading for the short path, with compass point and distance.
 - **LP**: the long-path heading (short path + 180°) and distance.
 
-The shaded area is night, so you can see the grey line. **Flat** shows the whole world centred on your longitude; **Azimuthal** is a great-circle map centred on you, where straight lines from the centre are true beam headings. When a rotator is connected, a dotted line shows where the beam points: a true great circle leaving your location on the rotator's current heading, so on the Flat map it curves the way the signal really travels, and on the Azimuthal map it is a straight line from the centre. It follows the rotator live.
+The shaded area is night, so you can see the grey line; untick **Night** in the pane's title bar to turn the shading off. **Flat** shows the whole world centred on your longitude; **Azimuthal** is a great-circle map centred on you, where straight lines from the centre are true beam headings. When a rotator is connected, a dotted line shows where the beam points: a true great circle leaving your location on the rotator's current heading, so on the Flat map it curves the way the signal really travels, and on the Azimuthal map it is a straight line from the centre. It follows the rotator live.
 
 Choose kilometres or miles in **Settings → General**.
 
@@ -117,3 +117,5 @@ If more than one antenna covers the band, Auto uses the one you last picked by h
 ## Station callsigns and locations
 
 Pick the callsign you're operating under and where you are from the top bar. The location's details (your grid, POTA or SOTA reference, rig, antenna and so on) are written into each QSO as the ADIF `MY_…` fields. See **Callsigns, locations and logs**.
+
+Under the map, a line shows sunrise and sunset (UTC) at your location and at the other station, and **Grey line both**: the times today when it is within 30 minutes of sunrise or sunset at both ends, which is often when the low bands open between the two. With *Show the computer's local time* on in Settings, your own times also show in local time. It is all worked out on your computer.

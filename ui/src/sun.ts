@@ -85,3 +85,39 @@ export function sunTimes(date: Date, pos: LatLon): SunTimes {
 export function fmtUtc(d: Date): string {
   return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}Z`;
 }
+
+/** "06:12" in the computer's own time. */
+export function fmtLocal(d: Date): string {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+const DAY = 1440;
+const minuteOfDay = (d: Date) => (((d.getTime() / 6e4) % DAY) + DAY) % DAY;
+
+/** The grey line at a place: half an hour either side of sunrise and sunset, as [start, end) minutes of the UTC day (end may pass 1440). */
+function twilight(t: SunTimes, half: number): [number, number][] {
+  if (!t.rise || !t.set) return [];
+  return [t.rise, t.set].map((d) => [minuteOfDay(d) - half, minuteOfDay(d) + half] as [number, number]);
+}
+
+/**
+ * The times of day (UTC) when the grey line is over both places at once, within `half` minutes of
+ * sunrise or sunset at each. Returned as Date pairs on the UTC day of `date`; empty when they never overlap.
+ */
+export function greylineOverlap(date: Date, a: LatLon, b: LatLon, half = 30): { from: Date; to: Date }[] {
+  const day0 = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  const ta = twilight(sunTimes(date, a), half);
+  const tb = twilight(sunTimes(date, b), half);
+  const out: { from: number; to: number }[] = [];
+  for (const [a0, a1] of ta) {
+    for (const [b0, b1] of tb) {
+      // Try the second window a day early and late so windows that straddle midnight line up.
+      for (const shift of [-DAY, 0, DAY]) {
+        const from = Math.max(a0, b0 + shift), to = Math.min(a1, b1 + shift);
+        if (to > from) out.push({ from, to });
+      }
+    }
+  }
+  out.sort((x, y) => x.from - y.from);
+  return out.map((w) => ({ from: new Date(day0 + w.from * 6e4), to: new Date(day0 + w.to * 6e4) }));
+}

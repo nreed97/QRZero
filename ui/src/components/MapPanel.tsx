@@ -4,6 +4,8 @@ import { api } from "../api";
 import { compass, destination, fmtDistance, pathInfo, subsolarPoint, type LatLon } from "../geo";
 
 import { land, borders } from "../mapData";
+import { fmtLocal, fmtUtc, greylineOverlap, sunTimes } from "../sun";
+import { useDisplay } from "../display";
 
 export type MapView = "flat" | "azimuthal";
 
@@ -15,11 +17,15 @@ interface Props {
   units: "km" | "mi";
   view: MapView;
   onView: (v: MapView) => void;
+  /** Whether the night side is shaded. */
+  shade: boolean;
+  onShade: (on: boolean) => void;
   /** Rotator heading, when PstRotatorAz is connected; undefined when it isn't set up. */
   rotator?: number | null;
 }
 
-export default function MapPanel({ home, homeLabel, dx, dxLabel, units, view, onView, rotator }: Props) {
+export default function MapPanel({ home, homeLabel, dx, dxLabel, units, view, onView, shade, onShade, rotator }: Props) {
+  const display = useDisplay();
   const [turnErr, setTurnErr] = useState("");
   const turn = (az: number) => {
     setTurnErr("");
@@ -94,6 +100,7 @@ export default function MapPanel({ home, homeLabel, dx, dxLabel, units, view, on
       <div className="panel-title">
         <span>Map</span>
         <span className="spacer" />
+        <label className="check" title="Shade the night side of the Earth (the grey line)"><input type="checkbox" checked={shade} onChange={(e) => onShade(e.target.checked)} /> Night</label>
         <button className={`tiny ${view === "flat" ? "on" : ""}`} onClick={() => onView("flat")} title="Flat world map">Flat</button>
         <button className={`tiny ${view === "azimuthal" ? "on" : ""}`} onClick={() => onView("azimuthal")} title="Azimuthal equidistant, centred on your location">Azimuthal</button>
       </div>
@@ -103,7 +110,7 @@ export default function MapPanel({ home, homeLabel, dx, dxLabel, units, view, on
           <path className="graticule" d={path(geoGraticule10()) ?? ""} />
           <path className="land" d={path(land) ?? ""} />
           <path className="borders" d={path(borders) ?? ""} />
-          <path className="night" d={path(night) ?? ""} />
+          {shade && <path className="night" d={path(night) ?? ""} />}
           {longPath && <path className="long-path" d={longPath} />}
           {shortPath && <path className="short-path" d={shortPath} />}
           {beamPath && <path className="beam-path" d={beamPath} />}
@@ -131,6 +138,33 @@ export default function MapPanel({ home, homeLabel, dx, dxLabel, units, view, on
         {rotator !== undefined && <span className="muted rot" title="Rotator heading (dotted line on the map)">Rot {rotator === null ? "?" : `${Math.round(rotator)}°`}</span>}
         {turnErr && <span className="err">{turnErr}</span>}
       </div>
+      <SunInfo home={home} homeLabel={homeLabel} dx={dx} dxLabel={dxLabel} now={now} local={display.localTime} />
     </section>
+  );
+}
+
+function sunText(t: ReturnType<typeof sunTimes>, local: boolean) {
+  if (!t.rise || !t.set) return t.polar === "day" ? "sun up all day" : "no sunrise today";
+  const base = `${fmtUtc(t.rise)} / ${fmtUtc(t.set)}`;
+  return local ? `${base} (${fmtLocal(t.rise)} / ${fmtLocal(t.set)} local)` : base;
+}
+
+/** Sunrise and sunset at your QTH and the other station, and when the grey line is over both. */
+function SunInfo({ home, homeLabel, dx, dxLabel, now, local }: { home: LatLon | null; homeLabel: string; dx: LatLon | null; dxLabel: string; now: Date; local: boolean }) {
+  if (!home) return null;
+  const mine = sunTimes(now, home);
+  const theirs = dx ? sunTimes(now, dx) : null;
+  const both = dx ? greylineOverlap(now, home, dx) : [];
+  return (
+    <div className="map-sun" title="Sunrise / sunset, UTC. The grey line window is within 30 minutes of sunrise or sunset at both ends.">
+      <span>Sun {homeLabel || "QTH"} <b>{sunText(mine, local)}</b></span>
+      {theirs && <span>{dxLabel || "DX"} <b>{sunText(theirs, false)}</b></span>}
+      {dx && (
+        <span>
+          Grey line both:{" "}
+          <b>{both.length ? both.map((w) => `${fmtUtc(w.from)}-${fmtUtc(w.to)}`).join(", ") : "none today"}</b>
+        </span>
+      )}
+    </div>
   );
 }
