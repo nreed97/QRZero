@@ -16,6 +16,7 @@ use crate::band;
 use crate::error::{Error, Result};
 use crate::model::*;
 use crate::awards::{AwardIndex, AwardQso, CtyFacts};
+use crate::cwclubs::ClubQso;
 use crate::worked::WorkedIndex;
 
 /// Migrations in order; migration N brings the schema to user_version N.
@@ -562,6 +563,53 @@ impl Store {
             q.lotw = yes(&facts.LOTW_QSL_RCVD);
             q.paper = yes(&facts.QSL_RCVD);
             q.eqsl = yes(&facts.EQSL_QSL_RCVD);
+            f(&q);
+        }
+        Ok(())
+    }
+
+    /// Calls `f` with the CW club facts of every CW QSO in the log (SKCC and CWops
+    /// numbers, time, band and place), optionally only for some station callsigns.
+    pub fn for_each_club_qso(&self, log_id: i64, callsigns: &[String], mut f: impl FnMut(&ClubQso)) -> Result<()> {
+        let marks = vec!["?"; callsigns.len()].join(", ");
+        let calls = if callsigns.is_empty() { String::new() } else { format!(" AND station_callsign IN ({marks})") };
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT call, time_on, band, IFNULL(submode, mode), dxcc, fields FROM qsos WHERE log_id = ?{calls}"
+        ))?;
+        let mut args: Vec<Value> = vec![log_id.into()];
+        args.extend(callsigns.iter().map(|c| Value::from(c.to_ascii_uppercase())));
+        let mut rows = stmt.query(params_from_iter(args))?;
+        #[derive(serde::Deserialize)]
+        #[allow(non_snake_case)]
+        struct Facts<'a> {
+            #[serde(borrow)]
+            SKCC: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            CWOPS: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            STATE: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            CONTEST_ID: Option<std::borrow::Cow<'a, str>>,
+        }
+        while let Some(r) = rows.next()? {
+            let mode: Option<String> = r.get(3)?;
+            if !mode.as_deref().is_some_and(|m| m.trim().eq_ignore_ascii_case("CW")) {
+                continue;
+            }
+            let dxcc: Option<i64> = r.get(4)?;
+            let raw = r.get_ref(5)?.as_str().map_err(rusqlite::Error::from)?;
+            let facts: Facts = serde_json::from_str(raw)?;
+            let contest = facts.CONTEST_ID.as_deref().unwrap_or_default().to_ascii_uppercase();
+            let q = ClubQso {
+                call: r.get::<_, String>(0)?.to_ascii_uppercase(),
+                time: r.get(1)?,
+                band: r.get::<_, Option<String>>(2)?.map(|b| b.trim().to_ascii_lowercase()).filter(|b| !b.is_empty()),
+                dxcc: dxcc.and_then(|d| u32::try_from(d).ok()),
+                state: facts.STATE.map(|s| s.trim().to_ascii_uppercase()).filter(|s| !s.is_empty()),
+                skcc: facts.SKCC.as_deref().and_then(crate::cwclubs::parse_skcc),
+                cwops: facts.CWOPS.as_deref().and_then(crate::cwclubs::parse_cwops),
+                cwt_tagged: contest.contains("CWT") || contest.contains("CWOPS"),
+            };
             f(&q);
         }
         Ok(())

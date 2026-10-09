@@ -228,6 +228,7 @@ fn router(state: Shared) -> Router {
         .route("/qsos/send", post(send_qsos))
         .route("/logs/{id}/paper-queue", get(paper_queue))
         .route("/logs/{id}/awards/{award}", get(award))
+        .route("/logs/{id}/club-awards", get(club_awards))
         .route("/logs/{id}/lookup/{call}", get(lookup))
         .route("/logs/{id}/award-hints", get(award_hints))
         .route("/logs/{id}/replies", get(list_replies).post(add_reply))
@@ -602,6 +603,31 @@ async fn award(State(s): State<Shared>, Path((id, award)): Path<(i64, Award)>, Q
     })
     .await?;
     Ok(Json(table.as_ref().clone()))
+}
+
+#[derive(Deserialize)]
+struct ClubQuery {
+    /// Comma-separated station callsigns; empty means all.
+    #[serde(default)]
+    calls: String,
+    #[serde(default)]
+    region: qrzero_core::cwclubs::Region,
+    /// Count only QSOs whose CONTEST_ID names a CWops test.
+    #[serde(default)]
+    cwt_tagged: bool,
+}
+
+/// SKCC, CWops and CWT medal progress, counted from the CW QSOs with club numbers.
+async fn club_awards(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Query<ClubQuery>) -> ApiResult<qrzero_core::cwclubs::ClubAwards> {
+    let calls: Vec<String> = q.calls.split(',').map(|c| c.trim().to_ascii_uppercase()).filter(|c| !c.is_empty()).collect();
+    let opts = qrzero_core::cwclubs::CwtOptions { region: q.region, tagged_only: q.cwt_tagged };
+    let out = db(&s, move |st| {
+        let mut tally = qrzero_core::cwclubs::ClubTally::default();
+        st.for_each_club_qso(id, &calls, |qso| tally.add(qso))?;
+        Ok(tally.finish(opts))
+    })
+    .await?;
+    Ok(Json(out))
 }
 
 #[derive(Deserialize)]

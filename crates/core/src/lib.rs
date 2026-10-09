@@ -5,6 +5,7 @@ pub mod awards;
 pub mod backup;
 pub mod band;
 pub mod confirm;
+pub mod cwclubs;
 pub mod cty;
 pub mod error;
 pub mod model;

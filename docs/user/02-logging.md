@@ -39,7 +39,7 @@ Tick **Enter time** to type the date and time (UTC) yourself, for example when c
 
 ## CW club numbers
 
-SKCC, NAQCC, FISTS and CWops numbers can be entered in the entry panel. Choose the **CW clubs** layout under Settings, Entry fields, or add **SKCC**, **NAQCC**, **FISTS** or **CWops** to your own layout. When you type a call, each number is filled from your last QSO with that call, in grey like other lookup data; type over it if it changed (SKCC numbers gain a suffix as the member advances). The numbers are saved as the ADIF fields SKCC, NAQCC, FISTS and CWOPS, and can be shown as columns in the log.
+SKCC, NAQCC, FISTS and CWops numbers can be entered in the entry panel. Choose the **CW clubs** layout under Settings, Entry fields, or add **SKCC**, **NAQCC**, **FISTS** or **CWops** to your own layout. When you type a call, each number is filled from your last QSO with that call, in grey like other lookup data; type over it if it changed (SKCC numbers gain a suffix as the member advances). The numbers are saved as the ADIF fields SKCC, NAQCC, FISTS and CWOPS, and can be shown as columns in the log. The **SKCC** and **CWops** buttons in the Awards pane count them towards Centurion, Tribune, Senator, the CWops awards and the CWT medals.
 
 ## The station panel
 
