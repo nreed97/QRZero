@@ -2,13 +2,20 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../api";
 import { PAPER_ACTIONS, qf as f, cardDate as date, cardTime as time, cardFreq as freq, cardMode as mode } from "../paper";
+import { localGet, localSet } from "../prefs";
 import type { Qso } from "../types";
 
 /** Label sheets: how many labels per page, the grid, and QSO lines per label. */
 const SHEETS = {
+  // Brother QL-700 DK-22223 (50 mm continuous), cut to 4 in: covers the fill-in block on the back of a card.
+  "dk22223": { name: "Brother QL-700 DK-22223, 50 mm x 4 in (QSL card block)", cols: 1, rows: 1, lines: 4, mm: [101.6, 50], card: true },
   "5160": { name: "Avery 5160 / L7160 (30 small labels)", cols: 3, rows: 10, lines: 2 },
   "5163": { name: "Avery 5163 / L7163 (10 large labels)", cols: 2, rows: 5, lines: 5 },
-} as const;
+  // Brother QL-700 rolls: one label per page, printed in landscape (width x height, mm).
+  "dk1201": { name: "Brother QL-700 DK-1201 (29 x 90 mm)", cols: 1, rows: 1, lines: 2, mm: [90, 29] },
+  "dk1209": { name: "Brother QL-700 DK-1209 (29 x 62 mm)", cols: 1, rows: 1, lines: 2, mm: [62, 29] },
+  "dk1202": { name: "Brother QL-700 DK-1202 (62 x 100 mm)", cols: 1, rows: 1, lines: 5, mm: [100, 62] },
+} as const satisfies Record<string, { name: string; cols: number; rows: number; lines: number; mm?: readonly [number, number]; card?: boolean }>;
 type Sheet = keyof typeof SHEETS;
 
 interface Label { call: string; via: string; own: string; qsos: Qso[]; tnx: boolean }
@@ -23,6 +30,7 @@ function labels(queue: Qso[], lines: number): Label[] {
   }
   const out: Label[] = [];
   for (const qs of groups.values()) {
+    qs.sort((a, b) => (f(b, "QSO_DATE") + f(b, "TIME_ON")).localeCompare(f(a, "QSO_DATE") + f(a, "TIME_ON")));
     for (let i = 0; i < qs.length; i += lines) {
       const part = qs.slice(i, i + lines);
       out.push({
@@ -37,18 +45,42 @@ function labels(queue: Qso[], lines: number): Label[] {
   return out;
 }
 
-function LabelSheet({ items, sheet, skip }: { items: Label[]; sheet: Sheet; skip: number }) {
+function LabelSheet({ items, sheet, skip, foot }: { items: Label[]; sheet: Sheet; skip: number; foot: string }) {
   const s = SHEETS[sheet];
   const cells: (Label | null)[] = [...Array(skip).fill(null), ...items];
   const perPage = s.cols * s.rows;
+  const mm = "mm" in s ? s.mm : undefined;
+  const card = "card" in s && s.card;
   const pages: (Label | null)[][] = [];
   for (let i = 0; i < cells.length; i += perPage) pages.push(cells.slice(i, i + perPage));
   return (
-    <div className={`label-print sheet-${sheet}`}>
+    <div className={`label-print sheet-${sheet}${mm ? " roll" : ""}`}>
+      {mm && <style>{`@page { size: ${mm[0]}mm ${mm[1]}mm; margin: 0; }`}</style>}
       {pages.map((page, p) => (
         <div className="label-page" key={p}>
           {page.map((l, i) =>
-            l ? (
+            l && card ? (
+              <div className="label" key={i}>
+                <div className="card-head"><span>CONFIRMING QSO WITH</span><b>{l.call}</b></div>
+                <table>
+                  <thead>
+                    <tr><th>DATE</th><th>UTC</th><th>MHz</th><th>MODE</th><th>RST</th></tr>
+                  </thead>
+                  <tbody>
+                    {l.qsos.map((q) => (
+                      <tr key={q.id}>
+                        <td>{date(f(q, "QSO_DATE"))}</td>
+                        <td>{time(f(q, "TIME_ON"))}</td>
+                        <td>{freq(q)}</td>
+                        <td>{mode(q)}</td>
+                        <td>{f(q, "RST_SENT")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {foot && <div className="card-foot">{foot}</div>}
+              </div>
+            ) : l ? (
               <div className="label" key={i}>
                 <div className="label-to">
                   <b>{l.call}</b>
@@ -85,7 +117,8 @@ function LabelSheet({ items, sheet, skip }: { items: Label[]; sheet: Sheet; skip
 export default function PaperQsl({ logId }: { logId: number }) {
   const [queue, setQueue] = useState<Qso[] | null>(null);
   const [picked, setPicked] = useState<Set<number>>(new Set());
-  const [sheet, setSheet] = useState<Sheet>("5163");
+  const [sheet, setSheet] = useState<Sheet>("dk22223");
+  const [foot, setFoot] = useState(() => localGet<{ v: string }>("qsl.labelFoot", { v: "" }).v ?? "");
   const [skip, setSkip] = useState(0);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [printing, setPrinting] = useState(false);
@@ -173,10 +206,14 @@ export default function PaperQsl({ logId }: { logId: number }) {
                 {(Object.keys(SHEETS) as Sheet[]).map((k) => <option key={k} value={k}>{SHEETS[k].name}</option>)}
               </select>
             </label>
-            <label className="f w-s">
+            {"card" in SHEETS[sheet] && <label className="f w-xl">
+              <span>Bottom line (optional)</span>
+              <input value={foot} placeholder="PWR 100W" onChange={(e) => { setFoot(e.target.value); localSet("qsl.labelFoot", { v: e.target.value }); }} title="Printed under a rule at the bottom of each label, e.g. RIG, ANT or power" />
+            </label>}
+            {SHEETS[sheet].cols * SHEETS[sheet].rows > 1 && <label className="f w-s">
               <span>Skip labels</span>
               <input value={skip} inputMode="numeric" onChange={(e) => setSkip(Math.max(0, Math.min(SHEETS[sheet].cols * SHEETS[sheet].rows - 1, Number(e.target.value) || 0)))} title="Labels already used on a part-used sheet" />
-            </label>
+            </label>}
             <button className="primary" disabled={!items.length} onClick={() => setPrinting(true)}>
               Print {items.length} label{items.length === 1 ? "" : "s"}
             </button>
@@ -190,7 +227,7 @@ export default function PaperQsl({ logId }: { logId: number }) {
         </>
       )}
       {msg && <p className={msg.ok ? "ok" : "err"}>{msg.text}</p>}
-      {printing && createPortal(<LabelSheet items={items} sheet={sheet} skip={skip} />, document.body)}
+      {printing && createPortal(<LabelSheet items={items} sheet={sheet} skip={SHEETS[sheet].cols * SHEETS[sheet].rows > 1 ? skip : 0} foot={foot.trim()} />, document.body)}
     </div>
   );
 }
