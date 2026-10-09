@@ -87,6 +87,21 @@ function Online({ callsigns, locations }: Props) {
     });
   }, []);
 
+
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [waiting, setWaiting] = useState<number | null>(null);
+  const rangeOk = !!rangeFrom && !!rangeTo && rangeFrom <= rangeTo;
+  const mapped = (cfg?.lotw ?? []).map((m) => m.location_id).join(",");
+  useEffect(() => {
+    setWaiting(null);
+    if (!rangeOk) return;
+    let live = true;
+    api.lotwWaiting(rangeFrom, rangeTo).then((w) => live && setWaiting(w.locations.reduce((n, l) => n + l.waiting, 0)), () => {});
+    return () => {
+      live = false;
+    };
+  }, [rangeFrom, rangeTo, rangeOk, mapped, o?.runs.lotw]);
   if (!o || !cfg) return <p className="muted">Loading…</p>;
 
   const calls = callsigns.map((c) => c.callsign);
@@ -161,20 +176,6 @@ function Online({ callsigns, locations }: Props) {
     const rest = cfg.lotw.filter((m) => !(m.callsign === call && m.location_id === locId));
     set({ lotw: name ? [...rest, { callsign: call, location_id: locId, station_location: name }] : rest });
   };
-  const [rangeFrom, setRangeFrom] = useState("");
-  const [rangeTo, setRangeTo] = useState(() => new Date().toISOString().slice(0, 10));
-  const [waiting, setWaiting] = useState<number | null>(null);
-  const rangeOk = !!rangeFrom && !!rangeTo && rangeFrom <= rangeTo;
-  const mapped = cfg.lotw.map((m) => m.location_id).join(",");
-  useEffect(() => {
-    setWaiting(null);
-    if (!rangeOk) return;
-    let live = true;
-    api.lotwWaiting(rangeFrom, rangeTo).then((w) => live && setWaiting(w.locations.reduce((n, l) => n + l.waiting, 0)), () => {});
-    return () => {
-      live = false;
-    };
-  }, [rangeFrom, rangeTo, rangeOk, mapped, o.runs.lotw]);
   const uploadRange = async () => {
     setBusy("lotw");
     setMsg(null);
