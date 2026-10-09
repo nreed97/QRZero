@@ -7,7 +7,6 @@
 .rot-heading { font-size: 18px; font-weight: 700; }
 .rot-status { font-size: 12px; }
 .rot-status.moving { color: var(--new); font-weight: 600; }
-.rot-hover { margin-left: auto; }
 
 .rot-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .rot-dial { flex: 1; min-height: 140px; display: flex; padding: 4px; }
@@ -50,3 +49,13 @@
 .rot-dial .hover { stroke: var(--accent); stroke-width: 1; opacity: 0.6; }
 .rot-dial .needle line { stroke: var(--accent); stroke-width: 3; stroke-linecap: square; }
 .rot-dial .needle circle { fill: var(--accent); }
+
+.rot-maptoggle { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; }
+.rot-hover { margin-left: 8px; }
+.rot-dial .dial-map { pointer-events: none; }
+.rot-dial .dial-map .sea { fill: var(--panel-2); }
+.rot-dial .dial-map .graticule { fill: none; stroke: var(--line); stroke-width: 0.4; }
+.rot-dial .dial-map .land { fill: var(--line); opacity: 0.7; }
+.rot-dial .dial-map .borders { fill: none; stroke: var(--muted); stroke-width: 0.3; }
+.rot-dial .dial-map .beam-path { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 1 3; }
+.rot-dial .dial-map .dx-dot { fill: var(--path); stroke: #000; stroke-width: 0.5; }
