@@ -592,4 +592,14 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 .spot-row.mode-phone .mode { color: var(--mode-phone); font-weight: 700; }
 .mode-key { display: inline-flex; gap: 8px; font-size: 11px; color: var(--muted); }
 .mode-key span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 3px; border-radius: 1px; background: var(--k); }
-.qsl-who { margin: 8px 0; }
+
+.ql-list { max-height: 230px; overflow: auto; border: 1px solid var(--line); }
+.ql-card { margin-top: 8px; border: 1px solid var(--line); padding: 6px 10px; }
+.ql-card h3 { margin: 0 0 4px; font-size: 15px; }
+.ql-card dl { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 2px 18px; }
+.ql-card dl > div { display: flex; gap: 8px; }
+.ql-card dt { width: 70px; flex: none; color: var(--muted); }
+.ql-card dd { margin: 0; white-space: pre-line; }
+.tabs.sub { margin-bottom: 8px; }
+.qsl details.more { margin: 6px 0; }
+.qsl details.more summary { cursor: pointer; color: var(--muted); }

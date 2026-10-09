@@ -4,6 +4,7 @@ import { onLive } from "../live";
 import type { Location, QslConfig, QslDownload, QslOverview, QslRun, QslService, StationCallsign } from "../types";
 import Modal from "./Modal";
 import PaperQsl from "./PaperQsl";
+import QslLookup from "./QslLookup";
 import ReplyList from "./ReplyList";
 
 interface Props {
@@ -48,16 +49,17 @@ function RunLine({ run }: { run?: QslRun }) {
   );
 }
 
-export default function QslDialog(props: Props) {
-  const [tab, setTab] = useState<"online" | "paper" | "reply">("online");
+type Tab = "lookup" | "cards" | "reply" | "online";
+
+export default function QslDialog(props: Props & { tab?: Tab }) {
+  const [tab, setTab] = useState<Tab>(props.tab ?? "lookup");
+  const tabs: [Tab, string][] = [["lookup", "Look up"], ["cards", "Cards to send"], ["reply", "To reply to"], ["online", "Online services"]];
   return (
     <Modal title="QSL" onClose={props.onClose} wide>
       <nav className="tabs">
-        <button className={tab === "online" ? "active" : ""} onClick={() => setTab("online")}>LoTW, QRZ, Club Log, eQSL</button>
-        <button className={tab === "paper" ? "active" : ""} onClick={() => setTab("paper")}>Paper cards</button>
-        <button className={tab === "reply" ? "active" : ""} onClick={() => setTab("reply")}>To reply to</button>
+        {tabs.map(([k, label]) => <button key={k} className={tab === k ? "active" : ""} onClick={() => setTab(k)}>{label}</button>)}
       </nav>
-      {tab === "online" ? <Online {...props} /> : tab === "paper" ? <PaperQsl logId={props.logId} /> : <ReplyList logId={props.logId} />}
+      {tab === "lookup" ? <QslLookup logId={props.logId} /> : tab === "cards" ? <PaperQsl logId={props.logId} /> : tab === "reply" ? <ReplyList logId={props.logId} /> : <Online {...props} />}
     </Modal>
   );
 }
@@ -72,6 +74,7 @@ function Online({ callsigns, locations }: Props) {
   const [eqslPassword, setEqslPassword] = useState("");
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [busy, setBusy] = useState("");
+  const [svc, setSvc] = useState<"lotw" | "qrz" | "clublog" | "eqsl">("lotw");
 
   const load = () =>
     api.qsl().then((r) => {
@@ -193,6 +196,12 @@ function Online({ callsigns, locations }: Props) {
 
   return (
       <div className="qsl">
+        <nav className="tabs sub" aria-label="Service">
+          {([["lotw", "LoTW"], ["qrz", "QRZ Logbook"], ["clublog", "Club Log"], ["eqsl", "eQSL"]] as const).map(([k, label]) => (
+            <button key={k} className={svc === k ? "active" : ""} onClick={() => setSvc(k)}>{label}</button>
+          ))}
+        </nav>
+        {svc === "lotw" && (
         <fieldset>
           <legend>LoTW</legend>
           <p className="small muted">
@@ -240,6 +249,8 @@ function Online({ callsigns, locations }: Props) {
             </button>
             <RunLine run={o.runs.lotw} />
           </div>
+          <details className="more">
+            <summary>Upload by date range, moving from another logger</summary>
           <div className="row">
             <label className="f w-m"><span>Upload needed, from</span><input type="date" value={rangeFrom} onChange={(e) => setRangeFrom(e.target.value)} /></label>
             <label className="f w-m"><span>to</span><input type="date" value={rangeTo} onChange={(e) => setRangeTo(e.target.value)} /></label>
@@ -249,6 +260,7 @@ function Online({ callsigns, locations }: Props) {
           </div>
           <p className="small muted">Picks every QSO in the range whose LoTW sent status is N or blank, whatever the "QSOs from" date says.</p>
           <p className="small muted"><b>Moving from another logger?</b> Download confirmations before your first upload. Matching QSOs are marked sent and confirmed, so they aren't uploaded again.</p>
+          </details>
           <p className="small muted">To download confirmations (for awards), enter your LoTW website login. It's not your TQSL password.</p>
           <div className="row">
             <label className="f w-m"><span>LoTW username</span><input value={cfg.lotw_username} onChange={(e) => set({ lotw_username: e.target.value })} /></label>
@@ -257,7 +269,9 @@ function Online({ callsigns, locations }: Props) {
             <DownloadLine d={o.downloads.lotw} />
           </div>
         </fieldset>
+        )}
 
+        {svc === "qrz" && (
         <fieldset>
           <legend>QRZ Logbook</legend>
           <label className="check"><input type="checkbox" checked={cfg.qrz_enabled} onChange={(e) => set({ qrz_enabled: e.target.checked })} /> Upload new QSOs every {cfg.interval_min} minutes</label>
@@ -287,7 +301,9 @@ function Online({ callsigns, locations }: Props) {
             <RunLine run={o.runs.qrz} />
           </div>
         </fieldset>
+        )}
 
+        {svc === "clublog" && (
         <fieldset>
           <legend>Club Log</legend>
           <label className="check"><input type="checkbox" checked={cfg.clublog_enabled} onChange={(e) => set({ clublog_enabled: e.target.checked })} /> Upload new QSOs every {cfg.interval_min} minutes</label>
@@ -308,7 +324,9 @@ function Online({ callsigns, locations }: Props) {
             <RunLine run={o.runs.clublog} />
           </div>
         </fieldset>
+        )}
 
+        {svc === "eqsl" && (
         <fieldset>
           <legend>eQSL</legend>
           <label className="check"><input type="checkbox" checked={cfg.eqsl_enabled} onChange={(e) => set({ eqsl_enabled: e.target.checked })} /> Upload new QSOs every {cfg.interval_min} minutes</label>
@@ -333,6 +351,7 @@ function Online({ callsigns, locations }: Props) {
             <DownloadLine d={o.downloads.eqsl} />
           </div>
         </fieldset>
+        )}
 
         <div className="row">
           <label className="f w-m">

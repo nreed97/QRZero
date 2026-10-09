@@ -11,7 +11,6 @@ import { localGet, localSet, usePref } from "./prefs";
 import EntryPanel, { type EntryContext, type Prefill } from "./components/EntryPanel";
 import { type DecodePick } from "./components/FtxMonitor";
 import QslDialog from "./components/QslDialog";
-import QslLookup from "./components/QslLookup";
 import { onLive, useRadios } from "./live";
 import LogGrid from "./components/LogGrid";
 import ImportDialog from "./components/ImportDialog";
@@ -518,8 +517,7 @@ export default function App() {
           }}
         />
       )}
-      {dialog === "qsl" && logId !== null && <QslDialog logId={logId} callsigns={callsigns} locations={locations} onClose={() => setDialog(null)} />}
-      {dialog === "qsllookup" && logId !== null && <QslLookup logId={logId} onClose={() => setDialog(null)} />}
+      {(dialog === "qsl" || dialog === "qsllookup") && logId !== null && <QslDialog tab={dialog === "qsl" ? "online" : "lookup"} logId={logId} callsigns={callsigns} locations={locations} onClose={() => setDialog(null)} />}
       {dialog === "help" && <HelpView onClose={() => setDialog(null)} />}
     </div>
   );
