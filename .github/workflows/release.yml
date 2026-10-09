@@ -1,6 +1,6 @@
 name: Release
 
-# Builds the Windows and Linux packages and attaches them to a GitHub Release.
+# Builds the Windows, macOS and Linux packages and attaches them to a GitHub Release.
 # Runs when a tag is pushed, or by hand from the Actions tab for an existing tag.
 on:
   push:
@@ -122,3 +122,41 @@ jobs:
             target/release/bundle/rpm/*.rpm \
             target/release/bundle/appimage/*.AppImage \
             "QRZero-server_${VERSION}_linux-x86_64.tar.gz"
+
+  macos:
+    name: Build macOS (Apple Silicon) disk image
+    needs: release
+    runs-on: macos-14
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Set the version from the tag
+        # Same rule as the other jobs. macOS has BSD sed, so perl does the edits.
+        shell: bash
+        run: |
+          v=$(echo "$TAG" | grep -oE '[0-9]+(\.[0-9]+){0,2}' | tail -1)
+          IFS=. read -r major minor patch <<< "${v:-0.1.0}"
+          v="$major.${minor:-0}.${patch:-0}"
+          perl -0pi -e "s/^version = \".*?\"/version = \"$v\"/m" Cargo.toml
+          perl -pi -e "s/\"version\": \"[^\"]*\"/\"version\": \"$v\"/" src-tauri/tauri.conf.json
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+          echo "Building version $v"
+      - name: Build UI
+        working-directory: ui
+        run: npm ci && npm run build
+      - name: Build the disk image
+        # Unsigned (ad-hoc signed): there is no Apple Developer account behind this.
+        run: npx --yes @tauri-apps/cli@2.12.1 build --bundles dmg
+      - name: Attach to release
+        run: gh release upload "$TAG" --clobber target/release/bundle/dmg/*.dmg

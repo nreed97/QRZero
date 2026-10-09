@@ -1,6 +1,16 @@
 # Getting started
 
-QRZero is a logbook for amateur radio. It runs as a desktop app on Windows and Linux; the same screens can also be opened in a web browser.
+QRZero is a logbook for amateur radio. It runs as a desktop app on Windows, macOS (Apple Silicon) and Linux; the same screens can also be opened in a web browser.
+
+## Opening QRZero on a Mac the first time
+
+The Mac version is not signed with an Apple Developer account, so macOS blocks it the first time. Open the `.dmg`, drag QRZero into **Applications**, then either:
+
+- Open **Applications**, Control-click (right-click) **QRZero**, choose **Open**, and click **Open** in the warning; or
+- Try to open it once, then go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to the QRZero message; or
+- In Terminal, run `xattr -dr com.apple.quarantine /Applications/QRZero.app`.
+
+You only need to do this once per downloaded version. It needs a Mac with an Apple chip (M1 or newer) running macOS 11 or later. This version has had less testing than Windows; please report anything odd.
 
 ## First run
 
@@ -15,7 +25,7 @@ The first time QRZero starts, the setup wizard walks you through:
 
 Every step except the callsign can be skipped. You can run the wizard again from **Settings → General**; it never removes anything.
 
-Your log is stored in one file, `qrzero.db`, in `%APPDATA%\QRZero` on Windows or `~/.local/share/QRZero` on Linux. QRZero backs it up once a day when it starts, into the `backups` folder next to it; **Settings → Backups** lists those copies, makes one on demand and restores from one (see **Callsigns, locations and logs**). Copy the backups folder to another drive or a USB stick now and then, so a dead disk doesn't take your log with it.
+Your log is stored in one file, `qrzero.db`, in `%APPDATA%\QRZero` on Windows, `~/Library/Application Support/QRZero` on a Mac, or `~/.local/share/QRZero` on Linux. QRZero backs it up once a day when it starts, into the `backups` folder next to it; **Settings → Backups** lists those copies, makes one on demand and restores from one (see **Callsigns, locations and logs**). Copy the backups folder to another drive or a USB stick now and then, so a dead disk doesn't take your log with it.
 
 ## The main window
 

@@ -1,6 +1,6 @@
 # QRZero
 
-A fast, reliable amateur radio logger for Windows and Linux.
+A fast, reliable amateur radio logger for Windows, macOS (Apple Silicon) and Linux.
 
 QRZero keeps your log in one SQLite file, stays quick with hundreds of thousands of QSOs, and talks to the programs and radios in a ham shack: WSJT-X, JTDX, N1MM Logger+, Hamlib, TCI, serial CAT, rotators, the DX cluster, QRZ.com, LoTW, Club Log and eQSL.
 
@@ -16,7 +16,7 @@ QRZero keeps your log in one SQLite file, stays quick with hundreds of thousands
 - **Every mode is equal.** CW, phone and digital get the same treatment everywhere: entry defaults, awards, band map, spot colours.
 - **Nothing is lost.** Every ADIF field of every QSO is stored, including fields other programs add for themselves, and comes back out on a full export. The log is one file with daily automatic backups.
 - **Plain and classic.** A dense desktop-logger layout with panes you can move, tab, resize and pop out to a second screen. No wizard to fight, no cloud account.
-- **Local first.** Your log lives on your computer. QRZero only talks to the internet for the services you switch on. Passwords go in Windows Credential Manager (or the Linux desktop keyring), never in the log file.
+- **Local first.** Your log lives on your computer. QRZero only talks to the internet for the services you switch on. Passwords go in Windows Credential Manager (the macOS Keychain, or the Linux desktop keyring), never in the log file.
 
 ## Install
 
@@ -27,10 +27,11 @@ Download the files for the newest version from the [Releases page](https://githu
 | Windows | `QRZero_<version>_x64-setup.exe` | Normal installer. |
 | Windows | `QRZero_<version>_x64_en-US.msi` | The same app as an MSI, for managed installs. |
 | Windows | `QRZero_<version>_portable.exe` | Nothing to install: copy it anywhere and run it. Needs the WebView2 runtime that ships with Windows 10 and 11. |
+| macOS (Apple Silicon) | `QRZero_<version>_aarch64.dmg` | Open it and drag QRZero to Applications. The app is unsigned, so the first launch needs Control-click → **Open** (or **System Settings → Privacy & Security → Open Anyway**, or `xattr -dr com.apple.quarantine /Applications/QRZero.app`). macOS 11 or later, M1 or newer. |
 | Linux | `.deb`, `.rpm` or `.AppImage` | Debian/Ubuntu, Fedora/openSUSE, or any distribution. Make the AppImage executable and run it. |
 | Linux, headless | `QRZero-server_<version>_linux-x86_64.tar.gz` | The server without a window, for a shack PC or Raspberry Pi-class machine you reach from a browser. See [Using a browser](#using-a-browser). |
 
-Windows is the main platform and gets the most testing. Your log is stored in `%APPDATA%\QRZero\qrzero.db` on Windows and `~/.local/share/QRZero/qrzero.db` on Linux.
+Windows is the main platform and gets the most testing. Your log is stored in `%APPDATA%\QRZero\qrzero.db` on Windows `~/Library/Application Support/QRZero/qrzero.db` on a Mac and `~/.local/share/QRZero/qrzero.db` on Linux.
 
 ## First run
 
@@ -307,6 +308,12 @@ cargo run -p qrzero-server                   # browser version on http://127.0.0
 npx @tauri-apps/cli@2 build                  # Windows installer (MSI and setup .exe)
 ```
 
+On a Mac (Apple Silicon) no extra libraries are needed beyond Xcode's command line tools:
+
+```sh
+npx @tauri-apps/cli@2 build --bundles dmg
+```
+
 On Linux install the build libraries first, then build the packages:
 
 ```sh
@@ -324,15 +331,15 @@ cargo test --release -p qrzero-core --test perf -- --ignored --nocapture   # 200
 cd ui && npm run e2e                                                       # browser end-to-end test
 ```
 
-The UI talks to the server only over `/api` with an `x-qrzero-token` header, so the same UI runs in the desktop window and in a browser. CI runs all of the checks on Linux and Windows and attaches the Windows installer to each run.
+The UI talks to the server only over `/api` with an `x-qrzero-token` header, so the same UI runs in the desktop window and in a browser. CI runs the tests on Linux, Windows and macOS (Apple Silicon), the speed and browser checks on Linux, and attaches the Windows installer and the Mac `.dmg` to each run.
 
 ### Releases
 
-Pushing a tag builds the Windows and Linux packages and attaches them to that tag's GitHub Release (creating a pre-release if none exists). For a tag that already exists, run **Actions → Release → Run workflow** and enter the tag name. The version comes from the tag: `QRZero-Alpha-v0.12` builds version 0.12.0, and every file name carries it (use plain numbers, up to three parts; a tag with no number builds 0.1.0). Each release gets the MSI, the setup `.exe` and `QRZero_<version>_portable.exe`, plus for Linux a `.deb`, an `.rpm`, an `.AppImage` and `QRZero-server_<version>_linux-x86_64.tar.gz`.
+Pushing a tag builds the Windows, macOS and Linux packages and attaches them to that tag's GitHub Release (creating a pre-release if none exists). For a tag that already exists, run **Actions → Release → Run workflow** and enter the tag name. The version comes from the tag: `QRZero-Alpha-v0.12` builds version 0.12.0, and every file name carries it (use plain numbers, up to three parts; a tag with no number builds 0.1.0). Each release gets the MSI, the setup `.exe` and `QRZero_<version>_portable.exe`, a macOS `QRZero_<version>_aarch64.dmg` (unsigned), plus for Linux a `.deb`, an `.rpm`, an `.AppImage` and `QRZero-server_<version>_linux-x86_64.tar.gz`.
 
 ## Status
 
-QRZero is in active development and its versions are alpha releases. Most integrations are built from the protocol documentation and checked against stand-ins in the test suite. Real-station testing so far covers WSJT-X, N1MM Logger+, AetherSDR over TCI and a WRC rotator controller over GS-232; the rest (Hamlib, serial CAT, CI-V, the other online services) is less proven, so reports and bug reports are welcome. Keep your own ADIF export and the automatic backups until you trust it.
+QRZero is in active development and its versions are alpha releases. Most integrations are built from the protocol documentation and checked against stand-ins in the test suite. The Mac build has only been built and tested in CI so far, not on a real Mac. Real-station testing so far covers WSJT-X, N1MM Logger+, AetherSDR over TCI and a WRC rotator controller over GS-232; the rest (Hamlib, serial CAT, CI-V, the other online services) is less proven, so reports and bug reports are welcome. Keep your own ADIF export and the automatic backups until you trust it.
 
 ## License
 
