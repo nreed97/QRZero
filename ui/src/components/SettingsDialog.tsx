@@ -9,6 +9,7 @@ import { StartupAppsTab, UdpConnectionsTab } from "./ConnectionsSettings";
 import { confirmDelete } from "../display";
 import BackupsTab from "./BackupsTab";
 import { DISPLAY_DEFAULTS, beep, setDisplay, useDisplay } from "../display";
+import { UPDATES_CHANGED } from "./UpdateNotice";
 import { MODES } from "../modes";
 import { NEED_NAME, type NeedRank } from "../needed";
 import { setNeededConfig, useNeededConfig } from "../neededPrefs";
@@ -570,6 +571,12 @@ const RST_MODES = ["CW", "SSB", "FM", "AM", "RTTY", "PSK31", "FT8", "FT4"];
 
 function GeneralTab({ general, onGeneral, onWizard }: Pick<Props, "general" | "onGeneral" | "onWizard">) {
   const d = useDisplay();
+  const [checkUpdates, setCheckUpdates] = useState<boolean | null>(null);
+  useEffect(() => { api.updates().then((i) => setCheckUpdates(i.enabled)).catch(() => {}); }, []);
+  const toggleUpdates = (on: boolean) => {
+    setCheckUpdates(on);
+    api.setUpdates(on).then(() => window.dispatchEvent(new Event(UPDATES_CHANGED))).catch(() => setCheckUpdates(!on));
+  };
   return (
     <div className="general-tab">
       <fieldset>
@@ -642,6 +649,10 @@ function GeneralTab({ general, onGeneral, onWizard }: Pick<Props, "general" | "o
           <input type="checkbox" checked={d.soundOnLog} onChange={(e) => { setDisplay({ soundOnLog: e.target.checked }); if (e.target.checked) beep(660); }} /> Beep when a QSO is logged
         </label>
         <p className="small muted">Deleting a whole log, restoring a backup and discarding edits always ask.</p>
+        <label className="check">
+          <input type="checkbox" checked={checkUpdates ?? true} disabled={checkUpdates === null} onChange={(e) => toggleUpdates(e.target.checked)} /> Tell me when a newer QRZero is released
+        </label>
+        <p className="small muted">Checks GitHub once a day in the background and shows a link in the top bar. Nothing is downloaded or installed for you.</p>
       </fieldset>
 
       <fieldset>

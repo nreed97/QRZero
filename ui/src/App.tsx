@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import MainMenu from "./components/MainMenu";
 import VfoBar from "./components/VfoBar";
+import UpdateNotice from "./components/UpdateNotice";
 import type { Equipment, Fields, Location, Log, LookupResult, Qso, QsoFilter, StationCallsign } from "./types";
 import { localClock, utcClock } from "./util";
 import { useDisplay } from "./display";
@@ -396,6 +397,7 @@ export default function App() {
         </label>
         <VfoBar radios={radios} radioKey={radioKey} onRadio={chooseRadio} />
         <span className="spacer" />
+        <UpdateNotice />
         {notice && <span className="notice" role="status">{notice}</span>}
         <span className="muted">{currentLog?.qso_count.toLocaleString() ?? 0} QSOs</span>
         <span className="clock" title={display.localTime ? "UTC, then your computer's time" : "UTC"}>{utcClock(now)}{display.localTime && <span className="muted"> ({localClock(now)} local)</span>}</span>

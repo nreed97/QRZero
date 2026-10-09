@@ -411,6 +411,7 @@ pub struct Hub {
     pub(crate) dxped: crate::dxped::Dxped,
     /// Contests from the WA7BNM calendar feed.
     pub(crate) contests: crate::contests::Contests,
+    pub(crate) updates: crate::updates::Updates,
     /// The user's own UDP connections and relays.
     pub(crate) udp: Arc<crate::udp_out::Outputs>,
     /// Where auto-logged QSOs go to be looked up: (log id, QSO id, call).
@@ -440,7 +441,7 @@ impl Hub {
         let udp = crate::udp_out::Outputs::new(conns);
         let dxped = crate::dxped::saved(|k| store.lock().unwrap_or_else(|p| p.into_inner()).get_setting(k).ok().flatten());
         let contests = crate::contests::saved(|k| store.lock().unwrap_or_else(|p| p.into_inner()).get_setting(k).ok().flatten());
-        let hub = Arc::new(Hub { store, data_dir, events, inner: Mutex::default(), cty: RwLock::default(), watch, dxped, contests, udp, auto_lookup: Mutex::default() });
+        let hub = Arc::new(Hub { store, data_dir, events, inner: Mutex::default(), cty: RwLock::default(), watch, dxped, contests, updates: crate::updates::Updates::new(), udp, auto_lookup: Mutex::default() });
         if let Err(e) = hub.load_cty_file() {
             tracing::info!("no country file yet: {e}");
         }

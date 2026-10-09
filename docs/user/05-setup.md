@@ -63,6 +63,7 @@ The options people change most. They apply at once and are kept with your other 
 - **Reports filled in for each mode**: change the report the QSO panel starts with for CW, SSB, FM, AM, RTTY, PSK31, FT8 or FT4 (for example 59 for CW). An empty box means the usual report.
 - **Ask before deleting** QSOs, notes, equipment and layouts. Turn it off if the prompts slow you down; deleting a whole log, restoring a backup and discarding edits always ask.
 - **Beep when a QSO is logged**.
+- **Tell me when a newer QRZero is released**: once a day (and shortly after start) QRZero asks GitHub for the latest release. When it is newer than yours, a link such as *Version 0.14 is available* appears in the top bar and opens the download page in your web browser. The × hides it until the next release. Nothing is downloaded or installed for you, and the check never delays starting. Turn it off here if you don't want QRZero to contact GitHub.
 - **Run the setup wizard** again (it never removes anything), and **Reset these options**.
 
 ## Logs
