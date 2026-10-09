@@ -14,7 +14,7 @@ use qrzero_core::awards::{AwardHint, AwardIndex, AwardQso, Counts, CtyFacts};
 use qrzero_core::worked::{Needed, WorkedIndex};
 use qrzero_core::Store;
 use qrzero_radio::rig::{self, RigCommand, RigConfig, RigHandle, RigState};
-use qrzero_radio::{n1mm, pst, wsjtx};
+use qrzero_radio::{n1mm, pst, rotor, wsjtx};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::net::UdpSocket;
@@ -47,7 +47,13 @@ pub struct Integrations {
     /// Look up QSOs logged by WSJT-X, JTDX or N1MM on QRZ and fill in what they left blank.
     pub auto_log_lookup: bool,
     pub rotator_enabled: bool,
+    /// How QRZero reaches the rotator: `pst` (PstRotatorAz over UDP, `rotator_addr`), `rotctld`
+    /// (Hamlib, TCP `rotator_tcp`) or `gs232` (Yaesu GS-232 over TCP `rotator_tcp`, or serial `rotator_serial`).
+    pub rotator_kind: String,
     pub rotator_addr: String,
+    pub rotator_tcp: String,
+    pub rotator_serial: String,
+    pub rotator_baud: u32,
 }
 
 impl Integrations {
@@ -76,7 +82,11 @@ impl Default for Integrations {
             n1mm_auto_log: true,
             auto_log_lookup: true,
             rotator_enabled: false,
+            rotator_kind: "pst".into(),
             rotator_addr: "127.0.0.1:12000".into(),
+            rotator_tcp: "127.0.0.1:4533".into(),
+            rotator_serial: String::new(),
+            rotator_baud: 9600,
         }
     }
 }
@@ -370,6 +380,8 @@ struct Inner {
     /// Per listen address, how its WSJT-X listener is doing.
     wsjtx_status: BTreeMap<String, String>,
     rotator_az: Option<f64>,
+    /// Commands to the direct rotator connection (rotctld, GS-232); dropping it ends that thread.
+    rotator_tx: Option<std::sync::mpsc::Sender<rotor::Cmd>>,
 }
 
 impl Inner {
@@ -745,6 +757,7 @@ impl Hub {
             l.abort();
         }
         inner.wsjtx_sockets.clear();
+        inner.rotator_tx = None;
         inner.wsjtx_status.clear();
         inner.status = ListenerStatus::default();
         inner.integrations = cfg.clone();
@@ -760,9 +773,32 @@ impl Hub {
             inner.status.n1mm = Some(format!("starting on {}", cfg.n1mm_listen));
             inner.listeners.push(tokio::spawn(n1mm_listener(weak.clone(), cfg.n1mm_listen.clone())));
         }
-        if cfg.rotator_enabled {
+        if cfg.rotator_enabled && cfg.rotator_kind == "pst" {
             inner.status.rotator = Some(format!("talking to {}", cfg.rotator_addr));
             inner.listeners.push(tokio::spawn(rotator_poller(weak, cfg.rotator_addr.clone())));
+        } else if cfg.rotator_enabled {
+            let (protocol, link) = if cfg.rotator_kind == "rotctld" {
+                (rotor::Protocol::Rotctld, rotor::Link::Tcp(cfg.rotator_tcp.clone()))
+            } else if cfg.rotator_serial.trim().is_empty() {
+                (rotor::Protocol::Gs232, rotor::Link::Tcp(cfg.rotator_tcp.clone()))
+            } else {
+                (rotor::Protocol::Gs232, rotor::Link::Serial { path: cfg.rotator_serial.trim().to_string(), baud: cfg.rotator_baud })
+            };
+            inner.status.rotator = Some("connecting".into());
+            let events = weak;
+            inner.rotator_tx = Some(rotor::spawn(rotor::Config { protocol, link }, move |ev| {
+                let Some(h) = events.upgrade() else { return };
+                match ev {
+                    rotor::Event::Status(t) => h.set_status("rotator", t),
+                    rotor::Event::Heading(az) => {
+                        let changed = h.lock().rotator_az.is_none_or(|old| (old - az).abs() >= 0.5);
+                        if changed {
+                            h.lock().rotator_az = Some(az);
+                            h.emit(json!({"type": "rotator", "azimuth": az}));
+                        }
+                    }
+                }
+            }));
         }
         drop(inner);
         self.remove_radios("wsjtx:");
@@ -1212,9 +1248,9 @@ impl Hub {
     // ---- rotator ----------------------------------------------------------
 
     pub async fn rotate(&self, azimuth: f64) -> Result<(), String> {
-        let (enabled, addr) = {
+        let (enabled, addr, direct) = {
             let inner = self.lock();
-            (inner.integrations.rotator_enabled, inner.integrations.rotator_addr.clone())
+            (inner.integrations.rotator_enabled, inner.integrations.rotator_addr.clone(), inner.rotator_tx.clone())
         };
         let others = self.udp.wants(UdpEvent::Rotator);
         if others {
@@ -1225,6 +1261,9 @@ impl Hub {
                 return Ok(());
             }
             return Err("turn on the rotator in Settings, Radios first".into());
+        }
+        if let Some(tx) = direct {
+            return tx.send(rotor::Cmd::Turn(azimuth)).map_err(|_| "the rotator connection is down".to_string());
         }
         let sock = UdpSocket::bind("0.0.0.0:0").await.map_err(|e| e.to_string())?;
         sock.send_to(pst::set_azimuth(azimuth).as_bytes(), &addr).await.map_err(|e| e.to_string())?;

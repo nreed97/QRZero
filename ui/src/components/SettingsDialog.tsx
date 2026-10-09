@@ -358,10 +358,32 @@ function RadiosTab() {
       </fieldset>
 
       <fieldset>
-        <legend>PstRotatorAz</legend>
-        {check("rotator_enabled", "Turn the rotator with PstRotatorAz")}
-        <div className="row">{text("rotator_addr", "PstRotatorAz UDP address", "w-l", "127.0.0.1:12000")}</div>
-        <p className="small muted">In PstRotatorAz: Setup, UDP Control, port 12000. The map gets Turn SP / LP buttons.</p>
+        <legend>Rotator</legend>
+        {check("rotator_enabled", "Control a rotator")}
+        <div className="row">
+          <label className="f w-l"><span>Connect with</span>
+            <select value={cfg.rotator_kind} onChange={(e) => set({ rotator_kind: e.target.value })}>
+              <option value="pst">PstRotatorAz (UDP)</option>
+              <option value="rotctld">Hamlib rotctld (TCP)</option>
+              <option value="gs232">Yaesu GS-232 (serial or TCP)</option>
+            </select>
+          </label>
+          {cfg.rotator_kind === "pst" && text("rotator_addr", "PstRotatorAz UDP address", "w-l", "127.0.0.1:12000")}
+          {cfg.rotator_kind === "rotctld" && text("rotator_tcp", "rotctld address", "w-l", "127.0.0.1:4533")}
+          {cfg.rotator_kind === "gs232" && text("rotator_serial", "Serial port (blank for TCP)", "w-m", "COM5")}
+          {cfg.rotator_kind === "gs232" && (
+            <label className="f w-s"><span>Baud</span>
+              <input type="number" value={cfg.rotator_baud} onChange={(e) => set({ rotator_baud: Number(e.target.value) || 9600 })} />
+            </label>
+          )}
+          {cfg.rotator_kind === "gs232" && !cfg.rotator_serial.trim() && text("rotator_tcp", "TCP address", "w-l", "192.168.1.50:23")}
+        </div>
+        <p className="small muted">
+          {cfg.rotator_kind === "pst" && "In PstRotatorAz: Setup, UDP Control, port 12000."}
+          {cfg.rotator_kind === "rotctld" && "Run rotctld for your rotator (or use a controller that speaks the rotctld protocol)."}
+          {cfg.rotator_kind === "gs232" && "For controllers that emulate the Yaesu GS-232, over a serial port or a network (telnet-style) connection."}
+          {" "}The map and Rotator pane get the heading and Turn SP / LP buttons.
+        </p>
         {status?.rotator && <p className="small">Status: {status.rotator}</p>}
       </fieldset>
 

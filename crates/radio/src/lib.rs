@@ -5,4 +5,5 @@ pub mod cluster;
 pub mod n1mm;
 pub mod pst;
 pub mod rig;
+pub mod rotor;
 pub mod wsjtx;

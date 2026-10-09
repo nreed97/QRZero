@@ -451,3 +451,52 @@ async fn auto_logged_qsos_are_looked_up_on_qrz() {
     assert_eq!(f["STATE"], "MA");
     assert_eq!(f["GRIDSQUARE"], "FN41", "what WSJT-X sent is not overwritten");
 }
+
+/// A tiny rotctld: answers `p`, takes `P az el`.
+async fn mock_rotctld(turns: mpsc::UnboundedSender<String>) -> u16 {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        while let Ok((sock, _)) = listener.accept().await {
+            let turns = turns.clone();
+            tokio::spawn(async move {
+                let (r, mut w) = sock.into_split();
+                let mut lines = BufReader::new(r).lines();
+                let mut az = 80u32;
+                while let Ok(Some(line)) = lines.next_line().await {
+                    let reply = match line.split_whitespace().collect::<Vec<_>>().as_slice() {
+                        ["p"] => format!("{az}.000000\n0.000000\n"),
+                        ["P", a, _] => {
+                            az = a.parse().unwrap();
+                            let _ = turns.send(line.clone());
+                            "RPRT 0\n".to_string()
+                        }
+                        _ => "RPRT -1\n".to_string(),
+                    };
+                    if w.write_all(reply.as_bytes()).await.is_err() {
+                        return;
+                    }
+                }
+            });
+        }
+    });
+    port
+}
+
+#[tokio::test]
+async fn rotator_over_rotctld_reads_and_turns() {
+    let api = Api::new().await;
+    let mut events = api.events().await;
+    let (tx, mut turns) = mpsc::unbounded_channel();
+    let port = mock_rotctld(tx).await;
+    let mut cfg = api.get("/integrations").await["config"].clone();
+    cfg["rotator_enabled"] = true.into();
+    cfg["rotator_kind"] = "rotctld".into();
+    cfg["rotator_tcp"] = format!("127.0.0.1:{port}").into();
+    api.send(reqwest::Method::PUT, "/integrations", Some(cfg), None).await;
+    next_matching(&mut events, |e| e["type"] == "rotator" && e["azimuth"] == 80.0).await;
+
+    api.post("/rotator", json!({"azimuth": 271.6})).await;
+    assert_eq!(turns.recv().await.unwrap(), "P 272 0");
+    next_matching(&mut events, |e| e["type"] == "rotator" && e["azimuth"] == 272.0).await;
+}
