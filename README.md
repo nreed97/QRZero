@@ -1,6 +1,6 @@
 # QRZero
 
-A fast, reliable amateur radio logger for Windows and Linux, built to replace Log4OM 2.
+A fast, reliable amateur radio logger for Windows and Linux.
 
 QRZero keeps your log in one SQLite file, stays quick with hundreds of thousands of QSOs, and talks to the programs and radios in a ham shack: WSJT-X, JTDX, N1MM Logger+, Hamlib, TCI, serial CAT, rotators, the DX cluster, QRZ.com, LoTW, Club Log and eQSL.
 
@@ -43,13 +43,13 @@ The first time QRZero starts, a setup wizard walks you through the basics. Every
 | ![Equipment step](docs/screenshots/wizard-4-equipment.png) | ![Entry fields step](docs/screenshots/wizard-5-fields.png) |
 | 4. Your radios, antennas and amplifiers. | 5. A starting layout for the entry form: general/DX, CW, parks and summits, satellites or casual contesting. 6. Import an ADIF log. |
 
-### Coming from Log4OM 2
+### Coming from another logger
 
-1. In Log4OM, export your whole log as ADIF (**File → Export → ADIF**).
+1. In your old logger, export your whole log as ADIF.
 2. In QRZero, choose **Import ADIF…** from the ☰ menu (or use the wizard's import step), pick the file and the location those QSOs were made from.
 3. Leave **Skip duplicates** on, so importing the same file twice is safe.
 
-Fields Log4OM adds for itself (`APP_L4ONG_…`) are kept, and come back out if you export with **Full** fields. QRZero can also pass QSOs on to other programs over UDP while you run both side by side (see [UDP connections](#udp-connections-and-startup-programs)).
+Fields the other program added for itself (`APP_…`) are kept, and come back out if you export with **Full** fields. QRZero can also pass QSOs on to other programs over UDP while you run both side by side (see [UDP connections](#udp-connections-and-startup-programs)).
 
 ## Logging QSOs
 
@@ -215,7 +215,7 @@ QRZero reads and writes ADIF `.adi` files, including older Windows-1252 files wi
 
 ## UDP connections and startup programs
 
-For everything QRZero does not know by name (an antenna switch, a band decoder, another rotator program, a script of your own), **Settings → UDP connections** sends a message when something happens, much like Log4OM's UDP outbound connections and relay:
+For everything QRZero does not know by name (an antenna switch, a band decoder, another rotator program, a script of your own), **Settings → UDP connections** sends a message when something happens,:
 
 - **When:** a QSO is logged, a radio changes frequency or mode, a rotator turn is requested, a call is entered, or a WSJT-X/JTDX or N1MM packet arrives (to relay it untouched).
 - **Format:** N1MM RadioInfo XML, N1MM contactinfo XML, ADIF record, JSON, PstRotatorAz azimuth, or your own text with `{CALL}`, `{FREQ_HZ}`, `{BAND}`, `{MODE}`, `{AZ}` and other placeholders (any ADIF field for a logged QSO).
