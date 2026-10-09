@@ -167,6 +167,7 @@ export const api = {
   saveCluster: (c: ClusterConfig) => json<ClusterSnapshot>("PUT", "/cluster", c),
   clusterConnect: (connect: boolean) => json<null>("POST", "/cluster/connect", { connect }),
   clusterSend: (line: string) => json<null>("POST", "/cluster/send", { line }),
+  clusterSpot: (b: { call: string; freq_khz: number; comment: string; qso_utc: number }) => json<{ line: string }>("POST", "/cluster/spot", b),
   qsl: () => json<QslOverview>("GET", "/qsl"),
   saveQsl: (config: QslConfig, secrets: QslSecrets) => json<QslOverview>("PUT", "/qsl", { config, secrets }),
   testQrzLogbook: (callsign: string) => json<{ callsign: string }>("POST", "/qsl/qrz/test", { callsign }),
