@@ -29,8 +29,13 @@ pub struct LotwMapping {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct QslConfig {
-    /// Minutes between automatic QRZ and Club Log uploads.
+    /// The one interval older versions used for every service. Kept so an
+    /// upgrade gives each service its own copy of it (see `normalize`).
     pub interval_min: u32,
+    /// Minutes between automatic uploads, per service (0: take `interval_min`).
+    pub qrz_interval_min: u32,
+    pub clublog_interval_min: u32,
+    pub eqsl_interval_min: u32,
     pub qrz_enabled: bool,
     /// Only QSOs from this date (YYYY-MM-DD) on are uploaded.
     pub qrz_since: String,
@@ -56,14 +61,42 @@ pub struct QslConfig {
     /// Station callsigns uploaded to the eQSL account.
     pub eqsl_calls: Vec<String>,
     pub eqsl_rcvd_since: String,
-    /// Download new LoTW and eQSL confirmations once a day.
+    /// Download new eQSL confirmations once a day. (Older versions also
+    /// downloaded LoTW's with it; see `lotw_download_enabled`.)
     pub confirm_daily: bool,
+    /// Download new LoTW confirmations every `lotw_download_interval_min` minutes.
+    pub lotw_download_enabled: bool,
+    /// 0: not set yet (settings from an older version); `normalize` fills it.
+    pub lotw_download_interval_min: u32,
+}
+
+impl QslConfig {
+    /// Gives a service without its own interval (settings saved by an older
+    /// version) the interval it used so far, and keeps all of them in range.
+    fn normalize(&mut self) {
+        if self.lotw_download_interval_min == 0 {
+            // Before this setting, "once a day" also downloaded LoTW.
+            self.lotw_download_interval_min = 24 * 60;
+            self.lotw_download_enabled = self.confirm_daily;
+        }
+        self.lotw_download_interval_min = self.lotw_download_interval_min.clamp(1, 7 * 24 * 60);
+        let old = if self.interval_min == 0 { 15 } else { self.interval_min };
+        for m in [&mut self.qrz_interval_min, &mut self.clublog_interval_min, &mut self.eqsl_interval_min] {
+            if *m == 0 {
+                *m = old;
+            }
+            *m = (*m).clamp(1, 24 * 60);
+        }
+    }
 }
 
 impl Default for QslConfig {
     fn default() -> Self {
         QslConfig {
             interval_min: 15,
+            qrz_interval_min: 0,
+            clublog_interval_min: 0,
+            eqsl_interval_min: 0,
             qrz_enabled: false,
             qrz_since: String::new(),
             qrz_calls: Vec::new(),
@@ -83,6 +116,8 @@ impl Default for QslConfig {
             eqsl_calls: Vec::new(),
             eqsl_rcvd_since: String::new(),
             confirm_daily: false,
+            lotw_download_enabled: false,
+            lotw_download_interval_min: 0,
         }
     }
 }
@@ -118,8 +153,6 @@ struct Inner {
     config: QslConfig,
     runs: BTreeMap<&'static str, Run>,
     downloads: BTreeMap<&'static str, Download>,
-    /// When confirmations were last downloaded automatically (Unix seconds).
-    last_auto_download: i64,
     /// QSOs a service refused this session, so they aren't retried every few minutes.
     refused: HashSet<(&'static str, i64)>,
 }
@@ -217,7 +250,8 @@ impl Qsl {
     }
 
     pub fn new(store: Arc<Mutex<Store>>, hub: Arc<Hub>, secret_service: String, data_dir: PathBuf, endpoints: Endpoints) -> Arc<Self> {
-        let config = hub.setting("qsl").and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
+        let mut config: QslConfig = hub.setting("qsl").and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
+        config.normalize();
         Arc::new(Qsl {
             store,
             hub,
@@ -229,34 +263,37 @@ impl Qsl {
         })
     }
 
-    /// Uploads to QRZ and Club Log every `interval_min` minutes.
+    /// Uploads to QRZ, Club Log and eQSL, each on its own interval, and
+    /// downloads confirmations once a day when that is on.
     pub fn start(self: &Arc<Self>) {
         let me = Arc::downgrade(self);
         tokio::spawn(async move {
+            let mut last: BTreeMap<&'static str, std::time::Instant> = BTreeMap::new();
+            let begin = std::time::Instant::now();
             loop {
-                let Some(q) = me.upgrade() else { return };
-                let minutes = q.config().interval_min.clamp(1, 24 * 60);
-                drop(q);
-                tokio::time::sleep(Duration::from_secs(60 * minutes as u64)).await;
+                tokio::time::sleep(Duration::from_secs(30)).await;
                 let Some(q) = me.upgrade() else { return };
                 let cfg = q.config();
-                if cfg.qrz_enabled {
-                    q.upload("qrz").await;
-                }
-                if cfg.clublog_enabled {
-                    q.upload("clublog").await;
-                }
-                if cfg.eqsl_enabled {
-                    q.upload("eqsl").await;
-                }
-                let now = Utc::now().timestamp();
-                if cfg.confirm_daily && now - q.lock().last_auto_download > 24 * 3600 {
-                    q.lock().last_auto_download = now;
-                    if !cfg.lotw_username.is_empty() {
-                        q.download("lotw").await;
+                for (svc, on, minutes) in [
+                    ("qrz", cfg.qrz_enabled, cfg.qrz_interval_min),
+                    ("clublog", cfg.clublog_enabled, cfg.clublog_interval_min),
+                    ("eqsl", cfg.eqsl_enabled, cfg.eqsl_interval_min),
+                ] {
+                    let since = *last.entry(svc).or_insert(begin);
+                    if on && since.elapsed() >= Duration::from_secs(60 * minutes.clamp(1, 24 * 60) as u64) {
+                        last.insert(svc, std::time::Instant::now());
+                        q.upload(svc).await;
                     }
-                    if !cfg.eqsl_username.is_empty() {
-                        q.download("eqsl").await;
+                }
+                for (svc, on, minutes, ready) in [
+                    ("lotw", cfg.lotw_download_enabled, cfg.lotw_download_interval_min, !cfg.lotw_username.is_empty()),
+                    ("eqsl", cfg.confirm_daily, 24 * 60, !cfg.eqsl_username.is_empty()),
+                ] {
+                    let key = if svc == "lotw" { "lotw-rcvd" } else { "eqsl-rcvd" };
+                    let since = *last.entry(key).or_insert(begin);
+                    if on && ready && since.elapsed() >= Duration::from_secs(60 * minutes as u64) {
+                        last.insert(key, std::time::Instant::now());
+                        q.download(svc).await;
                     }
                 }
             }
@@ -334,6 +371,7 @@ impl Qsl {
     }
 
     pub fn save(&self, mut cfg: QslConfig, update: SecretsUpdate) -> Result<(), String> {
+        cfg.normalize();
         let today = Utc::now().format("%Y-%m-%d").to_string();
         // Turning a service on starts from today, so an imported log isn't sent again.
         for (on, date) in [(cfg.qrz_enabled, &mut cfg.qrz_since), (cfg.clublog_enabled, &mut cfg.clublog_since), (cfg.eqsl_enabled, &mut cfg.eqsl_since)] {
@@ -717,5 +755,21 @@ mod tests {
         assert_eq!(day_range("2024-01-02", "2024-01-04").unwrap().1, 1_704_153_600 + 3 * 86_400);
         assert!(day_range("2024-01-03", "2024-01-02").is_err());
         assert!(day_range("x", "2024-01-02").is_err());
+    }
+
+    #[test]
+    fn upgrade_keeps_each_services_interval() {
+        // Settings saved before per-service intervals only have `interval_min`.
+        let mut c: QslConfig = serde_json::from_str(r#"{"interval_min":40,"qrz_enabled":true}"#).unwrap();
+        c.normalize();
+        assert_eq!((c.qrz_interval_min, c.clublog_interval_min, c.eqsl_interval_min), (40, 40, 40));
+        assert!(!c.lotw_download_enabled && c.lotw_download_interval_min == 1440);
+        let mut d: QslConfig = serde_json::from_str(r#"{"confirm_daily":true}"#).unwrap();
+        d.normalize();
+        assert!(d.lotw_download_enabled, "daily LoTW download carries over");
+        // Afterwards they are independent.
+        c.clublog_interval_min = 5;
+        c.normalize();
+        assert_eq!((c.qrz_interval_min, c.clublog_interval_min), (40, 5));
     }
 }

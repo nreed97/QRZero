@@ -268,13 +268,20 @@ function Online({ callsigns, locations }: Props) {
             <button disabled={!!busy || !cfg.lotw_username} onClick={() => download("lotw")}>{busy === "lotw-rcvd" ? "Downloading…" : "Download confirmations"}</button>
             <DownloadLine d={o.downloads.lotw} />
           </div>
+          <div className="row">
+            <label className="check"><input type="checkbox" checked={cfg.lotw_download_enabled} onChange={(e) => set({ lotw_download_enabled: e.target.checked })} /> Download confirmations automatically</label>
+            <label className="f w-s"><span>Every (min)</span><input value={cfg.lotw_download_interval_min} disabled={!cfg.lotw_download_enabled} inputMode="numeric" onChange={(e) => set({ lotw_download_interval_min: Math.max(1, Number(e.target.value) || 1440) })} /></label>
+          </div>
         </fieldset>
         )}
 
         {svc === "qrz" && (
         <fieldset>
           <legend>QRZ Logbook</legend>
-          <label className="check"><input type="checkbox" checked={cfg.qrz_enabled} onChange={(e) => set({ qrz_enabled: e.target.checked })} /> Upload new QSOs every {cfg.interval_min} minutes</label>
+          <div className="row">
+            <label className="check"><input type="checkbox" checked={cfg.qrz_enabled} onChange={(e) => set({ qrz_enabled: e.target.checked })} /> Upload new QSOs automatically</label>
+            <label className="f w-s"><span>Every (min)</span><input value={cfg.qrz_interval_min} disabled={!cfg.qrz_enabled} inputMode="numeric" onChange={(e) => set({ qrz_interval_min: Math.max(1, Number(e.target.value) || 15) })} /></label>
+          </div>
           <p className="small muted">Each logbook on QRZ.com has its own API key (QRZ Logbook, Settings, API). QRZ needs an XML subscription for the API.</p>
           <table className="list">
             <tbody>
@@ -306,7 +313,10 @@ function Online({ callsigns, locations }: Props) {
         {svc === "clublog" && (
         <fieldset>
           <legend>Club Log</legend>
-          <label className="check"><input type="checkbox" checked={cfg.clublog_enabled} onChange={(e) => set({ clublog_enabled: e.target.checked })} /> Upload new QSOs every {cfg.interval_min} minutes</label>
+          <div className="row">
+            <label className="check"><input type="checkbox" checked={cfg.clublog_enabled} onChange={(e) => set({ clublog_enabled: e.target.checked })} /> Upload new QSOs automatically</label>
+            <label className="f w-s"><span>Every (min)</span><input value={cfg.clublog_interval_min} disabled={!cfg.clublog_enabled} inputMode="numeric" onChange={(e) => set({ clublog_interval_min: Math.max(1, Number(e.target.value) || 15) })} /></label>
+          </div>
           <div className="row">
             <label className="f w-l"><span>Club Log email</span><input value={cfg.clublog_email} onChange={(e) => set({ clublog_email: e.target.value })} /></label>
             <label className="f w-m"><span>Password</span><input type="password" value={clPassword} placeholder={o.secrets.clublog_password ? "saved" : ""} onChange={(e) => setClPassword(e.target.value)} /></label>
@@ -329,7 +339,10 @@ function Online({ callsigns, locations }: Props) {
         {svc === "eqsl" && (
         <fieldset>
           <legend>eQSL</legend>
-          <label className="check"><input type="checkbox" checked={cfg.eqsl_enabled} onChange={(e) => set({ eqsl_enabled: e.target.checked })} /> Upload new QSOs every {cfg.interval_min} minutes</label>
+          <div className="row">
+            <label className="check"><input type="checkbox" checked={cfg.eqsl_enabled} onChange={(e) => set({ eqsl_enabled: e.target.checked })} /> Upload new QSOs automatically</label>
+            <label className="f w-s"><span>Every (min)</span><input value={cfg.eqsl_interval_min} disabled={!cfg.eqsl_enabled} inputMode="numeric" onChange={(e) => set({ eqsl_interval_min: Math.max(1, Number(e.target.value) || 15) })} /></label>
+          </div>
           <div className="row">
             <label className="f w-m"><span>eQSL username</span><input value={cfg.eqsl_username} onChange={(e) => set({ eqsl_username: e.target.value.toUpperCase() })} /></label>
             <label className="f w-m"><span>Password</span><input type="password" value={eqslPassword} placeholder={o.secrets.eqsl_password ? "saved" : ""} onChange={(e) => setEqslPassword(e.target.value)} /></label>
@@ -354,11 +367,7 @@ function Online({ callsigns, locations }: Props) {
         )}
 
         <div className="row">
-          <label className="f w-m">
-            <span>Upload every (min)</span>
-            <input value={cfg.interval_min} inputMode="numeric" onChange={(e) => set({ interval_min: Math.max(1, Number(e.target.value) || 15) })} />
-          </label>
-          <label className="check"><input type="checkbox" checked={cfg.confirm_daily} onChange={(e) => set({ confirm_daily: e.target.checked })} /> Download LoTW and eQSL confirmations once a day</label>
+          <label className="check"><input type="checkbox" checked={cfg.confirm_daily} onChange={(e) => set({ confirm_daily: e.target.checked })} /> Download eQSL confirmations once a day</label>
           <span className="spacer" />
           {msg && <span className={msg.ok ? "ok" : "err"}>{msg.text}</span>}
           <button className="primary" onClick={save}>Save</button>
