@@ -20,7 +20,7 @@ Each row is an entity, state, zone, prefix and so on. The columns are **Mixed**,
 
 ## Choosing which awards to show
 
-Open **Settings…**, **Awards** and tick the awards you chase. An award you untick disappears from the Awards pane, from the award lines in the QSO panel, and (for DXCC) from the slot grid there. If you don't operate CW, untick **SKCC** and **CWops**. **Clear all** and **Select all** switch everything off or on at once.
+Open **Settings…**, **Awards** and tick the awards you chase. An award you untick disappears from the Awards pane, from the award lines in the QSO panel, and (for DXCC) from the slot grid there. If you don't operate CW, untick **SKCC**, **CWops**, **NAQCC** and **FISTS**. **Clear all** and **Select all** switch everything off or on at once.
 
 Hiding an award only hides it. Your log is not touched, and ticking the award again brings it back as it was. Every award is on to begin with, and so is any award added in a later version.
 
@@ -40,7 +40,7 @@ Tick the sources that count under **Confirmed by**:
 
 ## CW club awards
 
-The **SKCC** and **CWops** buttons count from the club numbers you log on CW QSOs (the SKCC and CWops boxes in the entry panel, see **Logging**). Only CW QSOs count. Members are counted by their number, not their call, because calls change hands. Confirmations don't apply: both clubs run on your log. You can pick one of your callsigns as with the other awards.
+The **SKCC**, **CWops**, **NAQCC** and **FISTS** buttons count from the club numbers you log on CW QSOs (the SKCC, CWops, NAQCC and FISTS boxes in the entry panel, see **Logging**). Only CW QSOs count. Members are counted by their number, not their call, because calls change hands. Confirmations don't apply: both clubs run on your log. You can pick one of your callsigns as with the other awards.
 
 QRZero uses the numbers and SKCC suffixes exactly as logged. It has no member list, so it cannot check that a number is real, that a member was active when you worked them, or that both of you used a straight key, bug or sideswiper (SKCC requires that). Check those before you apply; the clubs' own award managers are the authority.
 
@@ -61,6 +61,19 @@ The first table shows each award's members, level, how many more members the nex
 - **CWT medals**: points for the weekly CWops tests, which run for an hour on Wednesday 1300 and 1900 UTC and Thursday 0300 and 0700 UTC. An hour with 10 or more contacts is a point; working the same call again on a different band counts as another contact, but on the same band it doesn't (5 or more contacts if you operate from outside North America and Europe; pick where you operate from). A year's points earn bronze (50, or 24), silver (80, or 40) and gold (120, or 60). Unless you tick **Only QSOs logged as a CWops test**, every CW QSO in those hours counts, including ones you typed in by hand; ticking it counts only QSOs whose contest ID (from N1MM or an import) names a CWT or CWops test.
 
 WAE and the other CWops awards are not tracked yet.
+
+**NAQCC**
+
+- **Friendship Club**: 200 different NAQCC members, one point each, taken by club number from QSOs since 2005-01-01. Every further 200 is another level. *Since* is the date of the QSO that made 200. The same table also shows the members counted on each band.
+
+NAQCC awards are for NAQCC members only, the other station must have been a member when you worked them, and all QSOs must be two-way CW. QRZero has no member list and cannot check that. The club also gives points for sprint QSOs and has awards that depend on your power and antenna (DXCC, WAC, WAS, 2XQRP and so on) and on when members joined (New Member Ambassador). Those are not tracked; use this table for the plain member count and the club's own rules for the rest.
+
+**FISTS**
+
+- **Century, Silver Century, Gold Century and Diamond Century**: 100, 250, 500 and 1000 points. A FISTS member in your own country is worth one point and a member in another DXCC entity is worth two. A member's number counts once, with its best contact. The table shows how many more points each award needs and the date of the QSO that reached it. QRZero takes your country from the MY_DXCC field of the QSO, or from your station callsign when that is blank. Members it cannot compare (no DXCC on the QSO or for you) count one point and are noted under the table.
+- **WAS**: different states where you have worked a FISTS member, all bands and per band (50 for the award). It uses the STATE field.
+
+The member must have had a FISTS number when you worked them; QRZero cannot check that. FISTS club stations (worth extra points), the Platinum awards (which count Century holders you work) and the other endorsements are not tracked yet.
 
 ## While you log
 

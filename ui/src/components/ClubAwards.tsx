@@ -22,7 +22,7 @@ function BandHead({ first }: { first: string }) {
   );
 }
 
-function SkccTable({ data }: { data: Data["skcc"] }) {
+function LevelTables({ data, club, notes }: { data: { members: number; awards: ClubLevel[] }; club: string; notes: string }) {
   const levelText = (l: ClubLevel) => (l.level >= 10 ? "x10 or more" : l.level > 0 ? `x${l.level}` : "not yet");
   return (
     <>
@@ -61,9 +61,54 @@ function SkccTable({ data }: { data: Data["skcc"] }) {
           ))}
         </tbody>
       </table>
+      <div className="ftx-msg small muted">{data.members} different {club} members worked on CW in all. {notes}</div>
+    </>
+  );
+}
+
+const SKCC_NOTES =
+  "Members are counted by SKCC number, with the suffix (C, T or S) you logged in the QSO. Each level is one more set of members (100 for Centurion, 50 for Tribune, 200 for Senator). SKCC wants a straight key, bug or sideswiper on both ends; QRZero cannot tell, so check that before you apply. Rag Chew, Triple Key, WAS and the other SKCC awards are not tracked.";
+const NAQCC_NOTES =
+  "Members are counted by NAQCC number, one point each, for QSOs from 2005-01-01. NAQCC awards are for members only and the other station must have been a member at the time; QRZero cannot check either. Each further 200 members is the next level. The points for sprint QSOs, the New Member Ambassador award and the antenna and power awards (DXCC, WAC, WAS, 2XQRP and others) are not tracked.";
+
+function FistsTables({ data }: { data: Data["fists"] }) {
+  return (
+    <>
+      <div className="club-head">FISTS Century <span className="muted small">({data.members} different members, {data.points} points)</span></div>
+      <table className="award-table club-table">
+        <thead>
+          <tr>
+            <th className="name">Award</th>
+            <th>Points</th>
+            <th>Status</th>
+            <th>To go</th>
+            <th>Since</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.tiers.map((t) => (
+            <tr key={t.key}>
+              <td className="name"><b>{t.name}</b></td>
+              <td>{t.points_needed}</td>
+              <td className={t.earned ? "confirmed" : ""}>{t.earned ? "reached" : "not yet"}</td>
+              <td>{t.earned ? "" : `${t.to_go} more`}</td>
+              <td>{t.achieved ?? ""}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="club-head">FISTS WAS</div>
+      <table className="award-table club-table">
+        <BandHead first="Different states per band" />
+        <tbody>
+          <tr><td className="name">US states (total {data.was} of 50)</td>{bandCells(data.was_bands)}</tr>
+        </tbody>
+      </table>
       <div className="ftx-msg small muted">
-        {data.members} different SKCC members worked on CW in all. Members are counted by SKCC number, with the suffix (C, T or S) you logged in the QSO. Each level is one more set of members (100 for Centurion, 50 for Tribune, 200 for Senator).
-        SKCC wants a straight key, bug or sideswiper on both ends; QRZero cannot tell, so check that before you apply. Rag Chew, Triple Key, WAS and the other SKCC awards are not tracked.
+        A member's FISTS number counts once, for its best contact. Members in your own country are one point and members in another DXCC entity are two ({data.home} at one point, {data.abroad} at two).
+        {data.unknown > 0 && ` ${data.unknown} could not be compared because the QSO or your station has no DXCC entity, so they count one point.`}
+        {" "}Your country comes from the MY_DXCC field, or from the station callsign. FISTS club stations (worth more points), the other Century endorsements and the Platinum awards are not tracked.
+        The member must have had a FISTS number at the time of the contact; QRZero cannot check that. For WAS the QSO's state counts.
       </div>
     </>
   );
@@ -142,8 +187,8 @@ function CwopsTables({ data, cwt, opts, set }: { data: Data["cwops"]; cwt: Data[
   );
 }
 
-/** SKCC and CWops award progress, counted from the CW QSOs that carry a club number. */
-export default function ClubAwards({ logId, kind, call, stamp }: { logId: number; kind: "skcc" | "cwops"; call: string; stamp: number }) {
+/** SKCC, CWops, NAQCC and FISTS award progress, counted from the CW QSOs that carry a club number. */
+export default function ClubAwards({ logId, kind, call, stamp }: { logId: number; kind: "skcc" | "cwops" | "naqcc" | "fists"; call: string; stamp: number }) {
   const [opts, setOpts] = useState<ClubOpts>({ region: "na_eu", cwtTagged: false });
   const [data, setData] = useState<Data | null>(null);
   const [err, setErr] = useState("");
@@ -163,7 +208,9 @@ export default function ClubAwards({ logId, kind, call, stamp }: { logId: number
   return (
     <div className="award-scroll">
       {err && <div className="ftx-msg small err">{err}</div>}
-      {data && kind === "skcc" && <SkccTable data={data.skcc} />}
+      {data && kind === "skcc" && <LevelTables data={data.skcc} club="SKCC" notes={SKCC_NOTES} />}
+      {data && kind === "naqcc" && <LevelTables data={data.naqcc} club="NAQCC" notes={NAQCC_NOTES} />}
+      {data && kind === "fists" && <FistsTables data={data.fists} />}
       {data && kind === "cwops" && <CwopsTables data={data.cwops} cwt={data.cwt} opts={opts} set={(p) => setOpts({ ...opts, ...p })} />}
     </div>
   );

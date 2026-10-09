@@ -1,5 +1,6 @@
-//! CW club awards: SKCC (Centurion, Tribune, Senator) and CWops (ACA, CMA, ACMA,
-//! DXCC, WAS, and the CWT participation medals). Pure logic, no database.
+//! CW club awards: SKCC (Centurion, Tribune, Senator), CWops (ACA, CMA, ACMA,
+//! DXCC, WAS, and the CWT participation medals), NAQCC (Friendship Club) and
+//! FISTS (Century, Silver, Gold, Diamond and WAS). Pure logic, no database.
 //!
 //! The store feeds one [`ClubQso`] per CW QSO into a [`ClubTally`]. Member
 //! numbers, not calls, identify a member, because calls change hands over the
@@ -49,6 +50,16 @@ pub fn parse_cwops(s: &str) -> Option<u32> {
     s.parse().ok().filter(|&n| n > 0)
 }
 
+/// A NAQCC or FISTS member number as logged ("1234", "#1234"): the leading digits.
+pub fn parse_member_number(s: &str) -> Option<u32> {
+    let s = s.trim().trim_start_matches('#');
+    let digits = s.bytes().take_while(u8::is_ascii_digit).count();
+    if digits == 0 || digits > 6 {
+        return None;
+    }
+    s[..digits].parse().ok().filter(|&n| n > 0)
+}
+
 /// One CW QSO's club facts.
 #[derive(Clone, Debug, Default)]
 pub struct ClubQso {
@@ -62,6 +73,10 @@ pub struct ClubQso {
     pub state: Option<String>,
     pub skcc: Option<(u32, Rank)>,
     pub cwops: Option<u32>,
+    pub naqcc: Option<u32>,
+    pub fists: Option<u32>,
+    /// DXCC entity of the operator's own station, when known.
+    pub my_dxcc: Option<u32>,
     /// CONTEST_ID names a CWops test.
     pub cwt_tagged: bool,
 }
@@ -96,6 +111,46 @@ pub struct Skcc {
     /// Different SKCC members worked on CW, whatever the date.
     pub members: usize,
     pub awards: Vec<Level>,
+}
+
+/// NAQCC awards: the Friendship Club, counted from member numbers.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct Naqcc {
+    /// Different NAQCC members worked on CW since 2005-01-01.
+    pub members: usize,
+    pub awards: Vec<Level>,
+}
+
+/// One FISTS Century tier.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct FistsTier {
+    pub key: String,
+    pub name: String,
+    /// Points the tier needs.
+    pub points_needed: usize,
+    pub earned: bool,
+    /// Points still needed; 0 once earned.
+    pub to_go: usize,
+    /// Date of the QSO that reached the tier (YYYY-MM-DD).
+    pub achieved: Option<String>,
+}
+
+/// FISTS awards: Century points and Worked All States.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct Fists {
+    /// Different FISTS members worked on CW.
+    pub members: usize,
+    /// Century points: 1 per member in your own country, 2 per member elsewhere.
+    pub points: usize,
+    /// Members counted at 1 and at 2 points.
+    pub home: usize,
+    pub abroad: usize,
+    /// Members whose country could not be compared (no DXCC for them or for you), counted at 1.
+    pub unknown: usize,
+    pub tiers: Vec<FistsTier>,
+    /// Different states with members (50 for WAS), and per band.
+    pub was: usize,
+    pub was_bands: BTreeMap<String, usize>,
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
@@ -168,6 +223,8 @@ pub struct ClubAwards {
     pub skcc: Skcc,
     pub cwops: Cwops,
     pub cwt: Cwt,
+    pub naqcc: Naqcc,
+    pub fists: Fists,
 }
 
 // First dates the awards accept.
@@ -176,6 +233,9 @@ const TRIBUNE_FROM: (i32, u32, u32) = (2007, 3, 1);
 const SENATOR_FROM: (i32, u32, u32) = (2013, 8, 1);
 const CMA_FROM: (i32, u32, u32) = (2010, 1, 3);
 const ACMA_FROM_YEAR: i32 = 2024;
+const FRIENDSHIP_FROM: (i32, u32, u32) = (2005, 1, 1);
+/// FISTS Century, Silver, Gold and Diamond.
+const FISTS_TIERS: [(&str, &str, usize); 4] = [("century", "Century", 100), ("silver", "Silver Century", 250), ("gold", "Gold Century", 500), ("diamond", "Diamond Century", 1000)];
 
 fn start_of(d: (i32, u32, u32)) -> i64 {
     NaiveDate::from_ymd_opt(d.0, d.1, d.2).and_then(|d| d.and_hms_opt(0, 0, 0)).map_or(0, |t| t.and_utc().timestamp())
@@ -225,7 +285,7 @@ impl ClubTally {
 
     pub fn finish(mut self, cwt: CwtOptions) -> ClubAwards {
         self.qsos.sort_by_key(|q| q.time);
-        ClubAwards { skcc: skcc(&self.qsos), cwops: cwops(&self.qsos), cwt: cwt_medals(&self.qsos, cwt) }
+        ClubAwards { skcc: skcc(&self.qsos), cwops: cwops(&self.qsos), cwt: cwt_medals(&self.qsos, cwt), naqcc: naqcc(&self.qsos), fists: fists(&self.qsos) }
     }
 }
 
@@ -394,6 +454,89 @@ fn cwops(qsos: &[ClubQso]) -> Cwops {
         cma_bands,
         dxcc: dxcc.len(),
         dxcc_bands: set_counts(&dxcc_b),
+        was: was.len(),
+        was_bands: set_counts(&was_b),
+    }
+}
+
+fn naqcc(qsos: &[ClubQso]) -> Naqcc {
+    let from = start_of(FRIENDSHIP_FROM);
+    let all: HashSet<u32> = qsos.iter().filter_map(|q| q.naqcc).collect();
+    let mut friends = Counted::default();
+    for q in qsos.iter().filter(|q| q.time >= from) {
+        if let Some(n) = q.naqcc {
+            friends.add(q, n, 200);
+        }
+    }
+    Naqcc {
+        members: all.len(),
+        awards: vec![friends.level(
+            "friendship",
+            "Friendship Club",
+            "200 different NAQCC members at one point each, from 2005-01-01. Every further 200 is another level",
+            200,
+            "Log NAQCC numbers on CW QSOs to start counting.",
+        )],
+    }
+}
+
+fn fists(qsos: &[ClubQso]) -> Fists {
+    // Points per member number: 2 once you have worked them from another DXCC entity than yours,
+    // else 1. A number counts once, with its best contact.
+    let mut best: HashMap<u32, usize> = HashMap::new();
+    let mut compared: HashSet<u32> = HashSet::new();
+    let mut points = 0;
+    let mut reached: [Option<i64>; 4] = [None; 4];
+    let mut was: HashSet<usize> = HashSet::new();
+    let mut was_b: HashMap<&str, HashSet<usize>> = HashMap::new();
+    for q in qsos {
+        let Some(n) = q.fists else { continue };
+        let known = q.dxcc.filter(|&d| d != 0).zip(q.my_dxcc.filter(|&d| d != 0));
+        let pts = match known {
+            Some((theirs, mine)) if theirs != mine => 2,
+            _ => 1,
+        };
+        if known.is_some() {
+            compared.insert(n);
+        }
+        let e = best.entry(n).or_insert(0);
+        if pts > *e {
+            points += pts - *e;
+            *e = pts;
+        }
+        let state = q.state.as_deref().and_then(|s| US_STATES.binary_search_by(|(c, _)| (*c).cmp(s)).ok());
+        if let (Some(i), true) = (state, matches!(q.dxcc, None | Some(291 | 6 | 110))) {
+            was.insert(i);
+            if let Some(b) = q.band.as_deref() {
+                was_b.entry(b).or_default().insert(i);
+            }
+        }
+        for (r, (_, _, need)) in reached.iter_mut().zip(FISTS_TIERS) {
+            if r.is_none() && points >= need {
+                *r = Some(q.time);
+            }
+        }
+    }
+    let tiers = FISTS_TIERS
+        .iter()
+        .zip(reached)
+        .map(|(&(key, name, need), at)| FistsTier {
+            key: key.into(),
+            name: name.into(),
+            points_needed: need,
+            earned: points >= need,
+            to_go: need.saturating_sub(points),
+            achieved: at.map(date_text),
+        })
+        .collect();
+    let abroad = best.values().filter(|&&p| p == 2).count();
+    Fists {
+        members: best.len(),
+        points,
+        abroad,
+        unknown: best.len() - compared.len(),
+        home: best.len() - abroad,
+        tiers,
         was: was.len(),
         was_bands: set_counts(&was_b),
     }
@@ -674,5 +817,51 @@ mod tests {
         let a = t0.finish(CwtOptions::default());
         assert!(a.skcc.members > 0);
         assert!(start.elapsed().as_millis() < 2000, "{:?}", start.elapsed());
+    }
+
+    #[test]
+    fn friendship_club_counts_members_since_2005() {
+        let mut tally = ClubTally::default();
+        for n in 1..=250u32 {
+            tally.add(&ClubQso { call: format!("K{n}N"), time: t(2021, 3, 1, 0) + n as i64, band: Some("40m".into()), naqcc: parse_member_number(&n.to_string()), ..Default::default() });
+        }
+        tally.add(&ClubQso { call: "OLD".into(), time: t(2004, 12, 31, 0), naqcc: Some(9999), ..Default::default() });
+        let a = tally.finish(CwtOptions::default());
+        let f = &a.naqcc.awards[0];
+        assert_eq!((f.count, f.level, f.next), (250, 1, 150));
+        assert_eq!(f.achieved.as_deref(), Some("2021-03-01"));
+        assert_eq!(a.naqcc.members, 251);
+        assert_eq!(parse_member_number("#1234"), Some(1234));
+        assert_eq!(parse_member_number("1234 M"), Some(1234));
+        assert_eq!(parse_member_number("M1234"), None);
+        assert_eq!(parse_member_number("1234567"), None);
+    }
+
+    #[test]
+    fn fists_century_points_and_was() {
+        let mut tally = ClubTally::default();
+        // 60 members at home (1 point), 20 abroad (2 points) and one worked first at home, then abroad (counts 2).
+        for n in 1..=60u32 {
+            tally.add(&ClubQso { call: format!("K{n}F"), time: t(2022, 1, 1, 0) + n as i64, dxcc: Some(291), my_dxcc: Some(291), fists: Some(n), ..Default::default() });
+        }
+        for n in 101..=120u32 {
+            tally.add(&ClubQso { call: format!("G{n}F"), time: t(2022, 2, 1, 0) + n as i64, dxcc: Some(223), my_dxcc: Some(291), fists: Some(n), ..Default::default() });
+        }
+        tally.add(&ClubQso { call: "K1F".into(), time: t(2022, 3, 1, 0), dxcc: Some(223), my_dxcc: Some(291), fists: Some(1), ..Default::default() });
+        // No DXCC on either side: one point, and reported as not compared.
+        tally.add(&ClubQso { call: "X".into(), time: t(2022, 4, 1, 0), fists: Some(500), state: Some("OH".into()), ..Default::default() });
+        // Same member again is not counted twice.
+        tally.add(&ClubQso { call: "K2F".into(), time: t(2022, 5, 1, 0), dxcc: Some(291), my_dxcc: Some(291), fists: Some(2), state: Some("TX".into()), ..Default::default() });
+        let a = tally.finish(CwtOptions::default());
+        let f = &a.fists;
+        assert_eq!(f.members, 81);
+        assert_eq!(f.points, 60 + 40 + 1 + 1);
+        assert_eq!((f.home, f.abroad, f.unknown), (60, 21, 1));
+        let century = &f.tiers[0];
+        assert!(century.earned);
+        assert_eq!(century.achieved.as_deref(), Some("2022-02-01"));
+        assert!(!f.tiers[1].earned);
+        assert_eq!(f.tiers[1].to_go, 250 - 102);
+        assert_eq!(f.was, 2);
     }
 }
