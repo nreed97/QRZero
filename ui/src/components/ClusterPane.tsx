@@ -3,6 +3,7 @@ import { api } from "../api";
 import { distanceKm } from "../geo";
 import { onLive } from "../live";
 import { BANDS, MODE_GROUP_NAME, modeGroup } from "../modes";
+import { needRank } from "../needed";
 import { localGet, localSet } from "../prefs";
 import type { Entity, Spot } from "../types";
 import type { DecodePick } from "./FtxMonitor";
@@ -62,7 +63,7 @@ function flagsOf(s: Spot): { text: string; cls: string }[] {
   return out;
 }
 
-const isNeeded = (s: Spot) => !!s.needed && (s.needed.new_dxcc || s.needed.new_band || s.needed.new_mode);
+const isNeeded = (s: Spot) => needRank(s) !== null;
 
 export default function ClusterPane({ onPick, onSettings }: { onPick: (p: DecodePick) => void; onSettings: () => void }) {
   const [spots, setSpots] = useState<Spot[]>([]);

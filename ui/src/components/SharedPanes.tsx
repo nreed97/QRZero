@@ -14,6 +14,7 @@ import BandMapPane from "./BandMapPane";
 import WatchPane from "./WatchPane";
 import ContestsPane from "./ContestsPane";
 import DxpedPane from "./DxpedPane";
+import NeededPane from "./NeededPane";
 import PropagationPane from "./PropagationPane";
 import RotatorPane from "./RotatorPane";
 import NotesPane from "./NotesPane";
@@ -83,6 +84,8 @@ export default function SharedPane({ id, ctx, act }: { id: PaneId; ctx: PopConte
       return <WatchPane ctx={ctx} act={act} />;
     case "dxped":
       return <DxpedPane act={act} />;
+    case "needed":
+      return <NeededPane onPick={act.onPick} onSettings={() => act.onSettings("cluster")} />;
     case "contests":
       return <ContestsPane />;
     case "propagation":

@@ -10,6 +10,8 @@ import { confirmDelete } from "../display";
 import BackupsTab from "./BackupsTab";
 import { DISPLAY_DEFAULTS, beep, setDisplay, useDisplay } from "../display";
 import { MODES } from "../modes";
+import { NEED_NAME, type NeedRank } from "../needed";
+import { setNeededConfig, useNeededConfig } from "../neededPrefs";
 import { AWARD_LIST, setAwardEnabled, setAwardsOff, useAwardsOff } from "../awardsPref";
 
 export interface GeneralPrefs { units: "km" | "mi" }
@@ -431,6 +433,39 @@ const KNOWN_NODES: ClusterNode[] = [
   { name: "RBN (FT8)", host: "telnet.reversebeacon.net", port: 7001, login: "", password: "", commands: [] },
 ];
 
+/** Sound and popup for needed cluster spots (the Needed now pane lists them). */
+function NeededAlertsSettings() {
+  const c = useNeededConfig();
+  return (
+    <fieldset>
+      <legend>Alerts for needed spots</legend>
+      <label className="check">
+        <input type="checkbox" checked={c.sound} onChange={(e) => { setNeededConfig({ sound: e.target.checked }); if (e.target.checked) beep(780); }} /> Play a sound when a needed station is spotted
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={c.popup} onChange={(e) => setNeededConfig({ popup: e.target.checked })} /> Show a popup (click it to tune to the station)
+      </label>
+      <div className="row">
+        <label>
+          Alert for{" "}
+          <select value={c.level} onChange={(e) => setNeededConfig({ level: Number(e.target.value) as NeedRank })}>
+            <option value={0}>{NEED_NAME[0]}s only</option>
+            <option value={1}>New entities and new bands</option>
+            <option value={2}>New entities, bands and modes</option>
+          </select>
+        </label>
+        <label>
+          Not again for the same call, band and mode within{" "}
+          <select value={c.repeatMin} onChange={(e) => setNeededConfig({ repeatMin: Number(e.target.value) })}>
+            {[10, 15, 30, 60, 120].map((m) => <option key={m} value={m}>{m} min</option>)}
+          </select>
+        </label>
+      </div>
+      <p className="small muted">These apply at once; there is no need to press Save. The Needed now pane lists the same spots.</p>
+    </fieldset>
+  );
+}
+
 function ClusterTab() {
   const [cfg, setCfg] = useState<ClusterConfig | null>(null);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -491,6 +526,7 @@ function ClusterTab() {
           <button key={k.name} className="tiny" onClick={() => setCfg({ ...cfg, nodes: [...cfg.nodes, k] })}>{k.name}</button>
         ))}
       </div>
+      <NeededAlertsSettings />
       <label className="check"><input type="checkbox" checked={cfg.auto_connect} onChange={(e) => setCfg({ ...cfg, auto_connect: e.target.checked })} /> Connect when QRZero starts</label>
       {msg && <p className={msg.ok ? "ok" : "err"}>{msg.text}</p>}
       <div className="buttons"><button className="primary" onClick={save}>Save</button></div>
