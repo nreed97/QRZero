@@ -32,6 +32,8 @@ Tick the sources that count under **Confirmed by**:
 
 ## While you log
 
+The **Station** pane also shows a **DXCC slots** grid for the entity of the call you are working: bands across, CW, Phone and Digital down, **W** for worked, **C** for confirmed and blank for slots still needed. It uses the same confirmation sources as this pane. The band-by-mode grid covers 160 m to 6 m.
+
 You don't need to open this pane to see what a QSO would be worth. After a lookup, the **Station** pane has a short **Awards on 20m CW** block (with the band and mode from the entry panel). It has one line per award that the QSO would move:
 
 - **new country**, **new state**, **new zone**, **new prefix**, **new continent**, **new grid**, **new island group** or **new county** when you have never worked it. Grid, island and county lines appear once the lookup or entry has a grid square, IOTA reference or county.

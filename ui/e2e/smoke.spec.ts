@@ -351,6 +351,8 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.locator(".lookup-note")).toContainText("Runs 5 W / QSL direct only");
   // The Station pane says what the QSO would add to awards (K1 is already worked).
   await expect(page.getByLabel("Award hints", { exact: true })).toContainText("WPX");
+  // The DXCC slot grid shows when the call resolves to an entity (needs the country file).
+  if (await page.getByLabel("DXCC slots", { exact: true }).count()) await expect(page.getByLabel("DXCC slots", { exact: true })).toContainText("CW");
   await page.getByRole("tab", { name: "Worked before" }).click();
 
   // Panes: drag the Cluster tab beside the Station pane, it gets its own group.
