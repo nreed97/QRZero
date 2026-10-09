@@ -233,7 +233,9 @@ export interface QslConfig {
   lotw_download_interval_min: number;
 }
 export type QslService = "qrz" | "clublog" | "lotw" | "eqsl";
-export interface QslDownload { at: number; running: boolean; received: number; confirmed: number; unmatched: string[]; unmatched_count: number; error: string | null }
+/** An award cell a download confirmed that its service had not confirmed before. */
+export interface NewConfirm { award: AwardKind; key: string; name: string; column: string; before: { lotw: boolean; paper: boolean; eqsl: boolean } }
+export interface QslDownload { at: number; running: boolean; received: number; confirmed: number; unmatched: string[]; unmatched_count: number; new_awards: NewConfirm[]; auto: boolean; error: string | null }
 export interface QslOverview {
   config: QslConfig;
   secrets: { qrz_calls: string[]; clublog_password: boolean; clublog_app_key: boolean; lotw_password: boolean; eqsl_password: boolean };

@@ -161,12 +161,20 @@ async fn confirmations_awards_and_paper_cards() {
     api.put("/qsl", json!({"config": cfg, "secrets": {"lotw_password": "lotwpw"}})).await;
     let d = api.post("/qsl/download/lotw", json!(null)).await;
     assert_eq!((d["received"].as_u64(), d["confirmed"].as_u64(), d["unmatched_count"].as_u64()), (Some(3), Some(2), Some(1)), "{d}");
+    // The summary lists the cells LoTW filled: Japan and the US, mixed/mode/band each, with WAS for CT.
+    let new: Vec<(String, String, String)> = d["new_awards"].as_array().unwrap().iter().map(|n| (n["award"].as_str().unwrap().into(), n["name"].as_str().unwrap().into(), n["column"].as_str().unwrap().into())).collect();
+    assert!(new.contains(&("dxcc".into(), "Japan".into(), "mixed".into())), "{d}");
+    assert!(new.contains(&("dxcc".into(), "United States".into(), "20m".into())), "{d}");
+    assert!(new.contains(&("was".into(), "Connecticut".into(), "mixed".into())), "{d}");
+    assert!(d["new_awards"].as_array().unwrap().iter().all(|n| n["before"]["lotw"] == false), "{d}");
+    assert_eq!(d["auto"], false);
     let ja = api.fields(log, "JA1XYZ").await;
     assert_eq!((ja["LOTW_QSL_RCVD"].as_str(), ja["LOTW_QSLRDATE"].as_str()), (Some("Y"), Some("20260105")));
     assert_eq!(api.fields(log, "W1AW").await["STATE"], "CT", "blank state filled from LoTW");
     assert_eq!(api.get("/qsl").await["config"]["lotw_rcvd_since"], "2026-01-07");
     // Downloading again changes nothing.
-    assert_eq!(api.post("/qsl/download/lotw", json!(null)).await["confirmed"], 0);
+    let again = api.post("/qsl/download/lotw", json!(null)).await;
+    assert_eq!((again["confirmed"].as_u64(), again["new_awards"].as_array().unwrap().len()), (Some(0), 0));
 
     let dxcc = api.get(&format!("/logs/{log}/awards/dxcc?lotw=true&paper=true&unworked=true")).await;
     assert!(has_cell(&dxcc, "339", "mixed", "confirmed") && has_cell(&dxcc, "339", "cw", "confirmed"), "{dxcc}");
@@ -191,6 +199,8 @@ async fn confirmations_awards_and_paper_cards() {
     assert_eq!(api.fields(log, "DL1BAD").await["EQSL_QSL_SENT"], "Y");
     let d = api.post("/qsl/download/eqsl", json!(null)).await;
     assert_eq!(d["confirmed"], 1, "{d}");
+    let germany = d["new_awards"].as_array().unwrap().iter().find(|n| n["award"] == "dxcc" && n["column"] == "mixed").unwrap();
+    assert_eq!((germany["name"].as_str(), germany["before"]["lotw"].as_bool()), (Some("Germany"), Some(false)), "{d}");
     let dl = api.fields(log, "DL1BAD").await;
     assert_eq!((dl["EQSL_QSL_RCVD"].as_str(), dl["GRIDSQUARE"].as_str()), (Some("Y"), Some("JO62")));
     let dxcc = api.get(&format!("/logs/{log}/awards/dxcc?eqsl=true")).await;

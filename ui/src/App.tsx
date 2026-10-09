@@ -22,6 +22,7 @@ import Workspace from "./components/Workspace";
 import LayoutMenu from "./components/LayoutMenu";
 import { listen, openPopout, post, type BusMsg, type PopContext, type WindowId } from "./bus";
 import { DEFAULT_WORKSPACE, canPopOut, findPane, removePane, sanitize, showPane, type PaneId, type Workspace as WS, type Zone } from "./workspace";
+import { newConfirmLines } from "./newConfirms";
 import NeededAlerts from "./components/NeededAlerts";
 import SetupWizard from "./components/SetupWizard";
 
@@ -165,6 +166,12 @@ export default function App() {
           if (e.call) setNotice(e.added ? `Logged ${e.call} from ${e.source}` : `${e.call} from ${e.source} was already in the log`);
         }
         if (e.type === "error") setNotice(e.message);
+        if (e.type === "qsl_download" && e.run.auto && !e.run.running && !e.run.error && e.run.confirmed > 0) {
+          const n = newConfirmLines(e.run, e.service).length;
+          const who = e.service === "lotw" ? "LoTW" : "eQSL";
+          const got = `${e.run.confirmed} new confirmation${e.run.confirmed === 1 ? "" : "s"}`;
+          setNotice(n ? `${who}: ${got}, ${n} new for awards (see QSL)` : `${who}: ${got}`);
+        }
         if (e.type === "watch_hit") setNotice(`Watch list: ${e.hit.call} on ${(e.hit.freq_hz / 1000).toFixed(1)} kHz, ${e.hit.label}`);
       }),
     [logId, loadLogs],

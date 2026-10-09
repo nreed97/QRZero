@@ -28,7 +28,7 @@ Hiding an award only hides it. Your log is not touched, and ticking the award ag
 
 Tick the sources that count under **Confirmed by**:
 
-- **LoTW**: QSOs with **LoTW R** = Y. Download them in QSL, LoTW, **Download confirmations**.
+- **LoTW**: QSOs with **LoTW R** = Y. Download them in QSL, LoTW, **Download confirmations**. The page then lists what the download newly confirmed toward your awards.
 - **Cards**: QSOs with **QSL rcvd** = Y, from paper cards you've marked as received.
 - **eQSL**: QSOs with **eQSL R** = Y. ARRL's DXCC and WAS don't accept eQSL, so it's off by default.
 

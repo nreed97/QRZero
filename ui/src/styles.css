@@ -644,3 +644,6 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 .needed-row.mode-cw .mode { color: var(--mode-cw); font-weight: 700; }
 .needed-row.mode-digital .mode { color: var(--mode-digital); font-weight: 700; }
 .needed-row.mode-phone .mode { color: var(--mode-phone); font-weight: 700; }
+.new-confirms { margin: 6px 0; }
+.new-confirms table { border-collapse: collapse; margin-top: 2px; }
+.new-confirms td { padding: 1px 12px 1px 0; }
