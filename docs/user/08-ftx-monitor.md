@@ -32,7 +32,7 @@ Click the **FTx monitor** tab (next to the Log tab to start with). Drag the tab 
 
 Rows calling you are highlighted, and needed stations are shaded. Stations on your watch list (see **Watch list**) are marked **Watched**, with their call in colour in the message.
 
-- **Click** a decode to put the call, grid, band and mode into the QSO panel and look it up.
+- **Click** a decode to put the call, grid, band and mode into the QSO panel and look it up. Clicking never retunes a radio: the QSO panel switches to the radio (slice) that program is tied to, or to one already on that band, and just fills in the form.
 - **Double-click** to have that WSJT-X call the station, as if you'd double-clicked it in WSJT-X.
 - **CQ only** and **Needed only** narrow the list; the source box (**All sources**) shows one WSJT-X or JTDX at a time.
 - **Period breaks** draws a line between decode periods (every 15 seconds for FT8), with the period's time and how many decodes and calls it had.
