@@ -329,3 +329,44 @@ async fn lotw_signs_with_tqsl() {
     assert!(run["error"].as_str().unwrap().contains("connection"), "{run}");
     assert_eq!(api.get("/qsl").await["pending"]["lotw"][0]["pending"], 1);
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn lotw_upload_needed_by_date_range() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let (qrz, clublog) = mock_services(Seen::default()).await;
+    let api = Api::new(qrz, clublog).await;
+    let (log, loc) = api.setup().await;
+    for (call, date, sent) in [("A1AA", "20250601", None), ("B2BB", "20250602", Some("Y")), ("C3CC", "20250603", Some("N")), ("D4DD", "20250701", None)] {
+        let mut f = json!({"CALL": call, "QSO_DATE": date, "TIME_ON": "2330", "BAND": "20m", "FREQ": "14.025", "MODE": "CW", "STATION_CALLSIGN": "N0CALL"});
+        if let Some(s) = sent {
+            f["LOTW_QSL_SENT"] = json!(s);
+        }
+        api.post(&format!("/logs/{log}/qsos"), json!({"location_id": loc, "fields": f})).await;
+    }
+    let tqsl = api.dir.path().join("tqsl");
+    let record = api.dir.path().join("tqsl-args");
+    std::fs::write(&tqsl, format!("#!/bin/sh\nprintf '%s\\n' \"$@\" > {0}\ncat \"$9\" >> {0}\nexit 0\n", record.display())).unwrap();
+    std::fs::set_permissions(&tqsl, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut cfg = api.get("/qsl").await["config"].clone();
+    cfg["tqsl_path"] = json!(tqsl);
+    cfg["lotw_since"] = json!("2030-01-01"); // the range overrides this
+    cfg["lotw"] = json!([{"callsign": "N0CALL", "location_id": loc, "station_location": "Home QTH"}]);
+    api.put("/qsl", json!({"config": cfg, "secrets": {"qrz_keys": {}}})).await;
+
+    let w = api.get("/qsl/lotw/range?from=2025-06-01&to=2025-06-03").await;
+    assert_eq!(w["locations"][0]["waiting"], 2, "{w}");
+    let run = api.post("/qsl/lotw/range", json!({"from": "2025-06-01", "to": "2025-06-03"})).await;
+    assert_eq!(run["uploaded"], 2, "{run}");
+    let args = std::fs::read_to_string(&record).unwrap();
+    assert!(args.contains("<CALL:4>A1AA") && args.contains("<CALL:4>C3CC"), "{args}");
+    assert!(!args.contains("B2BB") && !args.contains("D4DD"), "{args}");
+    let a = api.fields(log, "A1AA").await;
+    assert_eq!(a["LOTW_QSL_SENT"], "Y");
+    assert_eq!(a["LOTW_QSLSDATE"].as_str().unwrap().len(), 8);
+    assert!(api.fields(log, "D4DD").await.get("LOTW_QSL_SENT").is_none());
+
+    let bad = api.post("/qsl/lotw/range", json!({"from": "2025-06-03", "to": "2025-06-01"})).await;
+    assert!(bad["error"].as_str().unwrap().contains("before"), "{bad}");
+}

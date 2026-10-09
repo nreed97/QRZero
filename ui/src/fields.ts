@@ -170,6 +170,8 @@ export const COLUMNS: ColumnDef[] = [
   { key: "LOTW_QSL_RCVD", label: "LoTW R", width: "52px", get: f("LOTW_QSL_RCVD") },
   { key: "QRZCOM_QSO_UPLOAD_STATUS", label: "QRZ", width: "40px", get: f("QRZCOM_QSO_UPLOAD_STATUS") },
   { key: "CLUBLOG_QSO_UPLOAD_STATUS", label: "Club Log", width: "60px", get: f("CLUBLOG_QSO_UPLOAD_STATUS") },
+  { key: "EQSL_QSL_SENT", label: "eQSL S", width: "52px", get: f("EQSL_QSL_SENT") },
+  { key: "EQSL_QSL_RCVD", label: "eQSL R", width: "52px", get: f("EQSL_QSL_RCVD") },
   { key: "QSL_SENT", label: "QSL S", width: "46px", get: f("QSL_SENT") },
   { key: "QSL_RCVD", label: "QSL R", width: "46px", get: f("QSL_RCVD") },
   { key: "QRZCOM_QSO_DOWNLOAD_STATUS", label: "QRZ R", width: "46px", get: f("QRZCOM_QSO_DOWNLOAD_STATUS") },

@@ -418,7 +418,13 @@ impl Store {
     /// QSOs not yet sent to a QSL service: `status_key` (e.g. QRZCOM_QSO_UPLOAD_STATUS)
     /// isn't Y or I, logged as one of `callsigns`, from `since` (Unix seconds) on, oldest first.
     pub fn pending_uploads(&self, log_id: i64, status_key: &str, callsigns: &[String], location_id: Option<i64>, since: i64, limit: i64) -> Result<Vec<Qso>> {
-        let (sql, args) = pending_sql("id, log_id, location_id, fields", log_id, status_key, callsigns, location_id, since)?;
+        self.pending_uploads_between(log_id, status_key, callsigns, location_id, since, i64::MAX, limit)
+    }
+
+    /// Like `pending_uploads`, but only QSOs before `until` (Unix seconds, exclusive).
+    #[allow(clippy::too_many_arguments)]
+    pub fn pending_uploads_between(&self, log_id: i64, status_key: &str, callsigns: &[String], location_id: Option<i64>, since: i64, until: i64, limit: i64) -> Result<Vec<Qso>> {
+        let (sql, args) = pending_sql("id, log_id, location_id, fields", log_id, status_key, callsigns, location_id, since, until)?;
         let mut stmt = self.conn.prepare(&format!("{sql} ORDER BY time_on LIMIT {}", limit.max(0)))?;
         let rows = stmt.query_map(params_from_iter(args), row_to_qso)?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
@@ -582,7 +588,12 @@ impl Store {
     }
 
     pub fn count_pending(&self, log_id: i64, status_key: &str, callsigns: &[String], location_id: Option<i64>, since: i64) -> Result<i64> {
-        let (sql, args) = pending_sql("COUNT(*)", log_id, status_key, callsigns, location_id, since)?;
+        self.count_pending_between(log_id, status_key, callsigns, location_id, since, i64::MAX)
+    }
+
+    /// Like `count_pending`, but only QSOs before `until` (Unix seconds, exclusive).
+    pub fn count_pending_between(&self, log_id: i64, status_key: &str, callsigns: &[String], location_id: Option<i64>, since: i64, until: i64) -> Result<i64> {
+        let (sql, args) = pending_sql("COUNT(*)", log_id, status_key, callsigns, location_id, since, until)?;
         Ok(self.conn.query_row(&sql, params_from_iter(args), |r| r.get(0))?)
     }
 
@@ -1107,15 +1118,15 @@ fn is_qsl_field(k: &str) -> bool {
     k.contains("QSL") || k.contains("UPLOAD") || k.contains("DOWNLOAD") || k.contains("OQRS") || k.starts_with("EQSL_") || k.starts_with("LOTW_")
 }
 
-fn pending_sql(select: &str, log_id: i64, status_key: &str, callsigns: &[String], location_id: Option<i64>, since: i64) -> Result<(String, Vec<Value>)> {
+fn pending_sql(select: &str, log_id: i64, status_key: &str, callsigns: &[String], location_id: Option<i64>, since: i64, until: i64) -> Result<(String, Vec<Value>)> {
     if !status_key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
         return Err(Error::Invalid(format!("bad field name {status_key}")));
     }
-    let mut args: Vec<Value> = vec![log_id.into(), since.into()];
+    let mut args: Vec<Value> = vec![log_id.into(), since.into(), until.into()];
     let marks = vec!["?"; callsigns.len()].join(", ");
     args.extend(callsigns.iter().map(|c| Value::from(c.to_ascii_uppercase())));
     let mut sql = format!(
-        "SELECT {select} FROM qsos WHERE log_id = ? AND time_on >= ? AND station_callsign IN ({marks})
+        "SELECT {select} FROM qsos WHERE log_id = ? AND time_on >= ? AND time_on < ? AND station_callsign IN ({marks})
          AND IFNULL(json_extract(fields, '$.{status_key}'), '') NOT IN ('Y', 'I')"
     );
     if let Some(loc) = location_id {

@@ -2,7 +2,9 @@
 
 Choose **QSL** from the **☰** menu at the right of the top bar. The first tab has the online services; **Paper cards** has your card queue and label printing.
 
-Each QSO keeps its upload status in the standard ADIF fields (`LOTW_QSL_SENT`, `QRZCOM_QSO_UPLOAD_STATUS`, `CLUBLOG_QSO_UPLOAD_STATUS`, `EQSL_QSL_SENT` and their dates), so exports and other loggers see what's been sent. Add the **LoTW S**, **QRZ** and **Club Log** columns to the log grid to see them.
+Each QSO keeps its upload status in the standard ADIF fields (`LOTW_QSL_SENT`, `QRZCOM_QSO_UPLOAD_STATUS`, `CLUBLOG_QSO_UPLOAD_STATUS`, `EQSL_QSL_SENT` and their dates), so exports and other loggers see what's been sent. Add the **LoTW S**, **eQSL S**, **QRZ**, **Club Log** and **QSL S** (card) columns to the log grid to see them.
+
+Every service follows the same three steps: **not sent** (N or blank), **sent** (Y, with the date filled in automatically the moment QRZero uploads the QSO, or marks the card sent), then **confirmed** (the matching R field, set when the confirmation arrives).
 
 Every service has a **QSOs from** date. Only QSOs on or after it are uploaded. When you turn a service on it starts from today, so a log you imported (and probably uploaded years ago) isn't sent again. Set an earlier date if you want older QSOs sent.
 
@@ -23,6 +25,10 @@ LoTW uploads use TQSL, already installed and set up with your certificate, and o
 1. QRZero finds TQSL in its usual place. If it's somewhere else, enter the path to `tqsl.exe`.
 2. For each callsign and location, pick the TQSL **station location** that matches it. QSOs from a location with no TQSL station location aren't uploaded.
 3. Click **Sign and upload**. QRZero hands the waiting QSOs to TQSL, which signs and uploads them quietly. QSOs TQSL reports as already on LoTW are marked as sent too.
+
+### Upload needed
+
+To send everything LoTW is missing for a period, use the **Upload needed, from / to** dates under the LoTW button. QRZero counts the QSOs in that range (both days included, UTC) whose LoTW sent status is N or blank, and **Sign and upload** hands them to TQSL in one go, marking each as sent with today's date. The **QSOs from** date doesn't apply to this; the range you pick decides. QSOs from a location with no TQSL station location are skipped, as above.
 
 If TQSL asks for your certificate password, it will show its own window.
 
