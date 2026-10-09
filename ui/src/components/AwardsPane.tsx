@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { onLive } from "../live";
 import { localGet, localSet } from "../prefs";
+import ClubAwards from "./ClubAwards";
 import type { AwardKind, AwardTable, QsoFilter, StationCallsign } from "../types";
 
 const AWARDS: { key: AwardKind; name: string; what: string; row: string }[] = [
@@ -15,6 +16,15 @@ const AWARDS: { key: AwardKind; name: string; what: string; row: string }[] = [
   { key: "iota", name: "IOTA", what: "island groups", row: "Reference" },
   { key: "counties", name: "Counties", what: "US counties", row: "County" },
 ];
+
+/** CW club awards, counted from club numbers in the log rather than from entity tables. */
+const CLUBS: { key: ClubKind; name: string }[] = [
+  { key: "skcc", name: "SKCC" },
+  { key: "cwops", name: "CWops" },
+];
+
+type ClubKind = "skcc" | "cwops";
+const isClub = (k: string): k is ClubKind => CLUBS.some((c) => c.key === k);
 
 /** Awards with a fixed list, so unworked rows are shown (the rest only list what you have worked). */
 const FIXED = new Set<AwardKind>(["dxcc", "was", "waz", "wac", "itu"]);
@@ -39,7 +49,7 @@ function dxccSummary(t: AwardTable) {
 
 const COL_NAMES: Record<string, string> = { mixed: "Mixed", cw: "CW", phone: "Phone", digital: "Digital" };
 
-interface Opts { award: AwardKind; call: string; lotw: boolean; paper: boolean; eqsl: boolean; needed: boolean }
+interface Opts { award: AwardKind | ClubKind; call: string; lotw: boolean; paper: boolean; eqsl: boolean; needed: boolean }
 
 /** Award progress: one row per entity, state, zone or prefix, worked or confirmed per band and mode. */
 export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: number; callsigns: StationCallsign[]; onShowQsos: (f: QsoFilter) => void }) {
@@ -55,10 +65,12 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
   };
 
   useEffect(() => {
+    if (isClub(opts.award)) return;
+    const kind = opts.award;
     let live = true;
     setErr("");
     api
-      .award(logId, opts.award, { calls: opts.call ? [opts.call] : [], lotw: opts.lotw, paper: opts.paper, eqsl: opts.eqsl, unworked: FIXED.has(opts.award) })
+      .award(logId, kind, { calls: opts.call ? [opts.call] : [], lotw: opts.lotw, paper: opts.paper, eqsl: opts.eqsl, unworked: FIXED.has(kind) })
       .then((t) => live && setTable(t))
       .catch((e) => live && setErr(e.message));
     return () => {
@@ -78,10 +90,11 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
     };
   }, []);
 
+  const club = isClub(opts.award) ? opts.award : null;
   const rows = useMemo(() => (table ? (opts.needed ? table.rows.filter((r) => r.cells.mixed !== "confirmed") : table.rows) : []), [table, opts.needed]);
-  const award = AWARDS.find((a) => a.key === opts.award)!;
+  const award = AWARDS.find((a) => a.key === opts.award) ?? AWARDS[0];
   const summary = useMemo(() => (table && opts.award === "dxcc" ? dxccSummary(table) : null), [table, opts.award]);
-  const mixed = table?.columns.find((c) => c.key === "mixed");
+  const mixed = club ? undefined : table?.columns.find((c) => c.key === "mixed");
 
   const show = (key: string) => {
     if (opts.award === "dxcc") onShowQsos({ dxcc: Number(key) });
@@ -103,15 +116,22 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
             <button key={a.key} className={opts.award === a.key ? "on" : ""} onClick={() => set({ award: a.key })}>{a.name}</button>
           ))}
         </nav>
+        <nav className="seg" aria-label="CW club award">
+          {CLUBS.map((a) => (
+            <button key={a.key} className={opts.award === a.key ? "on" : ""} onClick={() => set({ award: a.key })}>{a.name}</button>
+          ))}
+        </nav>
         <select value={opts.call} onChange={(e) => set({ call: e.target.value })} aria-label="Callsign">
           <option value="">All my callsigns</option>
           {callsigns.map((c) => <option key={c.id}>{c.callsign}</option>)}
         </select>
+        {!club && <>
         <span className="muted small">Confirmed by:</span>
         <label className="check"><input type="checkbox" checked={opts.lotw} onChange={(e) => set({ lotw: e.target.checked })} /> LoTW</label>
         <label className="check"><input type="checkbox" checked={opts.paper} onChange={(e) => set({ paper: e.target.checked })} /> Cards</label>
         <label className="check"><input type="checkbox" checked={opts.eqsl} onChange={(e) => set({ eqsl: e.target.checked })} /> eQSL</label>
         <label className="check"><input type="checkbox" checked={opts.needed} onChange={(e) => set({ needed: e.target.checked })} /> Not yet confirmed</label>
+        </>}
         <span className="spacer" />
         {mixed && (
           <span className="award-score">
@@ -119,14 +139,15 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
           </span>
         )}
       </div>
-      {summary && (
+      {summary && !club && (
         <div className="ftx-msg small">
           <b>DXCC Challenge:</b> {summary.slots.confirmed} confirmed, {summary.slots.worked} worked band slots (160 to 6 m; 1000 for the award).{" "}
           <b>5BDXCC:</b> {summary.five} of 100 entities confirmed on 80, 40, 20, 15 and 10 m.
         </div>
       )}
       {err && <div className="ftx-msg small err">{err}</div>}
-      {table && (
+      {club && <ClubAwards logId={logId} kind={club} call={opts.call} stamp={stamp} />}
+      {table && !club && (
         <div className="award-scroll">
           <table className="award-table">
             <thead>
@@ -167,9 +188,9 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
           </table>
         </div>
       )}
-      <div className="ftx-msg small muted">
+      {!club && <div className="ftx-msg small muted">
         {opts.award === "vucc" && "VUCC counts 4-character grid squares on 6 m and up. "}{opts.award === "counties" && "Counties come from the County field (like OH,Franklin), which LoTW and QRZ fill in. "}C confirmed, W worked but not confirmed. Click a row to see its QSOs in the log. Get confirmations with QSL, Download confirmations.
-      </div>
+      </div>}
     </div>
   );
 }

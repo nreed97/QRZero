@@ -244,6 +244,22 @@ export type AwardStatus = "worked" | "confirmed";
 export interface AwardRow { key: string; name: string; cells: Record<string, AwardStatus> }
 export interface AwardColumn { key: string; worked: number; confirmed: number }
 export interface AwardTable { award: AwardKind; columns: AwardColumn[]; rows: AwardRow[]; total: number }
+/** SKCC award with endorsement levels (Centurion, Tribune, Senator). */
+export interface ClubLevel { key: string; name: string; rule: string; count: number; step: number; level: number; next: number; achieved: string | null; bands: Record<string, number>; note: string | null }
+export interface ClubAwards {
+  skcc: { members: number; awards: ClubLevel[] };
+  cwops: {
+    members: number;
+    years: { year: number; aca: number; acma: number | null }[];
+    cma_bands: Record<string, number>;
+    cma_total: number;
+    dxcc: number;
+    dxcc_bands: Record<string, number>;
+    was: number;
+    was_bands: Record<string, number>;
+  };
+  cwt: { per_point: number; thresholds: [number, number, number]; years: { year: number; sessions: number; points: number; medal: string; next: number }[] };
+}
 /** What a QSO would add to one award: its row and the cells it falls in (mixed, mode group, band). */
 export interface AwardHint { award: AwardKind; key: string; name: string; cells: { column: string; status: "new" | AwardStatus }[] }
 
