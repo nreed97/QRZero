@@ -8,6 +8,7 @@ import EntryFieldsEditor from "./EntryFieldsEditor";
 import { StartupAppsTab, UdpConnectionsTab } from "./ConnectionsSettings";
 import { confirmDelete } from "../display";
 import BackupsTab from "./BackupsTab";
+import KeyboardTab from "./KeyboardSettings";
 import { DISPLAY_DEFAULTS, beep, setDisplay, useDisplay } from "../display";
 import { MODES } from "../modes";
 import { NEED_NAME, type NeedRank } from "../needed";
@@ -35,14 +36,14 @@ interface Props {
   initialTab?: string;
 }
 
-type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "udp" | "startup" | "cluster" | "logs" | "lookup" | "awards" | "backups" | "general";
+type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "udp" | "startup" | "cluster" | "logs" | "lookup" | "awards" | "backups" | "keyboard" | "general";
 
 /** The sections down the left of Settings, grouped. */
 const GROUPS: { name: string; tabs: Tab[] }[] = [
   { name: "Station", tabs: ["station", "locations", "equipment", "logs"] },
   { name: "Logging", tabs: ["fields", "lookup", "awards"] },
   { name: "Connections", tabs: ["radios", "udp", "cluster", "startup"] },
-  { name: "Program", tabs: ["backups", "general"] },
+  { name: "Program", tabs: ["backups", "keyboard", "general"] },
 ];
 
 const TAB_NAMES: Record<Tab, string> = {
@@ -58,6 +59,7 @@ const TAB_NAMES: Record<Tab, string> = {
   lookup: "Callsign lookup",
   awards: "Awards",
   backups: "Backups",
+  keyboard: "Keyboard",
   general: "General",
 };
 
@@ -106,6 +108,7 @@ export default function SettingsDialog(props: Props) {
       {tab === "cluster" && <ClusterTab />}
       {tab === "awards" && <AwardsTab />}
       {tab === "backups" && <BackupsTab />}
+      {tab === "keyboard" && <KeyboardTab />}
       {tab === "general" && <GeneralTab general={props.general} onGeneral={props.onGeneral} onWizard={props.onWizard} />}
       </div>
     </Modal>

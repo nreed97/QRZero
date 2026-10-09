@@ -491,10 +491,19 @@ table.list th { text-align: left; font-size: 12px; font-weight: 600; padding: 2p
 .qsl .row { align-items: flex-end; gap: 8px; flex-wrap: wrap; }
 
 /* Paper QSL labels: only the label sheet prints. */
-.label-print { display: none; }
+.label-print, .key-print { display: none; }
+.keys-tab button.key { min-width: 110px; font: 12px var(--mono); }
+.keys-tab .row-actions { text-align: right; white-space: nowrap; }
+.keys-tab .row-actions button { margin-left: 4px; }
 @media print {
   @page { size: letter; margin: 0; }
-  body > *:not(.label-print) { display: none !important; }
+  body > *:not(.label-print):not(.key-print) { display: none !important; }
+  body.printing-keys .label-print { display: none !important; }
+  .key-print { display: block; color: #000; font: 11pt Arial, Helvetica, sans-serif; padding: 0.5in; }
+  .key-print h1 { font-size: 16pt; margin: 0 0 10pt; }
+  .key-print table { border-collapse: collapse; width: 100%; }
+  .key-print th, .key-print td { text-align: left; padding: 4pt 8pt; border-bottom: 0.5pt solid #888; }
+  .key-print td:first-child { font-family: Consolas, "DejaVu Sans Mono", monospace; white-space: nowrap; }
   body { background: #fff; }
   .label-print { display: block; color: #000; font: 9pt Arial, Helvetica, sans-serif; }
   .label-page { display: grid; padding-top: 0.5in; }

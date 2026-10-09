@@ -8,6 +8,7 @@ import type { Equipment, Fields, Location, Qso, StationCallsign } from "../types
 import QrzPageLink from "./QrzPageLink";
 import { confirmDelete } from "../display";
 import "../editor.css";
+import { isShortcut, show, useBinding } from "../shortcuts";
 
 export interface QsoEditorProps {
   qso: Qso;
@@ -262,18 +263,18 @@ export default function QsoEditor({ qso, locations, equipment, callsigns, onClos
     onClose();
   };
 
-  // Ctrl+S and Alt+Up/Down work wherever the focus is, unless a dialog is open on top.
+  // The save and step-to-next-QSO keys (Settings > Keyboard) work wherever the focus is, unless a dialog is open on top.
   const keys = useRef({ save, onStep });
   keys.current = { save, onStep };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (document.querySelector(".backdrop")) return;
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "s") {
+      if (isShortcut("editsave", e)) {
         e.preventDefault();
         void keys.current.save();
-      } else if (e.altKey && !e.ctrlKey && (e.key === "ArrowUp" || e.key === "ArrowDown") && keys.current.onStep) {
+      } else if ((isShortcut("editprev", e) || isShortcut("editnext", e)) && keys.current.onStep) {
         e.preventDefault();
-        keys.current.onStep(e.key === "ArrowUp" ? -1 : 1);
+        keys.current.onStep(isShortcut("editprev", e) ? -1 : 1);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -574,7 +575,7 @@ export default function QsoEditor({ qso, locations, equipment, callsigns, onClos
         <button onClick={() => void lookup()} disabled={busy || !get("CALL").trim()} title="Look the call up on QRZ and fill in the fields that are blank">Fill from QRZ</button>
         <QrzPageLink call={get("CALL")} />
         <button onClick={revert} disabled={!dirty}>Revert</button>
-        <button className="primary" onClick={() => void save()} disabled={!dirty || busy} title="Save (Ctrl+S)">Save</button>
+        <button className="primary" onClick={() => void save()} disabled={!dirty || busy} title={`Save (${show(useBinding("editsave"))})`}>Save</button>
       </footer>
     </section>
   );
