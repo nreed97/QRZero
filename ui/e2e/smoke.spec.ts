@@ -284,9 +284,10 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
 
   // QSL lookup: type a call, Enter, results with the queued card.
   await fromMenu(page, /^QSL lookup/);
-  await page.getByLabel("Call").fill("k1abc");
-  await page.getByLabel("Call").press("Enter");
-  await expect(page.getByRole("dialog", { name: "QSL lookup" }).locator("tbody tr").first()).toContainText("queued");
+  const lookup = page.getByRole("dialog", { name: "QSL lookup" });
+  await lookup.getByLabel("Call").fill("k1abc");
+  await lookup.getByLabel("Call").press("Enter");
+  await expect(lookup.locator("tbody tr").first()).toContainText("queued");
   await page.keyboard.press("Escape");
 
   // OQRS: mark from the right-click menu, then see it in the editor.
