@@ -4,6 +4,7 @@ import { onLive } from "../live";
 import type { Location, QslConfig, QslDownload, QslOverview, QslRun, QslService, StationCallsign } from "../types";
 import Modal from "./Modal";
 import PaperQsl from "./PaperQsl";
+import ReplyList from "./ReplyList";
 
 interface Props {
   logId: number;
@@ -44,14 +45,15 @@ function RunLine({ run }: { run?: QslRun }) {
 }
 
 export default function QslDialog(props: Props) {
-  const [tab, setTab] = useState<"online" | "paper">("online");
+  const [tab, setTab] = useState<"online" | "paper" | "reply">("online");
   return (
     <Modal title="QSL" onClose={props.onClose} wide>
       <nav className="tabs">
         <button className={tab === "online" ? "active" : ""} onClick={() => setTab("online")}>LoTW, QRZ, Club Log, eQSL</button>
         <button className={tab === "paper" ? "active" : ""} onClick={() => setTab("paper")}>Paper cards</button>
+        <button className={tab === "reply" ? "active" : ""} onClick={() => setTab("reply")}>To reply to</button>
       </nav>
-      {tab === "online" ? <Online {...props} /> : <PaperQsl logId={props.logId} />}
+      {tab === "online" ? <Online {...props} /> : tab === "paper" ? <PaperQsl logId={props.logId} /> : <ReplyList logId={props.logId} />}
     </Modal>
   );
 }

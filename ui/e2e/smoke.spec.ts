@@ -282,6 +282,19 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Print 1 label" })).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
 
+  // Reply list: add from the log's right-click menu, jot a note, mark it replied.
+  await page.locator(".grid-row", { hasText: "K1ABC" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: /to reply list/ }).click();
+  await fromMenu(page, /^QSL/);
+  await page.getByRole("button", { name: "To reply to" }).click();
+  await expect(page.locator(".reply-table")).toContainText("K1ABC");
+  await page.getByLabel("Note for K1ABC").fill("send direct");
+  await page.getByLabel("Note for K1ABC").blur();
+  await page.getByRole("button", { name: "Replied" }).click();
+  await page.getByRole("button", { name: "Just remove" }).click();
+  await expect(page.getByText("Nothing waiting for a reply.")).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+
   // OQRS: mark from the right-click menu, then see it in the editor.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click({ button: "right" });
   await page.getByRole("menuitem", { name: /Mark OQRS requested/ }).click();

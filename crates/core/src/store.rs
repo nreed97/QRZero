@@ -19,7 +19,7 @@ use crate::awards::{AwardIndex, AwardQso, CtyFacts};
 use crate::worked::WorkedIndex;
 
 /// Migrations in order; migration N brings the schema to user_version N.
-const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5];
+const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6];
 /// The newest schema this build knows (`PRAGMA user_version`).
 pub const SCHEMA_VERSION: i32 = MIGRATIONS.len() as i32;
 
@@ -58,6 +58,18 @@ CREATE TABLE notes (
     PRIMARY KEY (log_id, call)
 ) WITHOUT ROWID;
 CREATE INDEX notes_log_updated ON notes (log_id, updated_at);
+"#;
+
+/// Cards received and still to be answered: one entry per log and call.
+const SCHEMA_V6: &str = r#"
+CREATE TABLE reply_list (
+    log_id INTEGER NOT NULL REFERENCES logs(id) ON DELETE CASCADE,
+    call TEXT NOT NULL,
+    received TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (log_id, call)
+) WITHOUT ROWID;
 "#;
 
 const SCHEMA_V1: &str = r#"
@@ -919,6 +931,49 @@ impl Store {
 
     pub fn delete_equipment(&self, id: i64) -> Result<()> {
         self.expect_changed(self.conn.execute("DELETE FROM equipment WHERE id = ?1", [id])?, "equipment")
+    }
+
+    // ---- cards to reply to ---------------------------------------------
+
+    /// The reply list, oldest card first.
+    pub fn list_replies(&self, log_id: i64) -> Result<Vec<ReplyEntry>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT call, received, note, created_at FROM reply_list WHERE log_id = ?1 ORDER BY received, created_at, call",
+        )?;
+        let rows = stmt.query_map([log_id], |r| Ok(ReplyEntry { call: r.get(0)?, received: r.get(1)?, note: r.get(2)?, created_at: r.get(3)? }))?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    /// Adds or updates a call on the reply list. A blank `received` means today.
+    pub fn save_reply(&self, log_id: i64, call: &str, received: &str, note: &str) -> Result<()> {
+        let call = call.trim().to_ascii_uppercase();
+        if call.is_empty() {
+            return Err(Error::Invalid("a reply entry needs a callsign".into()));
+        }
+        let received = received.trim();
+        let received = if received.is_empty() { chrono::Utc::now().format("%Y-%m-%d").to_string() } else { received.to_string() };
+        self.conn.execute(
+            "INSERT INTO reply_list (log_id, call, received, note, created_at) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT (log_id, call) DO UPDATE SET received = ?3, note = ?4",
+            params![log_id, call, received, note, chrono::Utc::now().timestamp()],
+        )?;
+        Ok(())
+    }
+
+    /// Adds a call only when it isn't listed yet, so "Add to reply list" never overwrites a note.
+    pub fn add_reply_if_new(&self, log_id: i64, call: &str) -> Result<()> {
+        let call = call.trim().to_ascii_uppercase();
+        let listed: bool = self
+            .conn
+            .query_row("SELECT 1 FROM reply_list WHERE log_id = ?1 AND call = ?2", params![log_id, call], |_| Ok(()))
+            .optional()?
+            .is_some();
+        if listed { Ok(()) } else { self.save_reply(log_id, &call, "", "") }
+    }
+
+    /// Removes a call from the reply list (replied); false when it wasn't there.
+    pub fn delete_reply(&self, log_id: i64, call: &str) -> Result<bool> {
+        Ok(self.conn.execute("DELETE FROM reply_list WHERE log_id = ?1 AND call = ?2", params![log_id, call.trim().to_ascii_uppercase()])? > 0)
     }
 
     // ---- station notes -------------------------------------------------
