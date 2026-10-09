@@ -18,7 +18,7 @@ VP8,Falkland Islands,141,SA,13,16,-51.63,58.72,4.0,VP8 VQ8;
 
 fn range(from: i64, to: i64) -> String {
     let (a, b) = (Utc::now() + Days::days(from), Utc::now() + Days::days(to));
-    format!("{}-{}", a.format("%b %d"), b.format("%b %d, %Y"))
+    format!("{}-{}", a.format("%b %-d"), b.format("%b %-d, %Y"))
 }
 
 async fn calendar(page: String) -> String {
@@ -49,12 +49,13 @@ async fn mock_node(spots: &'static [&'static str]) -> u16 {
 
 #[tokio::test]
 async fn dxpedition_list_needs_and_alerts() {
+    let entry = |dates: String, entity: &str, call: &str| format!("<p>\n{dates}\n<br>DXCC: {entity}<br>Callsign: <strong><a href=\"https://www.qrz.com/db/{call}\">{call}</a></strong><br>QSL: LoTW<br>Info: test\n</p>\n");
     let page = format!(
-        "<pre>\nADXO\n{} VP8LP Falkland Is. QSL: LoTW\n{} JA7XYZ Japan test\n{} W2UPC Upcoming\n{} K9OLD Over\n</pre>",
-        range(-1, 5),
-        range(-1, 5),
-        range(10, 15),
-        range(-30, -20),
+        "<html><body><h1>Announced DX Operations</h1><p>\n<strong>October</strong>\n</p>\n{}{}{}{}</body></html>",
+        entry(range(-1, 5), "Falkland Is.", "VP8LP"),
+        entry(range(-1, 5), "Japan", "JA7XYZ"),
+        entry(range(10, 15), "United States", "W2UPC"),
+        entry(range(-30, -20), "United States", "K9OLD"),
     );
     let url = calendar(page).await;
     let dir = tempfile::tempdir().unwrap();
