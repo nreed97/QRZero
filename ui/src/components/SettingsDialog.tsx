@@ -384,6 +384,11 @@ function RadiosTab() {
           {cfg.rotator_kind === "gs232" && "For controllers that emulate the Yaesu GS-232, over a serial port or a network (telnet-style) connection."}
           {" "}The map and Rotator pane get the heading and Turn SP / LP buttons.
         </p>
+        {check("rotator_serve", "Let N1MM (or another program) turn the rotator through QRZero")}
+        {cfg.rotator_serve && <div className="row">{text("rotator_serve_addr", "Listen on", "w-m", "127.0.0.1:12040")}</div>}
+        {cfg.rotator_serve && (
+          <p className="small muted">In N1MM: Config, Configure Ports, Rotor: pick the PstRotator-style UDP option and the address above. Bearings it sends are passed to the rotator chosen here, and the heading is sent back when it asks.</p>
+        )}
         {status?.rotator && <p className="small">Status: {status.rotator}</p>}
       </fieldset>
 

@@ -12,6 +12,9 @@ pub const ROTCTLD_PORT: u16 = 4533;
 
 const POLL: Duration = Duration::from_secs(1);
 const READ_TIMEOUT: Duration = Duration::from_millis(1500);
+/// GS-232 controllers answer within milliseconds and may not end the reply with a line break, so a
+/// short quiet period after the first bytes marks the end of a reply.
+const GS232_TIMEOUT: Duration = Duration::from_millis(400);
 const RETRY: Duration = Duration::from_secs(3);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -71,17 +74,16 @@ pub fn poll_command(p: Protocol) -> &'static str {
     }
 }
 
-/// Azimuth from a GS-232 reply: `+0123`, `+0123+0045` (B) or `AZ=123 EL=045`.
+/// Azimuth from a GS-232 style reply: `+0123`, `+0123+0045` (B), `AZ=123 EL=045` or just `123`.
 pub fn parse_gs232(line: &str) -> Option<f64> {
     let l = line.trim();
-    let digits = if let Some(i) = l.find("AZ=") {
-        &l[i + 3..]
-    } else {
-        l.strip_prefix("+0")?
+    let l = match l.find("AZ=") {
+        Some(i) => &l[i + 3..],
+        None => l.strip_prefix('+').unwrap_or(l),
     };
-    let n: String = digits.chars().take_while(|c| c.is_ascii_digit()).collect();
+    let n: String = l.chars().take_while(|c| c.is_ascii_digit()).collect();
     let az: f64 = n.parse().ok()?;
-    (n.len() >= 3 && az <= 450.0).then_some(az)
+    ((3..=4).contains(&n.len()) && az <= 450.0).then_some(az)
 }
 
 fn read_line(io: &mut dyn Read) -> std::io::Result<String> {
@@ -89,6 +91,7 @@ fn read_line(io: &mut dyn Read) -> std::io::Result<String> {
     let mut b = [0u8; 1];
     loop {
         match io.read(&mut b) {
+            Ok(0) if !out.is_empty() => return Ok(String::from_utf8_lossy(&out).into_owned()),
             Ok(0) => return Err(ErrorKind::UnexpectedEof.into()),
             Ok(_) => {
                 if b[0] == b'\n' || b[0] == b'\r' {
@@ -103,6 +106,10 @@ fn read_line(io: &mut dyn Read) -> std::io::Result<String> {
                 }
             }
             Err(e) if e.kind() == ErrorKind::Interrupted => {}
+            // Some controllers end a reply without a line break: take what came.
+            Err(e) if !out.is_empty() && matches!(e.kind(), ErrorKind::TimedOut | ErrorKind::WouldBlock) => {
+                return Ok(String::from_utf8_lossy(&out).into_owned());
+            }
             Err(e) => return Err(e),
         }
     }
@@ -111,7 +118,7 @@ fn read_line(io: &mut dyn Read) -> std::io::Result<String> {
 trait Io: Read + Write + Send {}
 impl<T: Read + Write + Send> Io for T {}
 
-fn open(link: &Link) -> Result<Box<dyn Io>, String> {
+fn open(link: &Link, timeout: Duration) -> Result<Box<dyn Io>, String> {
     match link {
         Link::Tcp(addr) => {
             let sa = addr
@@ -120,18 +127,20 @@ fn open(link: &Link) -> Result<Box<dyn Io>, String> {
                 .next()
                 .ok_or_else(|| format!("{addr}: no such address"))?;
             let s = TcpStream::connect_timeout(&sa, Duration::from_secs(3)).map_err(|e| format!("{addr}: {e}"))?;
-            s.set_read_timeout(Some(READ_TIMEOUT)).map_err(|e| e.to_string())?;
+            s.set_read_timeout(Some(timeout)).map_err(|e| e.to_string())?;
             let _ = s.set_nodelay(true);
             Ok(Box::new(s))
         }
         Link::Serial { path, baud } => {
-            let p = serialport::new(path, *baud).timeout(READ_TIMEOUT).open().map_err(|e| format!("{path}: {e}"))?;
+            let p = serialport::new(path, *baud).timeout(timeout).open().map_err(|e| format!("{path}: {e}"))?;
             Ok(Box::new(p))
         }
     }
 }
 
-fn poll(io: &mut dyn Io, p: Protocol) -> std::io::Result<Option<f64>> {
+/// `bad` gets the last reply that couldn't be read as a heading.
+fn poll(io: &mut dyn Io, p: Protocol, bad: &mut String) -> std::io::Result<Option<f64>> {
+    bad.clear();
     io.write_all(poll_command(p).as_bytes())?;
     io.flush()?;
     // A few lines may be left over from earlier commands (RPRT 0, blank replies): look through them.
@@ -143,9 +152,13 @@ fn poll(io: &mut dyn Io, p: Protocol) -> std::io::Result<Option<f64>> {
                     if line.trim() == "RPRT 0" {
                         continue;
                     }
+                    *bad = line;
                     return Ok(None);
                 }
-                let az: f64 = line.trim().parse().map_err(|_| ErrorKind::InvalidData)?;
+                let Ok(az) = line.trim().parse::<f64>() else {
+                    *bad = line;
+                    return Ok(None);
+                };
                 // The second line is the elevation; leave it for the next poll's cleanup.
                 let _ = read_line(io);
                 return Ok(az.is_finite().then_some(az.rem_euclid(360.0)));
@@ -154,6 +167,7 @@ fn poll(io: &mut dyn Io, p: Protocol) -> std::io::Result<Option<f64>> {
                 if let Some(az) = parse_gs232(&line) {
                     return Ok(Some(az % 360.0));
                 }
+                *bad = line;
             }
         }
     }
@@ -167,7 +181,8 @@ pub fn spawn(cfg: Config, on_event: impl Fn(Event) + Send + 'static) -> Sender<C
         .name("rotator".into())
         .spawn(move || {
             'outer: loop {
-                let mut io = match open(&cfg.link) {
+                let timeout = if cfg.protocol == Protocol::Gs232 { GS232_TIMEOUT } else { READ_TIMEOUT };
+                let mut io = match open(&cfg.link, timeout) {
                     Ok(io) => io,
                     Err(e) => {
                         on_event(Event::Status(format!("can't connect to {e}")));
@@ -179,13 +194,18 @@ pub fn spawn(cfg: Config, on_event: impl Fn(Event) + Send + 'static) -> Sender<C
                 };
                 on_event(Event::Status("connected".into()));
                 let mut silent = 0;
+                let mut bad = String::new();
                 loop {
-                    match poll(io.as_mut(), cfg.protocol) {
+                    match poll(io.as_mut(), cfg.protocol, &mut bad) {
                         Ok(Some(az)) => {
                             silent = 0;
                             on_event(Event::Heading(az));
                         }
-                        Ok(None) => {}
+                        Ok(None) => {
+                            if !bad.is_empty() {
+                                on_event(Event::Status(format!("connected, but can't read a heading from {:?}", bad.trim())));
+                            }
+                        }
                         Err(e) if matches!(e.kind(), ErrorKind::TimedOut | ErrorKind::WouldBlock) => {
                             silent += 1;
                             if silent == 3 {
@@ -194,6 +214,10 @@ pub fn spawn(cfg: Config, on_event: impl Fn(Event) + Send + 'static) -> Sender<C
                         }
                         Err(e) => {
                             on_event(Event::Status(format!("connection lost: {e}")));
+                            // Don't hammer a controller that only takes one connection at a time.
+                            if let Err(RecvTimeoutError::Disconnected) = rx.recv_timeout(Duration::from_secs(1)) {
+                                return;
+                            }
                             continue 'outer;
                         }
                     }
@@ -241,6 +265,7 @@ mod tests {
         assert_eq!(parse_gs232("+0123"), Some(123.0));
         assert_eq!(parse_gs232("+0270+0045"), Some(270.0));
         assert_eq!(parse_gs232("AZ=045 EL=010"), Some(45.0));
+        assert_eq!(parse_gs232("123"), Some(123.0));
         assert_eq!(parse_gs232("?>"), None);
         assert_eq!(parse_gs232("+0"), None);
     }
@@ -270,7 +295,8 @@ mod tests {
                         az = c.split(' ').nth(1).unwrap().parse().unwrap();
                         "RPRT 0\n".into()
                     }
-                    (Protocol::Gs232, "C") => format!("+0{az:03}\r\n"),
+                    // Like the WRC: five bytes, no line break; turn commands get no reply.
+                    (Protocol::Gs232, "C") => format!("+0{az:03}"),
                     (Protocol::Gs232, c) if c.starts_with('M') => {
                         az = c[1..].parse().unwrap();
                         String::new()
@@ -313,4 +339,5 @@ mod tests {
     fn gs232_polls_and_turns() {
         run(Protocol::Gs232);
     }
+
 }

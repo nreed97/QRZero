@@ -74,7 +74,11 @@ QRZero can talk to a rotator directly or through PstRotatorAz. In **Settings →
 - **Hamlib rotctld (TCP)**: give the address of a running `rotctld`, normally `127.0.0.1:4533`. This covers any rotator Hamlib supports.
 - **Yaesu GS-232 (serial or TCP)**: for controllers that emulate the GS-232, which most do. Type the serial port (for example `COM5`) and baud rate, or leave the port blank and give a network address like `192.168.1.50:23`. Use this or rotctld for a network controller such as the AF6SA WRC, whichever protocol its manual lists (the WRC also has a PstRotator-compatible telnet mode, which is not the same as these).
 
-The settings box shows whether the connection is up. QRZero reconnects by itself if the controller goes away.
+GS-232 replies don't need a line break at the end, which is how the WRC answers. If the controller answers with something QRZero can't read as a heading, the status line shows what it said. The settings box shows whether the connection is up. QRZero reconnects by itself if the controller goes away.
+
+### Turning the antenna from N1MM
+
+Tick **Let N1MM (or another program) turn the rotator through QRZero** under the rotator settings. QRZero then listens for PstRotatorAz-style UDP commands (default `127.0.0.1:12040`) and passes every bearing, and stop, to whichever rotator connection you set up above, and answers when the program asks for the heading. In N1MM, under **Config → Configure Ports**, set the rotor to the PstRotator-style UDP option with the same address. Use this when N1MM is the program you want to drive the antenna and QRZero holds the connection to the controller. Don't point it at the same port PstRotatorAz itself uses.
 
 With a rotator set up, the map shows the rotator's heading and **Turn SP** / **LP** buttons that turn the antenna to the short or long path of the station you're working.
 

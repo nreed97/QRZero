@@ -171,6 +171,8 @@ export interface Integrations {
   rotator_tcp: string;
   rotator_serial: string;
   rotator_baud: number;
+  rotator_serve: boolean;
+  rotator_serve_addr: string;
 }
 
 export interface IntegrationStatus { wsjtx: string | null; n1mm: string | null; rotator: string | null }
