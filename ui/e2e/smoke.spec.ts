@@ -329,13 +329,13 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   for (const time of ["1000", "1100"]) {
     await page.request.post(`/api/logs/${lid}/qsos`, { headers: apiHeaders, data: { location_id: null, fields: { CALL: "K8TWO", QSO_DATE: "20240301", TIME_ON: time, BAND: "20m", MODE: "CW" } } });
   }
-  await page.getByPlaceholder(/Search call/).fill("K8TWO");
+  await page.getByTestId("search").fill("K8TWO");
   await expect(page.locator(".grid-row", { hasText: "K8TWO" })).toHaveCount(2);
   await page.locator(".grid-row", { hasText: "K8TWO" }).first().click();
   await page.getByLabel("Paper QSL").selectOption("queue");
   await expect(page.getByText("1 QSO queued to send")).toBeVisible();
   // A card that arrives puts a card back in the queue for you to send.
-  await page.getByPlaceholder(/Search call/).fill("W1AW");
+  await page.getByTestId("search").fill("W1AW");
   await page.locator(".grid-row", { hasText: "W1AW" }).click({ button: "right" });
   await page.getByRole("menuitem", { name: /Card received, queue a reply/ }).click();
   await expect(page.getByText("1 QSO queued to send")).toBeVisible();
@@ -350,7 +350,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await queue.getByRole("button", { name: "Sent direct" }).click();
   await expect(queue.locator(".paper-queue tbody tr")).toHaveCount(1);
   await page.keyboard.press("Escape");
-  await page.getByPlaceholder(/Search call/).fill("");
+  await page.getByTestId("search").fill("");
 
   // OQRS: mark from the right-click menu, then see it in the editor.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click({ button: "right" });

@@ -625,7 +625,8 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 .ql-list tbody tr { cursor: default; }
 .ql-bottom { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.2fr); gap: 12px; align-items: start; }
 .queue-detail { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.2fr); gap: 12px; align-items: start; margin: 8px 0; }
-.queue-detail .ql-card { margin-top: 0; max-height: 200px; overflow: auto; }
+.queue-detail .ql-card { margin-top: 0; max-height: 260px; overflow: auto; }
+.queue-detail .ql-card dt { width: 120px; }
 .queue-detail .ql-card dl { grid-template-columns: 1fr; }
 .paper tr.sel td { background: var(--row-sel); }
 .ql-msg { min-height: 1.4em; margin: 4px 0; }
