@@ -18,6 +18,8 @@ use serde_json::json;
 use crate::station::{cty_facts, Hub};
 
 const BATCH: i64 = 500;
+/// Shortest wait (minutes) before a live upload, so a burst of edits goes up once.
+const LIVE_MIN: u32 = 1;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LotwMapping {
@@ -42,10 +44,10 @@ pub struct QslConfig {
     pub qrz_live: bool,
     pub clublog_live: bool,
     pub eqsl_live: bool,
-    /// Seconds to wait after the last change (0: not set yet, `normalize` fills 120).
-    pub qrz_live_delay_sec: u32,
-    pub clublog_live_delay_sec: u32,
-    pub eqsl_live_delay_sec: u32,
+    /// Minutes to wait after the last change (1 to 60; 0: not set yet, `normalize` fills 2).
+    pub qrz_live_delay_min: u32,
+    pub clublog_live_delay_min: u32,
+    pub eqsl_live_delay_min: u32,
     pub qrz_enabled: bool,
     /// Only QSOs from this date (YYYY-MM-DD) on are uploaded.
     pub qrz_since: String,
@@ -90,8 +92,8 @@ impl QslConfig {
             self.lotw_download_enabled = self.confirm_daily;
         }
         self.lotw_download_interval_min = self.lotw_download_interval_min.clamp(1, 7 * 24 * 60);
-        for d in [&mut self.qrz_live_delay_sec, &mut self.clublog_live_delay_sec, &mut self.eqsl_live_delay_sec] {
-            *d = if *d == 0 { 120 } else { (*d).clamp(5, 3600) };
+        for d in [&mut self.qrz_live_delay_min, &mut self.clublog_live_delay_min, &mut self.eqsl_live_delay_min] {
+            *d = if *d == 0 { 2 } else { (*d).clamp(LIVE_MIN, 60) };
         }
         let old = if self.interval_min == 0 { 15 } else { self.interval_min };
         for m in [&mut self.qrz_interval_min, &mut self.clublog_interval_min, &mut self.eqsl_interval_min] {
@@ -113,9 +115,9 @@ impl Default for QslConfig {
             qrz_live: false,
             clublog_live: false,
             eqsl_live: false,
-            qrz_live_delay_sec: 0,
-            clublog_live_delay_sec: 0,
-            eqsl_live_delay_sec: 0,
+            qrz_live_delay_min: 0,
+            clublog_live_delay_min: 0,
+            eqsl_live_delay_min: 0,
             qrz_enabled: false,
             qrz_since: String::new(),
             qrz_calls: Vec::new(),
@@ -346,12 +348,12 @@ impl Qsl {
                         let Some(q) = me.upgrade() else { return };
                         let cfg = q.config();
                         for (svc, live, delay) in [
-                            ("qrz", cfg.qrz_live, cfg.qrz_live_delay_sec),
-                            ("clublog", cfg.clublog_live, cfg.clublog_live_delay_sec),
-                            ("eqsl", cfg.eqsl_live, cfg.eqsl_live_delay_sec),
+                            ("qrz", cfg.qrz_live, cfg.qrz_live_delay_min),
+                            ("clublog", cfg.clublog_live, cfg.clublog_live_delay_min),
+                            ("eqsl", cfg.eqsl_live, cfg.eqsl_live_delay_min),
                         ] {
                             if live {
-                                due.insert(svc, std::time::Instant::now() + Duration::from_secs(delay as u64));
+                                due.insert(svc, std::time::Instant::now() + Duration::from_secs(60 * delay as u64));
                             }
                         }
                     }
@@ -916,6 +918,13 @@ mod tests {
     fn since_dates() {
         assert_eq!(since("2024-01-02"), 1_704_153_600);
         assert!(since("") >= Utc::now().timestamp() - 5, "no date means from now on");
+    }
+
+    #[test]
+    fn live_delay_has_a_minimum() {
+        let mut c = QslConfig { qrz_live_delay_min: 0, clublog_live_delay_min: 1, eqsl_live_delay_min: 1000, ..QslConfig::default() };
+        c.normalize();
+        assert_eq!((c.qrz_live_delay_min, c.clublog_live_delay_min, c.eqsl_live_delay_min), (2, 1, 60));
     }
 
     #[test]

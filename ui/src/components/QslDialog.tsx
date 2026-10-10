@@ -311,7 +311,7 @@ function Online({ callsigns, locations }: Props) {
           </div>
           <div className="row">
             <label className="check"><input type="checkbox" checked={cfg.qrz_live} onChange={(e) => set({ qrz_live: e.target.checked })} /> Upload shortly after a QSO is logged or edited</label>
-            <label className="f w-s"><span>Wait (sec)</span><input value={cfg.qrz_live_delay_sec} disabled={!cfg.qrz_live} inputMode="numeric" onChange={(e) => set({ qrz_live_delay_sec: Math.max(5, Number(e.target.value) || 120) })} /></label>
+            <label className="f w-s"><span>Wait (min)</span><input value={cfg.qrz_live_delay_min} disabled={!cfg.qrz_live} inputMode="numeric" onChange={(e) => set({ qrz_live_delay_min: Math.min(60, Math.max(1, Number(e.target.value) || 2)) })} /></label>
           </div>
           <p className="small muted">Each logbook on QRZ.com has its own API key (QRZ Logbook, Settings, API). QRZ needs an XML subscription for the API.</p>
           <table className="list">
@@ -350,7 +350,7 @@ function Online({ callsigns, locations }: Props) {
           </div>
           <div className="row">
             <label className="check"><input type="checkbox" checked={cfg.clublog_live} onChange={(e) => set({ clublog_live: e.target.checked })} /> Upload shortly after a QSO is logged or edited</label>
-            <label className="f w-s"><span>Wait (sec)</span><input value={cfg.clublog_live_delay_sec} disabled={!cfg.clublog_live} inputMode="numeric" onChange={(e) => set({ clublog_live_delay_sec: Math.max(5, Number(e.target.value) || 120) })} /></label>
+            <label className="f w-s"><span>Wait (min)</span><input value={cfg.clublog_live_delay_min} disabled={!cfg.clublog_live} inputMode="numeric" onChange={(e) => set({ clublog_live_delay_min: Math.min(60, Math.max(1, Number(e.target.value) || 2)) })} /></label>
           </div>
           <div className="row">
             <label className="f w-l"><span>Club Log email</span><input value={cfg.clublog_email} onChange={(e) => set({ clublog_email: e.target.value })} /></label>
@@ -380,7 +380,7 @@ function Online({ callsigns, locations }: Props) {
           </div>
           <div className="row">
             <label className="check"><input type="checkbox" checked={cfg.eqsl_live} onChange={(e) => set({ eqsl_live: e.target.checked })} /> Upload shortly after a QSO is logged or edited</label>
-            <label className="f w-s"><span>Wait (sec)</span><input value={cfg.eqsl_live_delay_sec} disabled={!cfg.eqsl_live} inputMode="numeric" onChange={(e) => set({ eqsl_live_delay_sec: Math.max(5, Number(e.target.value) || 120) })} /></label>
+            <label className="f w-s"><span>Wait (min)</span><input value={cfg.eqsl_live_delay_min} disabled={!cfg.eqsl_live} inputMode="numeric" onChange={(e) => set({ eqsl_live_delay_min: Math.min(60, Math.max(1, Number(e.target.value) || 2)) })} /></label>
           </div>
           <div className="row">
             <label className="f w-m"><span>eQSL username</span><input value={cfg.eqsl_username} onChange={(e) => set({ eqsl_username: e.target.value.toUpperCase() })} /></label>

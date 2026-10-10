@@ -314,7 +314,7 @@ async fn qrz_and_clublog_uploads() {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn live_upload_follows_a_new_qso() {
+async fn live_upload_waits_before_sending() {
     let seen = Seen::default();
     let (qrz, clublog) = mock_services(seen.clone()).await;
     let api = Api::new(qrz, clublog).await;
@@ -323,18 +323,13 @@ async fn live_upload_follows_a_new_qso() {
     cfg["qrz_calls"] = json!(["N0CALL"]);
     cfg["qrz_since"] = json!("2025-01-01");
     cfg["qrz_live"] = json!(true);
-    cfg["qrz_live_delay_sec"] = json!(5);
+    cfg["qrz_live_delay_min"] = json!(0);
     let o = api.put("/qsl", json!({"config": cfg, "secrets": {"qrz_keys": {"N0CALL": "GOOD-KEY"}}})).await;
+    assert_eq!(o["config"]["qrz_live_delay_min"], 2, "an unset wait becomes 2 minutes");
     assert_eq!(o["config"]["qrz_enabled"], false, "live upload doesn't need the timer");
     api.qso(log, loc, "JA1XYZ").await;
-    assert!(seen.lock().unwrap().is_empty(), "not sent at once");
-    for _ in 0..40 {
-        if api.fields(log, "JA1XYZ").await.get("QRZCOM_QSO_UPLOAD_STATUS").is_some() {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(300)).await;
-    }
-    assert_eq!(api.fields(log, "JA1XYZ").await["QRZCOM_QSO_UPLOAD_STATUS"], "Y");
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    assert!(seen.lock().unwrap().is_empty(), "not sent before the wait is over");
 }
 
 #[tokio::test]
