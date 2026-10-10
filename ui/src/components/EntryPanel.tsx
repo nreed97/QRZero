@@ -8,6 +8,7 @@ import { localGet, localSet } from "../prefs";
 import QrzPageLink from "./QrzPageLink";
 import type { Equipment, Fields, Location, LookupResult, Radio } from "../types";
 import { adifDateTime } from "../util";
+import { isShortcut } from "../shortcuts";
 
 export interface EntryContext {
   band: string;
@@ -27,7 +28,6 @@ interface Props {
   onLogged: () => void;
   onLookup: (r: LookupResult | null) => void;
   onContext: (c: EntryContext) => void;
-  onHelp: () => void;
   /** Radios the panel can follow; the selected one sets frequency, band and mode. */
   radios: Radio[];
   radioKey: string;
@@ -73,7 +73,7 @@ const PER_QSO = new Set(["COMMENT", "QSLMSG", "STX", "SRX", "STX_STRING", "SRX_S
 // Picked equipment ids; -1 is "none", and antenna 0 is "Auto (by band)".
 interface Gear { rig?: number; antenna?: number; amplifier?: number }
 
-export default function EntryPanel({ logId, stationCall, location, layout: baseLayout, modeLayouts, equipment, onLogged, onLookup, onContext, onHelp, radios, radioKey, onRadio, prefill, copy }: Props) {
+export default function EntryPanel({ logId, stationCall, location, layout: baseLayout, modeLayouts, equipment, onLogged, onLookup, onContext, radios, radioKey, onRadio, prefill, copy }: Props) {
   const prefs = useRef(localGet("qrzero.entry", { freq: "", band: "20m", mode: "CW", last: {} as Fields })).current;
   const [freq, setFreq] = useState(prefs.freq);
   // The receive frequency while the radio is in split; empty otherwise. `freq` is then the transmit frequency.
@@ -376,13 +376,10 @@ export default function EntryPanel({ logId, stationCall, location, layout: baseL
     } else if (e.altKey && /^[1-9]$/.test(e.key) && radios[Number(e.key) - 1]) {
       e.preventDefault();
       onRadio(radios[Number(e.key) - 1].key);
-    } else if (e.key === "`" && radios.length > 1) {
+    } else if (isShortcut("radioswap", e) && radios.length > 1) {
       // SO2R: swap between the first two radios.
       e.preventDefault();
       onRadio(radio?.key === radios[0].key ? radios[1].key : radios[0].key);
-    } else if (e.key === "F1") {
-      e.preventDefault();
-      onHelp();
     }
   };
 

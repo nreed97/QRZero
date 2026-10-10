@@ -18,7 +18,7 @@ The fields below the first line can be changed: see **Entry fields**.
 | <kbd>Esc</kbd> | Clear the form |
 | <kbd>Space</kbd> in the call field | Jump to the sent report |
 | <kbd>Tab</kbd> | Next field |
-| <kbd>F1</kbd> | This guide |
+| <kbd>F1</kbd> | This guide (can be changed, see **Keyboard shortcuts** below) |
 
 Two buttons next to **Clear** deal with QRZ.com:
 
