@@ -42,7 +42,7 @@ Tick the sources that count under **Confirmed by**:
 
 The **SKCC**, **CWops**, **NAQCC** and **FISTS** buttons count from the club numbers you log on CW QSOs (the SKCC, CWops, NAQCC and FISTS boxes in the entry panel, see **Logging**). Only CW QSOs count. Members are counted by their number, not their call, because calls change hands. Confirmations don't apply: both clubs run on your log. You can pick one of your callsigns as with the other awards.
 
-QRZero uses the numbers and SKCC suffixes exactly as logged. It has no member list, so it cannot check that a number is real, that a member was active when you worked them, or that both of you used a straight key, bug or sideswiper (SKCC requires that). Check those before you apply; the clubs' own award managers are the authority.
+QRZero uses the numbers and SKCC suffixes exactly as logged. For SKCC, a QSO counts only if its own SKCC box is filled in: a blank box means no number was exchanged, and QRZero never borrows a number from another QSO with the same call. It has no member list, so it cannot check that a number is real, that a member was active when you worked them, or that both of you used a straight key, bug or sideswiper (SKCC requires that). Check those before you apply; the clubs' own award managers are the authority.
 
 **SKCC**
 

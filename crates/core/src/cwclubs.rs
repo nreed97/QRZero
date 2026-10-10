@@ -665,6 +665,21 @@ mod tests {
     }
 
     #[test]
+    fn qso_without_an_skcc_number_does_not_count() {
+        let mut tally = ClubTally::default();
+        // 100 members, then 50 more QSOs with the same calls but no number exchanged.
+        for n in 1..=100u32 {
+            tally.add(&skcc_qso(t(2020, 1, 1, 0) + n as i64, n, "", "40m"));
+        }
+        for n in 101..=150u32 {
+            tally.add(&ClubQso { call: format!("K{n}X"), time: t(2020, 2, 1, 0), band: Some("40m".into()), skcc: parse_skcc(""), ..Default::default() });
+        }
+        let a = tally.finish(CwtOptions::default());
+        assert_eq!(a.skcc.members, 100);
+        assert_eq!(award(&a, "centurion").count, 100);
+    }
+
+    #[test]
     fn centurion_counts_members_once() {
         let mut tally = ClubTally::default();
         // 150 members, each worked twice (the second time on another band).
