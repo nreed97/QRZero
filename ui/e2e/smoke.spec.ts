@@ -324,7 +324,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(queue.locator(".paper-queue")).toContainText("K1ABC");
   await expect(queue.locator(".queue-detail")).toContainText("K1ABC");
   await expect(queue.locator(".queue-detail")).toContainText("Date");
-  await expect(queue.locator(".queue-detail")).toContainText("Ant");
+  await expect(queue.locator(".queue-detail")).toContainText("Contest ID");
   await expect(queue.locator(".queue-detail")).not.toContainText("QSO_DATE");
   await page.screenshot({ path: "e2e-results/queue-details.png" });
   await expect(queue.getByRole("button", { name: "Print 1 label" })).toBeVisible();

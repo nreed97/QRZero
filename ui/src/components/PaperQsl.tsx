@@ -86,9 +86,9 @@ function LabelSheet({ items, sheet, skip }: { items: Label[]; sheet: keyof typeo
   );
 }
 
-/** The QSO as it goes on the card: date, UTC, MHz, mode and RST, plus your rig, power and antenna. */
+/** The QSO as it goes on the card: date, UTC, MHz, mode and RST, plus your rig, power, antenna and the contest ID. */
 function QsoDetails({ q }: { q: Qso }) {
-  const lines: [string, string][] = [["Date", date(f(q, "QSO_DATE"))], ["UTC", time(f(q, "TIME_ON"))], ["MHz", freq(q)], ["Mode", mode(q)], ["RST", f(q, "RST_SENT")], ["Rig", f(q, "MY_RIG")], ["Pwr", f(q, "TX_PWR") && `${f(q, "TX_PWR")} W`], ["Ant", f(q, "MY_ANTENNA")]];
+  const lines: [string, string][] = [["Date", date(f(q, "QSO_DATE"))], ["UTC", time(f(q, "TIME_ON"))], ["MHz", freq(q)], ["Mode", mode(q)], ["RST", f(q, "RST_SENT")], ["Rig", f(q, "MY_RIG")], ["Pwr", f(q, "TX_PWR") && `${f(q, "TX_PWR")} W`], ["Ant", f(q, "MY_ANTENNA")], ["Contest ID", f(q, "CONTEST_ID")]];
   return (
     <div className="ql-card">
       <h3>QSO details</h3>
