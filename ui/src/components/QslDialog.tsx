@@ -5,6 +5,7 @@ import type { Location, QslConfig, QslDownload, QslOverview, QslRun, QslService,
 import SaveBar from "./SaveBar";
 import Modal from "./Modal";
 import PaperQsl from "./PaperQsl";
+import QueueUpload from "./QueueUpload";
 import { newConfirmLines } from "../newConfirms";
 
 interface Props {
@@ -115,20 +116,6 @@ function Online({ callsigns, locations, onClose }: Props) {
   }, []);
 
 
-  const [rangeFrom, setRangeFrom] = useState("");
-  const [rangeTo, setRangeTo] = useState(() => new Date().toISOString().slice(0, 10));
-  const [waiting, setWaiting] = useState<number | null>(null);
-  const rangeOk = !!rangeFrom && !!rangeTo && rangeFrom <= rangeTo;
-  const mapped = (cfg?.lotw ?? []).map((m) => m.location_id).join(",");
-  useEffect(() => {
-    setWaiting(null);
-    if (!rangeOk) return;
-    let live = true;
-    api.lotwWaiting(rangeFrom, rangeTo).then((w) => live && setWaiting(w.locations.reduce((n, l) => n + l.waiting, 0)), () => {});
-    return () => {
-      live = false;
-    };
-  }, [rangeFrom, rangeTo, rangeOk, mapped, o?.runs.lotw]);
   if (!o || !cfg) return <p className="muted">Loading…</p>;
 
   const calls = callsigns.map((c) => c.callsign);
@@ -160,7 +147,7 @@ function Online({ callsigns, locations, onClose }: Props) {
     }
   };
 
-  const download = async (service: "lotw" | "eqsl") => {
+  const download = async (service: "lotw" | "eqsl" | "qrz" | "clublog") => {
     setBusy(`${service}-rcvd`);
     setMsg(null);
     try {
@@ -202,19 +189,6 @@ function Online({ callsigns, locations, onClose }: Props) {
   const setMapping = (call: string, locId: number, name: string) => {
     const rest = cfg.lotw.filter((m) => !(m.callsign === call && m.location_id === locId));
     set({ lotw: name ? [...rest, { callsign: call, location_id: locId, station_location: name }] : rest });
-  };
-  const uploadRange = async () => {
-    setBusy("lotw");
-    setMsg(null);
-    try {
-      await save();
-      await api.lotwUploadRange(rangeFrom, rangeTo);
-      await load();
-    } catch (e) {
-      setMsg({ text: (e as Error).message, ok: false });
-    } finally {
-      setBusy("");
-    }
   };
   const lotwPending = o.pending.lotw.reduce((n, p) => n + p.pending, 0);
 
@@ -275,15 +249,8 @@ function Online({ callsigns, locations, onClose }: Props) {
           </div>
           <details className="more">
             <summary>Upload by date range, moving from another logger</summary>
-          <div className="row">
-            <label className="f w-m"><span>Upload needed, from</span><input type="date" value={rangeFrom} onChange={(e) => setRangeFrom(e.target.value)} /></label>
-            <label className="f w-m"><span>to</span><input type="date" value={rangeTo} onChange={(e) => setRangeTo(e.target.value)} /></label>
-            <button disabled={!!busy || !cfg.lotw.length || !rangeOk || !waiting} onClick={uploadRange}>
-              {busy === "lotw" ? "Signing and uploading…" : `Sign and upload ${waiting ?? 0} QSO${waiting === 1 ? "" : "s"} in this range`}
-            </button>
-          </div>
-          <p className="small muted">Picks every QSO in the range whose LoTW sent status is N or blank, whatever the "QSOs from" date says.</p>
-          <p className="small muted"><b>Moving from another logger?</b> Download confirmations before your first upload. Matching QSOs are marked sent and confirmed, so they aren't uploaded again.</p>
+            <QueueUpload service="lotw" name="LoTW" ready={cfg.lotw.length > 0} save={save} onChange={load} />
+            <p className="small muted"><b>Moving from another logger?</b> Download confirmations before your first upload. Matching QSOs are marked sent and confirmed, so they aren't uploaded again.</p>
           </details>
           <p className="small muted">To download confirmations (for awards), enter your LoTW website login. It's not your TQSL password.</p>
           <div className="row">
@@ -336,6 +303,15 @@ function Online({ callsigns, locations, onClose }: Props) {
             <button disabled={!!busy || !cfg.qrz_calls.length} onClick={() => upload("qrz")}>{busy === "qrz" ? "Uploading…" : `Upload ${o.pending.qrz} now`}</button>
             <RunLine run={o.runs.qrz} />
           </div>
+          <details className="more">
+            <summary>Upload by date range</summary>
+            <QueueUpload service="qrz" name="QRZ Logbook" ready={cfg.qrz_calls.length > 0} save={save} onChange={load} />
+          </details>
+          <div className="row">
+            <button disabled={!!busy || !cfg.qrz_calls.length} onClick={() => download("qrz")}>{busy === "qrz-rcvd" ? "Downloading…" : "Download confirmations"}</button>
+            <DownloadLine d={o.downloads.qrz} />
+          </div>
+          <p className="small muted">Marks the QSOs QRZ shows as confirmed, including the ones it confirmed from LoTW, as QRZ confirmations (QRZ R).</p>
         </fieldset>
         )}
 
@@ -365,6 +341,15 @@ function Online({ callsigns, locations, onClose }: Props) {
             <button disabled={!!busy || !cfg.clublog_calls.length} onClick={() => upload("clublog")}>{busy === "clublog" ? "Uploading…" : `Upload ${o.pending.clublog} now`}</button>
             <RunLine run={o.runs.clublog} />
           </div>
+          <details className="more">
+            <summary>Upload by date range</summary>
+            <QueueUpload service="clublog" name="Club Log" ready={cfg.clublog_calls.length > 0} save={save} onChange={load} />
+          </details>
+          <div className="row">
+            <button disabled={!!busy || !cfg.clublog_calls.length || !cfg.clublog_email} onClick={() => download("clublog")}>{busy === "clublog-rcvd" ? "Downloading…" : "Download matches"}</button>
+            <DownloadLine d={o.downloads.clublog} />
+          </div>
+          <p className="small muted">Club Log marks a QSO as matched when the other station has it in their Club Log too. If it says the login was refused, use a Club Log application password (Club Log, Settings, App Passwords).</p>
         </fieldset>
         )}
 
@@ -395,6 +380,10 @@ function Online({ callsigns, locations, onClose }: Props) {
             <button disabled={!!busy || !cfg.eqsl_calls.length} onClick={() => upload("eqsl")}>{busy === "eqsl" ? "Uploading…" : `Upload ${o.pending.eqsl} now`}</button>
             <RunLine run={o.runs.eqsl} />
           </div>
+          <details className="more">
+            <summary>Upload by date range</summary>
+            <QueueUpload service="eqsl" name="eQSL" ready={cfg.eqsl_calls.length > 0} save={save} onChange={load} />
+          </details>
           <div className="row">
             <button disabled={!!busy || !cfg.eqsl_username} onClick={() => download("eqsl")}>{busy === "eqsl-rcvd" ? "Downloading…" : "Download confirmations"}</button>
             <DownloadLine d={o.downloads.eqsl} />

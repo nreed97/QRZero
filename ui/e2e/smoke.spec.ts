@@ -304,6 +304,10 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Saved.")).toBeVisible();
   await expect(page.getByLabel("QRZ API key for N0OLD")).toHaveAttribute("placeholder", "API key saved");
+  // Upload by date range: the preview lists what would be sent (the logged QSOs are N0CALL's, so none for N0OLD).
+  await page.getByText("Upload by date range").click();
+  await page.getByRole("button", { name: "Everything not yet sent" }).click();
+  await expect(page.getByText(/Nothing waiting for QRZ Logbook/)).toBeVisible();
   // The note fades away, so a second save shows it again; Save and close saves and closes.
   await expect(page.getByText("Saved.")).toBeHidden({ timeout: 6000 });
   await page.getByRole("button", { name: "Save", exact: true }).click();

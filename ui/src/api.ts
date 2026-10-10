@@ -1,5 +1,5 @@
 import type { UpdateInfo, ContestList, DxpedList, DxpedPlanned, PropagationReport } from "./types";
-import type { ClubAwards, LotwWaiting, QslService, QslDownload, AwardHint, SlotGrid, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
+import type { ClubAwards, QslQueue, QslService, QslDownload, AwardHint, SlotGrid, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
 function sessionToken(): string {
@@ -176,8 +176,9 @@ export const api = {
   qslUpload: (service: QslService) => json<QslRun>("POST", `/qsl/upload/${service}`),
   qslTargets: () => json<QslService[]>("GET", "/qsl/targets"),
   qslUploadQsos: (service: QslService, ids: number[]) => json<QslRun>("POST", `/qsl/upload/${service}/qsos`, { ids }),
-  lotwWaiting: (from: string, to: string) => json<LotwWaiting>("GET", `/qsl/lotw/range?from=${from}&to=${to}`),
-  lotwUploadRange: (from: string, to: string) => json<QslRun>("POST", "/qsl/lotw/range", { from, to }),
-  qslDownload: (service: "lotw" | "eqsl") => json<QslDownload>("POST", `/qsl/download/${service}`),
+  qslQueue: (service: QslService, from: string, to: string) => json<QslQueue>("GET", `/qsl/queue/${service}?from=${from}&to=${to}`),
+  qslQueueUpload: (service: QslService, from: string, to: string) => json<QslRun>("POST", `/qsl/queue/${service}/upload`, { from, to }),
+  qslQueueRemove: (service: QslService, ids: number[]) => json<{ removed: number }>("POST", `/qsl/queue/${service}/remove`, { ids }),
+  qslDownload: (service: QslService) => json<QslDownload>("POST", `/qsl/download/${service}`),
   propagation: (refresh = false) => json<PropagationReport>("GET", `/propagation${refresh ? "?refresh=true" : ""}`),
 };

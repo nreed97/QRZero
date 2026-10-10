@@ -73,6 +73,9 @@ pub struct QslConfig {
     /// Station callsigns uploaded to the eQSL account.
     pub eqsl_calls: Vec<String>,
     pub eqsl_rcvd_since: String,
+    /// QRZ Logbook and Club Log confirmations already downloaded up to this date (YYYY-MM-DD; empty: all).
+    pub qrz_rcvd_since: String,
+    pub clublog_rcvd_since: String,
     /// Download new eQSL confirmations once a day. (Older versions also
     /// downloaded LoTW's with it; see `lotw_download_enabled`.)
     pub confirm_daily: bool,
@@ -136,6 +139,8 @@ impl Default for QslConfig {
             eqsl_nickname: String::new(),
             eqsl_calls: Vec::new(),
             eqsl_rcvd_since: String::new(),
+            qrz_rcvd_since: String::new(),
+            clublog_rcvd_since: String::new(),
             confirm_daily: false,
             lotw_download_enabled: false,
             lotw_download_interval_min: 0,
@@ -198,6 +203,7 @@ pub struct Qsl {
 pub struct Endpoints {
     pub qrz: String,
     pub clublog: String,
+    pub clublog_matches: String,
     pub eqsl_upload: String,
     pub eqsl_inbox: String,
     pub lotw_report: String,
@@ -208,6 +214,7 @@ impl Default for Endpoints {
         Endpoints {
             qrz: qsl::QRZ_LOGBOOK_ENDPOINT.into(),
             clublog: qsl::CLUBLOG_ENDPOINT.into(),
+            clublog_matches: confirm::CLUBLOG_MATCHES_ENDPOINT.into(),
             eqsl_upload: confirm::EQSL_UPLOAD_ENDPOINT.into(),
             eqsl_inbox: confirm::EQSL_INBOX_ENDPOINT.into(),
             lotw_report: confirm::LOTW_REPORT_ENDPOINT.into(),
@@ -243,35 +250,126 @@ fn since(date: &str) -> i64 {
 }
 
 /// Unix seconds for the start of `from` and the end of `to` (exclusive), both YYYY-MM-DD.
+/// A blank `from` means the start of the log, a blank `to` means no end.
 fn day_range(from: &str, to: &str) -> Result<(i64, i64), String> {
     let day = |d: &str| NaiveDate::parse_from_str(d.trim(), "%Y-%m-%d").map_err(|_| format!("'{d}' isn't a date"));
-    let (a, b) = (day(from)?, day(to)?);
-    if b < a {
-        return Err("the end date is before the start date".into());
-    }
     let at = |d: NaiveDate| d.and_hms_opt(0, 0, 0).map_or(0, |t| t.and_utc().timestamp());
-    Ok((at(a), at(b) + 86_400))
+    let a = if from.trim().is_empty() { None } else { Some(day(from)?) };
+    let b = if to.trim().is_empty() { None } else { Some(day(to)?) };
+    if let (Some(a), Some(b)) = (a, b) {
+        if b < a {
+            return Err("the end date is before the start date".into());
+        }
+    }
+    Ok((a.map_or(0, at), b.map_or(i64::MAX, |b| at(b) + 86_400)))
+}
+
+/// A QSO waiting to go to a service, for the preview.
+#[derive(Serialize)]
+pub struct QueueRow {
+    id: i64,
+    call: String,
+    date: String,
+    time: String,
+    band: String,
+    mode: String,
+    station: String,
+}
+
+/// What a service hasn't been sent in a date range.
+#[derive(Serialize)]
+pub struct Queue {
+    total: i64,
+    rows: Vec<QueueRow>,
 }
 
 impl Qsl {
-    /// QSOs in a date range that LoTW hasn't been sent yet, per mapped location.
-    pub fn lotw_waiting(&self, from: &str, to: &str) -> Result<serde_json::Value, String> {
+    fn service(name: &str) -> Option<&'static Service> {
+        match name {
+            "qrz" => Some(&QRZ),
+            "clublog" => Some(&CLUBLOG),
+            "eqsl" => Some(&EQSL),
+            "lotw" => Some(&LOTW),
+            _ => None,
+        }
+    }
+
+    /// The QSOs in a date range that `name` hasn't been sent (status not Y or I), the
+    /// first `limit` of them oldest first, and how many there are in all. Only QSOs the
+    /// service is set up for count: the ticked callsigns, or for LoTW the mapped locations.
+    pub fn queue(&self, name: &str, from: &str, to: &str, limit: i64) -> Result<Queue, String> {
+        let svc = Self::service(name).ok_or_else(|| format!("unknown service {name}"))?;
         let (a, b) = day_range(from, to)?;
         let cfg = self.config();
-        let rows: Vec<_> = cfg
-            .lotw
-            .iter()
-            .map(|m| {
-                let n = self
-                    .db(|st| {
-                        let loc = st.get_location(m.location_id)?;
-                        st.count_pending_between(loc.log_id, LOTW.status_key, std::slice::from_ref(&m.callsign), Some(m.location_id), a, b)
-                    })
-                    .unwrap_or(0);
-                json!({"mapping": m, "waiting": n})
+        let mut total = 0;
+        let mut qsos = Vec::new();
+        let mut take = |st: &mut Store, log_id: i64, calls: &[String], loc: Option<i64>| -> qrzero_core::Result<()> {
+            total += st.count_pending_between(log_id, svc.status_key, calls, loc, a, b)?;
+            let room = limit - qsos.len() as i64;
+            if room > 0 {
+                qsos.extend(st.pending_uploads_between(log_id, svc.status_key, calls, loc, a, b, room)?);
+            }
+            Ok(())
+        };
+        self.db(|st| {
+            if name == "lotw" {
+                for m in &cfg.lotw {
+                    let loc = st.get_location(m.location_id)?;
+                    take(st, loc.log_id, std::slice::from_ref(&m.callsign), Some(m.location_id))?;
+                }
+            } else {
+                let calls = match name {
+                    "qrz" => &cfg.qrz_calls,
+                    "eqsl" => &cfg.eqsl_calls,
+                    _ => &cfg.clublog_calls,
+                };
+                for log in st.list_logs()? {
+                    take(st, log.id, calls, None)?;
+                }
+            }
+            Ok(())
+        })
+        .map_err(|e| e.to_string())?;
+        let rows = qsos
+            .into_iter()
+            .map(|q| {
+                let f = |k: &str| q.fields.get(k).cloned().unwrap_or_default();
+                let t = f("TIME_ON");
+                QueueRow {
+                    id: q.id,
+                    call: f("CALL"),
+                    date: f("QSO_DATE"),
+                    time: t.get(..4).unwrap_or(&t).to_string(),
+                    band: f("BAND"),
+                    mode: f("MODE"),
+                    station: f("STATION_CALLSIGN"),
+                }
             })
             .collect();
-        Ok(json!({ "locations": rows }))
+        Ok(Queue { total, rows })
+    }
+
+    /// Takes QSOs out of a service's queue for good: their status becomes "I" (ignore),
+    /// which uploads skip until the status is changed in the QSO editor.
+    pub fn unqueue(&self, name: &str, ids: &[i64]) -> Result<usize, String> {
+        let svc = Self::service(name).ok_or_else(|| format!("unknown service {name}"))?;
+        let set: Fields = [(svc.status_key.to_string(), "I".to_string())].into();
+        self.db(|st| st.mark_qsos(ids, &set)).map_err(|e| e.to_string())?;
+        self.hub.emit(json!({"type": "qso_logged", "log_id": null, "call": "", "source": svc.name, "added": false}));
+        Ok(ids.len())
+    }
+
+    /// Uploads everything in a date range that `name` hasn't been sent, whatever the
+    /// service's "QSOs from" date says.
+    pub async fn upload_range(&self, name: &str, from: &str, to: &str) -> Run {
+        let bounds = match day_range(from, to) {
+            Ok(b) => b,
+            Err(e) => return Run { error: Some(e), at: Utc::now().timestamp(), ..Run::default() },
+        };
+        match name {
+            "lotw" => self.upload_lotw(Some(bounds)).await,
+            _ => self.upload_picked(name, None, Some(bounds)).await,
+        }
     }
 
     pub fn new(store: Arc<Mutex<Store>>, hub: Arc<Hub>, secret_service: String, data_dir: PathBuf, endpoints: Endpoints) -> Arc<Self> {
@@ -504,7 +602,7 @@ impl Qsl {
 
     /// Uploads everything pending to QRZ, Club Log or eQSL.
     pub async fn upload(&self, name: &str) -> Run {
-        self.upload_some(name, None).await
+        self.upload_picked(name, None, None).await
     }
 
     /// Uploads the given QSOs (whatever their sent status) to a configured service.
@@ -517,7 +615,7 @@ impl Qsl {
             self.set_run(LOTW.name, run.clone());
             return run;
         }
-        self.upload_some(name, Some(ids)).await
+        self.upload_picked(name, Some(ids), None).await
     }
 
     /// Services that are set up well enough to upload to, for the log's right-click menu.
@@ -539,7 +637,7 @@ impl Qsl {
         out
     }
 
-    async fn upload_some(&self, name: &str, only: Option<&[i64]>) -> Run {
+    async fn upload_picked(&self, name: &str, only: Option<&[i64]>, bounds: Option<(i64, i64)>) -> Run {
         let svc = match name {
             "qrz" => &QRZ,
             "clublog" => &CLUBLOG,
@@ -548,7 +646,7 @@ impl Qsl {
         };
         let _busy = self.busy.lock().await;
         self.set_run(svc.name, Run { running: true, at: Utc::now().timestamp(), ..Run::default() });
-        let run = self.upload_service(svc, only).await;
+        let run = self.upload_service(svc, only, bounds).await;
         self.set_run(svc.name, run.clone());
         run
     }
@@ -563,7 +661,7 @@ impl Qsl {
             .or_else(|| self.secret("clublog-app-key"))
     }
 
-    async fn upload_service(&self, svc: &Service, only: Option<&[i64]>) -> Run {
+    async fn upload_service(&self, svc: &Service, only: Option<&[i64]>, bounds: Option<(i64, i64)>) -> Run {
         let mut run = Run { at: Utc::now().timestamp(), ..Run::default() };
         let cfg = self.config();
         let (calls, date) = match svc.name {
@@ -619,7 +717,10 @@ impl Qsl {
                         return Ok(all);
                     }
                     for log in st.list_logs()? {
-                        all.extend(st.pending_uploads(log.id, svc.status_key, std::slice::from_ref(call), None, since(date), BATCH)?);
+                        all.extend(match bounds {
+                            Some((a, b)) => st.pending_uploads_between(log.id, svc.status_key, std::slice::from_ref(call), None, a, b, 100_000)?,
+                            None => st.pending_uploads(log.id, svc.status_key, std::slice::from_ref(call), None, since(date), BATCH)?,
+                        });
                     }
                     Ok(all)
                 })
@@ -688,6 +789,8 @@ impl Qsl {
         let name: &'static str = match name {
             "lotw" => "lotw",
             "eqsl" => "eqsl",
+            "qrz" => "qrz",
+            "clublog" => "clublog",
             _ => return Download { error: Some(format!("unknown service {name}")), ..Download::default() },
         };
         let _busy = self.busy.lock().await;
@@ -701,33 +804,77 @@ impl Qsl {
     async fn download_service(&self, name: &'static str) -> Download {
         let mut d = Download { at: Utc::now().timestamp(), ..Download::default() };
         let cfg = self.config();
-        let (service, records, next_since) = if name == "lotw" {
-            let Some(password) = self.secret("lotw-password").filter(|_| !cfg.lotw_username.is_empty()) else {
-                d.error = Some("enter your LoTW website username and password first".into());
-                return d;
-            };
-            match confirm::lotw_confirmations(&self.endpoints.lotw_report, &cfg.lotw_username, &password, None, &cfg.lotw_rcvd_since).await {
-                Ok(r) => {
-                    let next = r.last_qsl.as_deref().and_then(|t| t.get(..10)).map(str::to_string);
-                    (ConfirmService::Lotw, r.records, next)
-                }
-                Err(e) => {
-                    d.error = Some(e.to_string());
+        let today_iso = || Utc::now().format("%Y-%m-%d").to_string();
+        let (service, records, next_since) = match name {
+            "lotw" => {
+                let Some(password) = self.secret("lotw-password").filter(|_| !cfg.lotw_username.is_empty()) else {
+                    d.error = Some("enter your LoTW website username and password first".into());
                     return d;
+                };
+                match confirm::lotw_confirmations(&self.endpoints.lotw_report, &cfg.lotw_username, &password, None, &cfg.lotw_rcvd_since).await {
+                    Ok(r) => {
+                        let next = r.last_qsl.as_deref().and_then(|t| t.get(..10)).map(str::to_string);
+                        (ConfirmService::Lotw, r.records, next)
+                    }
+                    Err(e) => {
+                        d.error = Some(e.to_string());
+                        return d;
+                    }
                 }
             }
-        } else {
-            let Some(password) = self.secret("eqsl-password").filter(|_| !cfg.eqsl_username.is_empty()) else {
-                d.error = Some("enter your eQSL username and password first".into());
-                return d;
-            };
-            let nick = Some(cfg.eqsl_nickname.as_str()).filter(|n| !n.is_empty());
-            match confirm::eqsl_confirmations(&self.endpoints.eqsl_inbox, &cfg.eqsl_username, &password, nick, &cfg.eqsl_rcvd_since).await {
-                Ok(r) => (ConfirmService::Eqsl, r, Some(Utc::now().format("%Y-%m-%d").to_string())),
-                Err(e) => {
-                    d.error = Some(e.to_string());
+            "eqsl" => {
+                let Some(password) = self.secret("eqsl-password").filter(|_| !cfg.eqsl_username.is_empty()) else {
+                    d.error = Some("enter your eQSL username and password first".into());
+                    return d;
+                };
+                let nick = Some(cfg.eqsl_nickname.as_str()).filter(|n| !n.is_empty());
+                match confirm::eqsl_confirmations(&self.endpoints.eqsl_inbox, &cfg.eqsl_username, &password, nick, &cfg.eqsl_rcvd_since).await {
+                    Ok(r) => (ConfirmService::Eqsl, r, Some(today_iso())),
+                    Err(e) => {
+                        d.error = Some(e.to_string());
+                        return d;
+                    }
+                }
+            }
+            "qrz" => {
+                // One logbook per callsign that has an API key.
+                let keys: Vec<String> = cfg.qrz_calls.iter().filter_map(|c| self.secret(&qrz_secret(c))).collect();
+                if keys.is_empty() {
+                    d.error = Some("enter a QRZ Logbook API key and tick its callsign first".into());
                     return d;
                 }
+                let mut all = Vec::new();
+                for key in keys {
+                    match confirm::qrz_confirmations(&self.endpoints.qrz, &key, &cfg.qrz_rcvd_since).await {
+                        Ok(r) => all.extend(r),
+                        Err(e) => {
+                            d.error = Some(e.to_string());
+                            return d;
+                        }
+                    }
+                }
+                (ConfirmService::Qrz, all, Some(today_iso()))
+            }
+            _ => {
+                let (Some(password), Some(app_key)) = (self.secret("clublog-password").filter(|_| !cfg.clublog_email.is_empty()), self.clublog_app_key()) else {
+                    d.error = Some("enter your Club Log email and password first".into());
+                    return d;
+                };
+                if cfg.clublog_calls.is_empty() {
+                    d.error = Some("tick a callsign on the Club Log page first".into());
+                    return d;
+                }
+                let mut all = Vec::new();
+                for call in &cfg.clublog_calls {
+                    match confirm::clublog_matches(&self.endpoints.clublog_matches, &cfg.clublog_email, &password, call, &app_key, &cfg.clublog_rcvd_since).await {
+                        Ok(r) => all.extend(r),
+                        Err(e) => {
+                            d.error = Some(format!("{call}: {e}"));
+                            return d;
+                        }
+                    }
+                }
+                (ConfirmService::ClubLog, all, Some(today_iso()))
             }
         };
         let updates: Vec<_> = records
@@ -738,12 +885,17 @@ impl Qsl {
             })
             .collect();
         let cty = self.hub.cty();
-        let source = if name == "lotw" { Source::Lotw } else { Source::Eqsl };
+        // Only LoTW and eQSL confirmations count toward awards.
+        let source = match name {
+            "lotw" => Some(Source::Lotw),
+            "eqsl" => Some(Source::Eqsl),
+            _ => None,
+        };
         let stats = self.db(|st| {
             let logs: Vec<i64> = st.list_logs()?.iter().map(|l| l.id).collect();
             // The award cells as they stand, to tell which confirmations fill one for the first time.
             let mut cells = HashMap::new();
-            if !updates.is_empty() {
+            if !updates.is_empty() && source.is_some() {
                 for &id in &logs {
                     cells.insert(id, st.award_index(id, |c| cty_facts(cty.as_deref(), c))?.1);
                 }
@@ -751,7 +903,7 @@ impl Qsl {
             let mut stats = st.apply_confirmations(&logs, updates, confirm::same_qso)?;
             let mut seen = HashSet::new();
             for (log_id, fields) in std::mem::take(&mut stats.changed) {
-                let Some(index) = cells.get_mut(&log_id) else { continue };
+                let (Some(index), Some(source)) = (cells.get_mut(&log_id), source) else { continue };
                 let qso = AwardQso::from_fields(&fields, |c| cty_facts(cty.as_deref(), c));
                 for mut n in index.confirmed(&qso, source) {
                     if n.award == Award::Dxcc {
@@ -781,10 +933,11 @@ impl Qsl {
         }
         if let Some(next) = next_since {
             let mut c = self.config();
-            if name == "lotw" {
-                c.lotw_rcvd_since = next;
-            } else {
-                c.eqsl_rcvd_since = next;
+            match name {
+                "lotw" => c.lotw_rcvd_since = next,
+                "eqsl" => c.eqsl_rcvd_since = next,
+                "qrz" => c.qrz_rcvd_since = next,
+                _ => c.clublog_rcvd_since = next,
             }
             if let Ok(text) = serde_json::to_string(&c) {
                 let _ = self.db(|st| st.set_setting("qsl", &text));
@@ -799,13 +952,9 @@ impl Qsl {
     }
 
     /// Signs and uploads pending QSOs to LoTW with TQSL, one station location at a time.
-    /// With `range` (first and last day, YYYY-MM-DD, both included) it sends every QSO
-    /// in that range that isn't marked sent, whatever the "QSOs from" date says.
-    pub async fn upload_lotw(&self, range: Option<(&str, &str)>) -> Run {
-        let bounds = match range.map(|(a, b)| day_range(a, b)).transpose() {
-            Ok(b) => b,
-            Err(e) => return Run { error: Some(e), at: Utc::now().timestamp(), ..Run::default() },
-        };
+    /// With `bounds` (Unix seconds, end exclusive) it sends every QSO in that range that
+    /// isn't marked sent, whatever the "QSOs from" date says.
+    pub async fn upload_lotw(&self, bounds: Option<(i64, i64)>) -> Run {
         let _busy = self.busy.lock().await;
         self.set_run(LOTW.name, Run { running: true, at: Utc::now().timestamp(), ..Run::default() });
         let run = self.lotw_run(bounds, None).await;

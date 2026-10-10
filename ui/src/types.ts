@@ -202,7 +202,9 @@ export interface ClusterNode { name: string; host: string; port: number; login: 
 export interface ClusterConfig { nodes: ClusterNode[]; auto_connect: boolean; spot_max_minutes: number; spot_comment: string }
 export interface ClusterSnapshot { home?: Entity | null; config: ClusterConfig; state: string; connected: boolean; spots: Spot[]; lines: string[] }
 
-export interface LotwWaiting { locations: { mapping: LotwMapping; waiting: number }[] }
+/** A QSO waiting to be sent to a service. */
+export interface QueueRow { id: number; call: string; date: string; time: string; band: string; mode: string; station: string }
+export interface QslQueue { total: number; rows: QueueRow[] }
 export interface QslRun { at: number; running: boolean; uploaded: number; duplicates: number; rejected: string[]; error: string | null }
 export interface LotwMapping { callsign: string; location_id: number; station_location: string }
 export interface QslConfig {
@@ -234,6 +236,8 @@ export interface QslConfig {
   eqsl_nickname: string;
   eqsl_calls: string[];
   eqsl_rcvd_since: string;
+  qrz_rcvd_since: string;
+  clublog_rcvd_since: string;
   confirm_daily: boolean;
   lotw_download_enabled: boolean;
   lotw_download_interval_min: number;
@@ -247,7 +251,7 @@ export interface QslOverview {
   secrets: { qrz_calls: string[]; clublog_password: boolean; lotw_password: boolean; eqsl_password: boolean };
   pending: { qrz: number; clublog: number; eqsl: number; lotw: { mapping: LotwMapping; pending: number }[] };
   runs: Partial<Record<QslService, QslRun>>;
-  downloads: Partial<Record<"lotw" | "eqsl", QslDownload>>;
+  downloads: Partial<Record<QslService, QslDownload>>;
   tqsl: { path: string | null; found: boolean; locations: string[] };
 }
 export interface QslSecrets { qrz_keys?: Record<string, string>; clublog_password?: string; lotw_password?: string; eqsl_password?: string }

@@ -19,6 +19,9 @@ pub const EQSL_INBOX_ENDPOINT: &str = "https://www.eqsl.cc/qslcard/DownloadInBox
 /// Production eQSL ADIF upload endpoint.
 pub const EQSL_UPLOAD_ENDPOINT: &str = "https://www.eqsl.cc/qslcard/ImportADIF.cfm";
 
+/// Production Club Log log-match endpoint.
+pub const CLUBLOG_MATCHES_ENDPOINT: &str = "https://clublog.org/getmatches.php";
+
 /// How far apart the log's and the service's QSO start times may be.
 const TIME_SLACK_SECS: i64 = 30 * 60;
 
@@ -27,6 +30,10 @@ const TIME_SLACK_SECS: i64 = 30 * 60;
 pub enum Service {
     Lotw,
     Eqsl,
+    /// QRZ Logbook, which also shows the LoTW confirmations it knows of.
+    Qrz,
+    /// Club Log's log matches (both stations upload to Club Log).
+    ClubLog,
 }
 
 /// A LoTW confirmation report.
@@ -149,6 +156,143 @@ pub async fn eqsl_confirmations(
     let url = base.join(&href).map_err(|e| QslError::Service(format!("eQSL file link {href:?}: {e}")))?;
     let adi = get_text(&http, url.as_str(), "eQSL").await?;
     Ok(adif::parse(adi.as_bytes()).records)
+}
+
+/// Downloads the QSOs QRZ Logbook reports as confirmed (QRZ.com's own match, or
+/// LoTW's, which QRZ honors) for the logbook that `api_key` belongs to. `since`
+/// (YYYY-MM-DD; empty for all) limits it to QSOs QRZ changed since then.
+pub async fn qrz_confirmations(endpoint: &str, api_key: &str, since: &str) -> Result<Vec<Fields>, QslError> {
+    const PAGE: usize = 1000;
+    let http = download_client();
+    let mut out: Vec<Fields> = Vec::new();
+    let mut after = 0u64;
+    loop {
+        let mut opt = format!("TYPE:ADIF,STATUS:CONFIRMED,MAX:{PAGE}");
+        if after > 0 {
+            opt.push_str(&format!(",AFTERLOGID:{after}"));
+        }
+        if let Some(d) = Some(since.trim()).filter(|d| !d.is_empty()) {
+            opt.push_str(&format!(",MODSINCE:{d}"));
+        }
+        let body = form_encode(&[("KEY", api_key.trim()), ("ACTION", "FETCH"), ("OPTION", &opt)]);
+        let resp = http
+            .post(endpoint)
+            .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await
+            .map_err(|e| QslError::Network(format!("QRZ: {}", e.without_url())))?;
+        let status = resp.status();
+        let text = resp.text().await.map_err(|e| QslError::Network(format!("QRZ: {}", e.without_url())))?;
+        if !status.is_success() {
+            return Err(QslError::Service(format!("QRZ HTTP {status}: {}", visible_text(&text))));
+        }
+        let (head, adi) = match text.find("ADIF=") {
+            Some(i) => (&text[..i], Some(&text[i + 5..])),
+            None => (text.as_str(), None),
+        };
+        let result = head.split('&').find_map(|p| p.strip_prefix("RESULT=")).unwrap_or("");
+        let reason = head.split('&').find_map(|p| p.strip_prefix("REASON=")).unwrap_or("").replace('+', " ");
+        match result {
+            "OK" => {}
+            // No QSOs matched.
+            "FAIL" if reason.to_ascii_lowercase().contains("no log entries") || reason.to_ascii_lowercase().contains("no matching") => break,
+            "AUTH" => return Err(QslError::Auth(if reason.is_empty() { "invalid QRZ API key".into() } else { reason })),
+            "FAIL" if reason.to_ascii_lowercase().contains("key") => return Err(QslError::Auth(reason)),
+            other => return Err(QslError::Service(format!("QRZ {other}: {reason}"))),
+        }
+        let records = adi.map(qrz_adif).map(|a| adif::parse(a.as_bytes()).records).unwrap_or_default();
+        let n = records.len();
+        let top = records.iter().filter_map(|r| r.get("APP_QRZLOG_LOGID").and_then(|v| v.trim().parse::<u64>().ok())).max().unwrap_or(0);
+        out.extend(records);
+        if n < PAGE || top <= after {
+            break;
+        }
+        after = top;
+    }
+    Ok(out)
+}
+
+/// QRZ sends the ADIF text URL-encoded, or with its angle brackets as HTML entities.
+fn qrz_adif(raw: &str) -> String {
+    let mut s = raw.trim().to_string();
+    if !s.contains('<') {
+        s = crate::qsl::url_decode(&s);
+    }
+    if !s.contains('<') {
+        s = s.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&");
+    }
+    s
+}
+
+/// Downloads Club Log's log matches for one of the account's callsigns: QSOs Club Log
+/// matched against the other station's log. `since` (YYYY-MM-DD; empty for all) is the
+/// day the match was made; the day before is included in case a match landed late.
+/// Each match comes back as a QSO record with a date, a band and a mode (the time of
+/// day is only good to 15 minutes).
+pub async fn clublog_matches(
+    endpoint: &str,
+    email: &str,
+    password: &str,
+    callsign: &str,
+    app_key: &str,
+    since: &str,
+) -> Result<Vec<Fields>, QslError> {
+    let mut q = vec![("api", app_key.trim()), ("email", email.trim()), ("password", password), ("callsign", callsign.trim())];
+    let from = NaiveDate::parse_from_str(since.trim(), "%Y-%m-%d").ok().map(|d| d - chrono::Duration::days(1));
+    let (y, m, d);
+    if let Some(f) = from {
+        use chrono::Datelike;
+        (y, m, d) = (f.year().to_string(), f.month().to_string(), f.day().to_string());
+        q.extend([("startyear", y.as_str()), ("startmonth", m.as_str()), ("startday", d.as_str())]);
+    }
+    let resp = download_client()
+        .get(with_query(endpoint, &q))
+        .send()
+        .await
+        .map_err(|e| QslError::Network(format!("Club Log: {}", e.without_url())))?;
+    let status = resp.status();
+    let text = resp.text().await.map_err(|e| QslError::Network(format!("Club Log: {}", e.without_url())))?;
+    let text = text.trim();
+    if status.as_u16() == 403 || status.as_u16() == 401 {
+        let why = visible_text(text);
+        return Err(QslError::Auth(if why.is_empty() {
+            "Club Log refused the login (matches need an application password)".into()
+        } else {
+            format!("{why} (matches need a Club Log application password)")
+        }));
+    }
+    if !status.is_success() {
+        return Err(QslError::Service(format!("Club Log HTTP {status}: {}", visible_text(text))));
+    }
+    let rows: Vec<Vec<serde_json::Value>> =
+        serde_json::from_str(text).map_err(|_| QslError::Service(format!("Club Log: {}", visible_text(text))))?;
+    let col = |r: &[serde_json::Value], i: usize| r.get(i).and_then(|v| v.as_str().map(str::to_string).or_else(|| v.as_i64().map(|n| n.to_string())));
+    Ok(rows
+        .iter()
+        .filter_map(|r| {
+            let call = col(r, 0)?;
+            let when = chrono::NaiveDateTime::parse_from_str(&col(r, 2)?, "%Y-%m-%d %H:%M:%S").ok()?;
+            let mut f = Fields::new();
+            f.insert("CALL".into(), call);
+            f.insert("QSO_DATE".into(), when.format("%Y%m%d").to_string());
+            f.insert("TIME_ON".into(), when.format("%H%M%S").to_string());
+            f.insert("BAND".into(), clublog_band(&col(r, 3)?)?);
+            // A match with no mode (JSON false) can't be matched to a QSO, so it is left out.
+            f.insert("MODE".into(), col(r, 4)?);
+            Some(f)
+        })
+        .collect())
+}
+
+/// Club Log's band id (a wavelength in metres, or centimetres for the UHF bands) as an ADIF band.
+fn clublog_band(id: &str) -> Option<String> {
+    let n: u32 = id.trim().parse().ok()?;
+    Some(match n {
+        222 => "1.25m".to_string(),
+        70 | 33 | 23 | 13 => format!("{n}cm"),
+        _ => format!("{n}m"),
+    })
 }
 
 /// Uploads one QSO to eQSL.
@@ -358,14 +502,21 @@ pub fn confirmation_updates(service: Service, rec: &Fields) -> ConfirmUpdate {
             &["DXCC", "STATE", "CQZ", "ITUZ", "GRIDSQUARE", "CNTY", "IOTA", "PFX"],
         ),
         Service::Eqsl => ("EQSL_QSL_RCVD", "EQSL_QSLRDATE", &["QSLRDATE", "EQSL_QSLRDATE", "RCVD_DATE"], &["GRIDSQUARE"]),
+        Service::Qrz => ("QRZCOM_QSO_DOWNLOAD_STATUS", "QRZCOM_QSO_DOWNLOAD_DATE", &["QRZCOM_QSO_DOWNLOAD_DATE"], &["GRIDSQUARE", "STATE", "CQZ", "ITUZ"]),
+        Service::ClubLog => ("APP_QRZERO_CLUBLOG_RCVD", "APP_QRZERO_CLUBLOG_RDATE", &[], &[]),
     };
     let mut set = Fields::new();
     // A confirmed QSO is on the service, so it counts as sent too (the date only if blank).
-    set.insert(rcvd.replace("RCVD", "SENT"), "Y".into());
+    let (sent, sent_date) = match service {
+        Service::Qrz => ("QRZCOM_QSO_UPLOAD_STATUS".to_string(), "QRZCOM_QSO_UPLOAD_DATE".to_string()),
+        Service::ClubLog => ("CLUBLOG_QSO_UPLOAD_STATUS".to_string(), "CLUBLOG_QSO_UPLOAD_DATE".to_string()),
+        _ => (rcvd.replace("RCVD", "SENT"), date_key.replace("RDATE", "SDATE")),
+    };
+    set.insert(sent, "Y".into());
     set.insert(rcvd.into(), "Y".into());
     set.insert(date_key.into(), date_field(rec, date_sources).unwrap_or_else(today));
     let mut fill: Fields = fill_keys.iter().filter_map(|k| nonempty(rec, k).map(|v| (k.to_string(), v.to_string()))).collect();
-    fill.insert(date_key.replace("RDATE", "SDATE"), today());
+    fill.insert(sent_date, today());
     ConfirmUpdate { set, fill }
 }
 
@@ -387,6 +538,21 @@ mod tests {
         let html = "<html><head><style>p{}</style><script>var a='<b>';</script></head><body><P>Error:&nbsp; No  such\nUsername</P></body></html>";
         assert_eq!(visible_text(html), "Error: No such Username");
         assert_eq!(visible_text(&"x ".repeat(300)).chars().count(), 201);
+    }
+
+    #[test]
+    fn qrz_adif_comes_either_way() {
+        assert_eq!(qrz_adif("&lt;CALL:4&gt;W1AW &lt;EOR&gt;"), "<CALL:4>W1AW <EOR>");
+        assert_eq!(qrz_adif("%3CCALL%3A4%3EW1AW+%3CEOR%3E"), "<CALL:4>W1AW <EOR>");
+        assert_eq!(qrz_adif("<CALL:4>W1AW <EOR>"), "<CALL:4>W1AW <EOR>");
+    }
+
+    #[test]
+    fn club_log_band_ids() {
+        assert_eq!(clublog_band("20").as_deref(), Some("20m"));
+        assert_eq!(clublog_band("70").as_deref(), Some("70cm"));
+        assert_eq!(clublog_band("222").as_deref(), Some("1.25m"));
+        assert_eq!(clublog_band("x"), None);
     }
 
     #[test]

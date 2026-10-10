@@ -168,7 +168,7 @@ export default function App() {
           if (e.call) setNotice(e.added ? `Logged ${e.call} from ${e.source}` : `${e.call} from ${e.source} was already in the log`);
         }
         if (e.type === "error") setNotice(e.message);
-        if (e.type === "qsl_download" && e.run.auto && !e.run.running && !e.run.error && e.run.confirmed > 0) {
+        if (e.type === "qsl_download" && (e.service === "lotw" || e.service === "eqsl") && e.run.auto && !e.run.running && !e.run.error && e.run.confirmed > 0) {
           const n = newConfirmLines(e.run, e.service).length;
           const who = e.service === "lotw" ? "LoTW" : "eQSL";
           const got = `${e.run.confirmed} new confirmation${e.run.confirmed === 1 ? "" : "s"}`;
