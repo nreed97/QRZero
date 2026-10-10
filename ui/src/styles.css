@@ -676,3 +676,7 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 .new-confirms td { padding: 1px 12px 1px 0; }
 .club-sessions { margin: 4px 8px; }
 .club-sessions summary { cursor: pointer; }
+
+/* "Saved." stays about 2 seconds, then fades out. */
+.fades { animation: fade-out 0.6s ease 2s forwards; }
+@keyframes fade-out { to { opacity: 0; visibility: hidden; } }

@@ -237,7 +237,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.locator("select[aria-label=Format]")).toHaveValue("pst");
   await page.getByRole("button", { name: "Send test" }).click();
   await expect(page.locator("pre.udp-sent")).toHaveText("<PST><AZIMUTH>45</AZIMUTH></PST>");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Saved.")).toBeVisible();
   await page.getByRole("button", { name: "Startup programs" }).click();
   await page.getByRole("button", { name: "UDP connections" }).click();
@@ -261,24 +261,29 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("textbox", { name: "CW" }).fill("579");
   await page.getByRole("button", { name: "Reset these options" }).click();
   await expect(page.getByRole("textbox", { name: "CW" })).toHaveValue("");
-  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
 
   // With no cluster set up, the Cluster pane sends you to Settings to add one.
   await page.getByRole("tab", { name: "Cluster" }).click();
   await page.getByRole("button", { name: "Add a cluster…" }).click();
   await page.getByRole("button", { name: "VE7CC" }).click();
   await expect(page.locator("input[aria-label=Host]").first()).toHaveValue("dxc.ve7cc.net");
-  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   await page.getByRole("tab", { name: "Log", exact: true }).click();
 
   // QSL uploads: keys are saved, never shown back.
   await fromMenu(page, /^QSL:/);
   await page.getByRole("button", { name: "QRZ Logbook" }).click();
   await page.getByLabel("QRZ API key for N0OLD").fill("ABCD-1234");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Saved.")).toBeVisible();
   await expect(page.getByLabel("QRZ API key for N0OLD")).toHaveAttribute("placeholder", "API key saved");
-  await page.getByRole("button", { name: "Close" }).click();
+  // The note fades away, so a second save shows it again; Save and close saves and closes.
+  await expect(page.getByText("Saved.")).toBeHidden({ timeout: 6000 });
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Saved.")).toBeVisible();
+  await page.getByRole("button", { name: "Save and close" }).click();
+  await expect(page.getByRole("button", { name: "Save and close" })).toHaveCount(0);
 
   // Paper cards: queue one from the log, then find it in QSL, Cards to send.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click();
@@ -292,7 +297,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByLabel("Group by").selectOption("bureau");
   await expect(page.locator(".paper-queue .pile")).toContainText("1 card");
   await page.getByLabel("Group by").selectOption("none");
-  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
 
   // Reply list: add from the log's right-click menu, jot a note, mark it replied.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click({ button: "right" });
@@ -305,7 +310,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "Replied" }).click();
   await page.getByRole("button", { name: "Just remove" }).click();
   await expect(page.getByText("Nothing waiting for a reply.")).toBeVisible();
-  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
 
   // QSL Detail Lookup: type a call, Enter, results with the queued card.
   await fromMenu(page, /^QSL Detail Lookup/);
@@ -342,7 +347,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
     await page.getByRole("button", { name: "Save" }).click();
   }
   await expect(page.locator(".tree .item", { hasText: "Hex beam" })).toContainText("20 15 m");
-  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   const ant = page.getByTestId("gear-antenna");
   const bandPick = page.locator(".entry label.f", { has: page.locator("span", { hasText: /^Band$/ }) }).locator("select");
   await bandPick.selectOption("20m");
@@ -420,7 +425,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "Set up fields for CW" }).click();
   await page.getByLabel("Add a field to line 2").selectOption("SKCC");
   await page.getByRole("button", { name: "Add", exact: true }).first().click();
-  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   await page.locator("label.f", { has: page.locator("span", { hasText: "Mode" }) }).locator("select").selectOption("CW");
   await expect(page.getByLabel("SKCC")).toBeVisible();
   await page.locator("label.f", { has: page.locator("span", { hasText: "Mode" }) }).locator("select").selectOption("SSB");
@@ -446,7 +451,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "Cancel restore" }).click();
   await expect(page.getByText("Restore cancelled.")).toBeVisible();
   await expect(page.getByText("Restart QRZero to finish restoring.")).toHaveCount(0);
-  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
 
   // CW club awards: 100 SKCC members make a Centurion; ten calls in a CWT hour make a CWops test point.
   const adifField = (name: string, v: string) => `<${name}:${v.length}>${v}`;
@@ -494,7 +499,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("checkbox", { name: /^NAQCC/ }).uncheck();
   await page.getByRole("checkbox", { name: /^FISTS/ }).uncheck();
   await page.screenshot({ path: "e2e-results/settings-awards.png" });
-  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   await page.getByRole("tab", { name: "Awards" }).click();
   await expect(page.getByRole("button", { name: "WAZ" })).toBeVisible();
   await expect(page.getByRole("button", { name: "SKCC" })).toHaveCount(0);
@@ -505,7 +510,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await fromMenu(page, "Settings…");
   await page.getByRole("button", { name: "Awards", exact: true }).click();
   await page.getByRole("button", { name: "Select all" }).click();
-  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   await expect(page.getByRole("button", { name: "SKCC" })).toBeVisible();
   await expect(page.getByRole("button", { name: "NAQCC" })).toBeVisible();
   await expect(page.getByRole("button", { name: "FISTS" })).toBeVisible();

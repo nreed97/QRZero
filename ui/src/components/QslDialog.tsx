@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { onLive } from "../live";
 import type { Location, QslConfig, QslDownload, QslOverview, QslRun, QslService, StationCallsign } from "../types";
+import SaveBar from "./SaveBar";
 import Modal from "./Modal";
 import PaperQsl from "./PaperQsl";
 import QslLookup from "./QslLookup";
@@ -90,12 +91,11 @@ export default function QslDialog(props: Props & { tab?: Tab }) {
   );
 }
 
-function Online({ callsigns, locations }: Props) {
+function Online({ callsigns, locations, onClose }: Props) {
   const [o, setO] = useState<QslOverview | null>(null);
   const [cfg, setCfg] = useState<QslConfig | null>(null);
   const [qrzKeys, setQrzKeys] = useState<Record<string, string>>({});
   const [clPassword, setClPassword] = useState("");
-  const [clKey, setClKey] = useState("");
   const [lotwPassword, setLotwPassword] = useState("");
   const [eqslPassword, setEqslPassword] = useState("");
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -144,7 +144,6 @@ function Online({ callsigns, locations }: Props) {
       const secrets = {
         qrz_keys: Object.fromEntries(Object.entries(qrzKeys).filter(([, v]) => v.trim())),
         ...(clPassword ? { clublog_password: clPassword } : {}),
-        ...(clKey ? { clublog_app_key: clKey } : {}),
         ...(lotwPassword ? { lotw_password: lotwPassword } : {}),
         ...(eqslPassword ? { eqsl_password: eqslPassword } : {}),
       };
@@ -153,12 +152,13 @@ function Online({ callsigns, locations }: Props) {
       setCfg(r.config);
       setQrzKeys({});
       setClPassword("");
-      setClKey("");
       setLotwPassword("");
       setEqslPassword("");
       setMsg({ text: "Saved.", ok: true });
+      return true;
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
+      return false;
     }
   };
 
@@ -355,7 +355,6 @@ function Online({ callsigns, locations }: Props) {
           <div className="row">
             <label className="f w-l"><span>Club Log email</span><input value={cfg.clublog_email} onChange={(e) => set({ clublog_email: e.target.value })} /></label>
             <label className="f w-m"><span>Password</span><input type="password" value={clPassword} placeholder={o.secrets.clublog_password ? "saved" : ""} onChange={(e) => setClPassword(e.target.value)} /></label>
-            <label className="f w-l"><span>Club Log API key</span><input type="password" value={clKey} placeholder={o.secrets.clublog_app_key ? "saved" : "from clublog.org"} onChange={(e) => setClKey(e.target.value)} /></label>
           </div>
           <div className="row">
             <span className="muted small">Callsigns:</span>
@@ -409,11 +408,7 @@ function Online({ callsigns, locations }: Props) {
         </fieldset>
         )}
 
-        <div className="row">
-          <span className="spacer" />
-          {msg && <span className={msg.ok ? "ok" : "err"}>{msg.text}</span>}
-          <button className="primary" onClick={save}>Save</button>
-        </div>
+        <SaveBar msg={msg} onSave={save} onClose={onClose} />
       </div>
   );
 }
