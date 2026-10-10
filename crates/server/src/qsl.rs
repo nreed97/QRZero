@@ -355,7 +355,6 @@ impl Qsl {
             "secrets": {
                 "qrz_calls": qrz_keys,
                 "clublog_password": self.secret("clublog-password").is_some(),
-                "clublog_app_key": self.secret("clublog-app-key").is_some(),
                 "lotw_password": self.secret("lotw-password").is_some(),
                 "eqsl_password": self.secret("eqsl-password").is_some(),
             },
@@ -445,6 +444,16 @@ impl Qsl {
         run
     }
 
+    /// The Club Log application key: built into release builds (`CLUBLOG_API_KEY` at
+    /// compile time). A key an earlier version saved from the user is the fallback.
+    fn clublog_app_key(&self) -> Option<String> {
+        option_env!("CLUBLOG_API_KEY")
+            .map(str::trim)
+            .filter(|k| !k.is_empty())
+            .map(String::from)
+            .or_else(|| self.secret("clublog-app-key"))
+    }
+
     async fn upload_service(&self, svc: &Service) -> Run {
         let mut run = Run { at: Utc::now().timestamp(), ..Run::default() };
         let cfg = self.config();
@@ -454,7 +463,7 @@ impl Qsl {
             _ => (&cfg.clublog_calls, &cfg.clublog_since),
         };
         let eqsl_password = self.secret("eqsl-password");
-        let (password, app_key) = (self.secret("clublog-password"), self.secret("clublog-app-key"));
+        let (password, app_key) = (self.secret("clublog-password"), self.clublog_app_key());
         for call in calls {
             enum Client {
                 Qrz(QrzLogbook),
@@ -478,7 +487,11 @@ impl Qsl {
                 match (&password, &app_key) {
                     (Some(p), Some(k)) if !cfg.clublog_email.is_empty() => Client::ClubLog(ClubLog::new(&self.endpoints.clublog, &cfg.clublog_email, p, call, k)),
                     _ => {
-                        run.error = Some("Club Log needs your email, password and an API key".into());
+                        run.error = Some(if app_key.is_none() && password.is_some() && !cfg.clublog_email.is_empty() {
+                            "this build of QRZero has no Club Log application key yet".into()
+                        } else {
+                            "Club Log needs your email and password".into()
+                        });
                         return run;
                     }
                 }
@@ -766,6 +779,8 @@ pub struct SecretsUpdate {
     /// API keys by station callsign; an empty key removes it.
     pub qrz_keys: BTreeMap<String, String>,
     pub clublog_password: Option<String>,
+    /// Not shown in the UI: Club Log's application key is built into the app. Kept so a key can
+    /// still be supplied through the API (and so older saved keys keep working).
     pub clublog_app_key: Option<String>,
     pub lotw_password: Option<String>,
     pub eqsl_password: Option<String>,
