@@ -527,25 +527,6 @@ table.list th { text-align: left; font-size: 12px; font-weight: 600; padding: 2p
   .label-page:not(:last-child) { break-after: page; }
   .sheet-5160 .label-page { grid-template-columns: repeat(3, 2.625in); grid-auto-rows: 1in; column-gap: 0.125in; padding-left: 0.1875in; }
   .sheet-5163 .label-page { grid-template-columns: repeat(2, 4in); grid-auto-rows: 2in; column-gap: 0.1875in; padding-left: 0.156in; }
-  .roll .label-page { display: block; padding: 0; }
-  .roll .label { width: 100vw; height: 100vh; padding: 1.5mm 3mm; }
-  .sheet-dk1201 .label td, .sheet-dk1209 .label td { font-size: 8pt; }
-  .sheet-dk1209 .label td { font-size: 7pt; }
-  .sheet-dk1202 .label-to { font-size: 16pt; margin-bottom: 3pt; }
-  .sheet-dk1202 .label td { font-size: 11pt; }
-  .sheet-dk1202 .label-foot { font-size: 10pt; margin-top: 4pt; }
-  .sheet-dk22223 .label { position: relative; padding: 2.5mm 3mm; font-family: Consolas, "DejaVu Sans Mono", "Courier New", monospace; }
-  .card-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3mm; }
-  .card-head span { font-size: 7.5pt; }
-  .card-head b { font-size: 21pt; }
-  .sheet-dk22223 .label table { border-top: 0; }
-  .sheet-dk22223 .label th { font-size: 7.5pt; font-weight: bold; text-transform: none; border-bottom: 0.7mm solid #000; padding-bottom: 0.5mm; }
-  .sheet-dk22223 .label td { font-size: 10.5pt; padding-top: 1mm; }
-  .sheet-dk22223 .label th:nth-child(1), .sheet-dk22223 .label td:nth-child(1) { width: 26%; }
-  .sheet-dk22223 .label th:nth-child(2), .sheet-dk22223 .label td:nth-child(2) { width: 17%; }
-  .sheet-dk22223 .label th:nth-child(3), .sheet-dk22223 .label td:nth-child(3) { width: 20%; }
-  .sheet-dk22223 .label th:nth-child(4), .sheet-dk22223 .label td:nth-child(4) { width: 19%; }
-  .card-foot { position: absolute; left: 3mm; right: 3mm; bottom: 2.5mm; border-top: 0.7mm solid #000; padding-top: 1mm; font-size: 8pt; }
   .label { overflow: hidden; padding: 0.08in 0.12in; box-sizing: border-box; }
   .label-to { font-size: 11pt; }
   .sheet-5163 .label-to { font-size: 14pt; margin-bottom: 2pt; }
@@ -640,6 +621,15 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 .mode-key span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 3px; border-radius: 1px; background: var(--k); }
 
 .ql-list { max-height: 230px; overflow: auto; border: 1px solid var(--line); }
+.ql-list tr.sel td { background: var(--row-sel); }
+.ql-list tbody tr { cursor: default; }
+.ql-bottom { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.2fr); gap: 12px; align-items: start; }
+.ql-msg { min-height: 1.4em; margin: 4px 0; }
+.ql details.more summary { cursor: pointer; color: var(--muted); }
+.ql-after { background: var(--panel-2); border: 1px solid var(--line); padding: 4px 8px; }
+.ql .warn { color: var(--err); }
+.label-box { margin-top: 4px; }
+.label-preview canvas { width: 100%; max-width: 480px; border: 1px solid var(--line); background: #fff; display: block; margin-bottom: 6px; }
 .ql-card { margin-top: 8px; border: 1px solid var(--line); padding: 6px 10px; }
 .ql-card h3 { margin: 0 0 4px; font-size: 15px; }
 .ql-card dl { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 2px 18px; }

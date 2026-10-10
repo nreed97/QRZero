@@ -72,16 +72,14 @@ Tick **Download eQSL confirmations once a day** on the eQSL page to have this do
 
 Queue a card from the log: select the QSOs and pick **Paper QSL…, Queue a card to send**, or type Q in the **QSL sent** field when you log. QSOs where the other station asked for a card (R) show up too.
 
-The **Cards to send** tab lists everything waiting. Tick the ones to print and pick your label sheet:
+The **Cards to send** tab lists everything waiting. Tick the ones to print and pick the labels:
 
-- **Avery 5160 / L7160**: 30 small labels, two QSOs per label.
-- **Avery 5163 / L7163**: 10 large labels, five QSOs per label.
-- **Brother QL-700, DK-22223 50 mm tape, 4 in long** (the default): one label for the fill-in block on the back of a card. It reads "CONFIRMING QSO WITH", the call in large type, then Date, UTC, MHz, Mode and RST for up to four QSOs, newest first; more QSOs with the same station go on another label. **Bottom line** adds an optional line under a rule, such as your power or rig.
-- Other **Brother QL-700** rolls: **DK-1201** (29 x 90 mm) and **DK-1209** (29 x 62 mm) with two QSOs per label, or **DK-1202** (62 x 100 mm) with five. Each label is its own page. For any QL-700 size, choose your QL-700 in the print dialog, set the paper to the matching size (for DK-22223, a custom 50 mm x 101.6 mm), and leave scaling at 100%.
+- **Brother QL-700, straight to the printer** (the default). QRZero draws the label and sends it to the printer itself, so there's no print dialog, paper size or scaling to set. See **Label printer** below.
+- **Avery 5160 / L7160** (30 small labels, two QSOs per label) and **Avery 5163 / L7163** (10 large labels, five QSOs per label) print through the normal print dialog.
 
 **Group by** sorts the queue into piles for a bulk mailing, each with its card and station count: **Bureau (country)** makes one pile per country for your outgoing bureau (cards for a QSL manager get a pile per manager), and **QSL manager** makes one pile per manager, with the cards that have no manager together. Labels print pile by pile in the order shown, and the tick box on a pile's heading picks or unpicks the whole pile. Group by is remembered.
 
-Several QSOs with the same station share a label. **Skip labels** leaves the first few labels empty, for a sheet you've used part of. Click **Print**, and when the labels are on the cards click **Sent via bureau** or **Sent direct** to mark them sent with today's date.
+Several QSOs with the same station share a label. **Skip labels** (Avery sheets) leaves the first few labels empty, for a sheet you've used part of. Click **Print**, and when the labels are on the cards click **Sent via bureau** or **Sent direct** to mark them sent with today's date.
 
 When a card arrives, select its QSOs in the log and pick **Paper QSL…, Card received via bureau** (or direct).
 
@@ -99,7 +97,23 @@ For answering cards or writing them in bulk: pick **QSL Detail Lookup…** from 
 
 The top half lists that station's QSOs, newest first: date, UTC, MHz, mode, the RST you sent and received, your own callsign, and the card status (sent and received, with the bureau or direct route and date, and OQRS if you've asked). The bottom half is the contact card: name, address, QTH, country, grid, zones, QSL via (the manager), email, how many cards you've sent and which services have confirmed. Each comes from the newest QSO that has it filled in, and empty ones are left out.
 
-Nothing is ticked after a lookup. Tick the QSOs for the card (the box in the header ticks them all) and use **Mark selected as** to queue a card, or record it as sent or received, by bureau or direct. **Add to reply list** puts the call on the **To reply to** tab. After each lookup the call box is empty and ready for the next call. The call is matched whole, so DL1ABC finds DL1ABC and its portable forms such as DL1ABC/P, but not DL1ABCD.
+Nothing is ticked after a lookup. The row you're on is highlighted; **Up** and **Down** move it while the cursor is in the call box. Tick the QSOs for the card with the box beside each (the box in the header ticks them all) or press **F2** to tick the highlighted one and move to the next. If the call has no exact match, the calls that start with what you typed are listed instead, and a note says so. The call is otherwise matched whole, so DL1ABC finds DL1ABC and its portable forms such as DL1ABC/P, but not DL1ABCD.
+
+**Mark as** queues a card, or records one as sent or received, by bureau or direct, on the ticked QSOs (or the highlighted one when none are ticked). **Add to reply list** puts the call on the **To reply to** tab.
+
+### Label
+
+Under the contact card is the label as it will print: "CONFIRMING QSO WITH", the call in large type, then Date, UTC, MHz, Mode and RST for up to four QSOs, newest first, and an optional line at the bottom. It uses the ticked QSOs, or the highlighted one when nothing is ticked. QSOs with more than four for one station go on further labels.
+
+- **Print label** (or **F5**) sends it straight to your label printer.
+- **Save label image** (or **F6**) saves each label as a PNG file, the way it reads on the card, for printing some other way.
+- After a print, a line asks whether to mark those QSOs sent: **Via bureau**, **Direct** or **Not now**. Nothing is marked until you answer, and a failed print marks nothing.
+
+### Label printer
+
+Open **Label printer** under the preview and pick your printer (QRZero picks a Brother QL printer on its own the first time), the **tape** and the label **length**. DK-22223, 50 mm continuous tape cut at 101.6 mm is the fill-in block on the back of a card. Other continuous DK rolls (29, 38, 54 and 62 mm) work too; narrower tape fits fewer QSOs per label. **Bottom line** is printed under a rule at the foot of every label, for example `RIG K3S · ANT hex beam · PWR 100W`. These settings are kept in your log.
+
+The Brother driver must be installed so Windows knows the printer, and its tape must match the **Tape** setting. Printing straight to the printer is Windows only; elsewhere use **Save label image**. The same printer and label settings are used on the **Cards to send** tab.
 
 ## What gets sent
 

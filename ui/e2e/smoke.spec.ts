@@ -327,6 +327,25 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(lookup.locator("tbody tr").first()).toContainText("queued");
   await expect(lookup.locator(".ql-card")).toContainText("K1ABC");
   await expect(lookup.locator("tbody input[type=checkbox]:checked")).toHaveCount(0);
+  // F2 ticks the highlighted QSO; the label shows it and can be saved as an image.
+  await lookup.getByLabel("Call").press("F2");
+  await expect(lookup.locator("tbody input[type=checkbox]:checked")).toHaveCount(1);
+  await expect(lookup.getByLabel("Label preview")).toBeVisible();
+  const [png] = await Promise.all([page.waitForEvent("download"), lookup.getByRole("button", { name: "Save label image" }).click()]);
+  expect(png.suggestedFilename()).toBe("K1ABC.png");
+  // Printing needs a printer: with an unknown one the error says so and nothing is offered as sent.
+  await lookup.getByText("Label printer").click();
+  await lookup.getByLabel("Printer").fill("No such printer");
+  await lookup.getByRole("button", { name: "Print 1 label" }).click();
+  await expect(lookup.locator(".ql-msg.err")).toContainText(/only set up for Windows|Can't open the printer/);
+  await expect(lookup.locator(".ql-after")).toHaveCount(0);
+  // When the printer takes it, ask whether to mark the QSOs sent; the answer is recorded.
+  await page.route("**/api/label/print?*", (r) => r.fulfill({ json: 1 }));
+  await lookup.getByRole("button", { name: "Print 1 label" }).click();
+  await expect(lookup.locator(".ql-after")).toContainText("Mark 1 QSO sent?");
+  await lookup.getByRole("button", { name: "Via bureau" }).click();
+  await expect(lookup.locator("tbody tr").first()).toContainText("sent B");
+  await expect(lookup.locator(".ql-after")).toHaveCount(0);
   await page.keyboard.press("Escape");
 
   // OQRS: mark from the right-click menu, then see it in the editor.

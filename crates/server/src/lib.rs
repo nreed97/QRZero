@@ -25,6 +25,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 mod backups;
+mod label;
 mod cluster;
 mod propagation;
 mod qsl;
@@ -235,6 +236,8 @@ fn router(state: Shared) -> Router {
         .route("/qsos/{id}", get(get_qso).put(update_qso))
         .route("/qsos/delete", post(delete_qsos))
         .route("/qsos/mark", post(mark_qsos))
+        .route("/label/printers", get(label_printers))
+        .route("/label/print", post(label_print))
         .route("/qsos/lookup", post(lookup_qsos))
         .route("/qsos/send", post(send_qsos))
         .route("/logs/{id}/paper-queue", get(paper_queue))
@@ -560,6 +563,43 @@ async fn update_qso(State(s): State<Shared>, Path(id): Path<i64>, Json(b): Json<
 #[derive(Deserialize)]
 struct IdsBody {
     ids: Vec<i64>,
+}
+
+/// Printers installed on this PC (Windows), for the label printer picker.
+async fn label_printers() -> ApiResult<Vec<String>> {
+    Ok(Json(tokio::task::spawn_blocking(label::printers).await.unwrap_or_default()))
+}
+
+#[derive(Deserialize)]
+struct LabelQuery {
+    printer: String,
+    /// Tape width in mm (29, 38, 50, 54 or 62).
+    tape: u8,
+    /// Dots across the label.
+    width: usize,
+    /// Rows (dots along the tape) in each label.
+    rows: usize,
+}
+
+/// Prints labels straight to a Brother QL printer. The body is the labels' 1-bit rows (MSB first, 1 = black), one
+/// label after another, each `rows` rows tall.
+async fn label_print(Query(q): Query<LabelQuery>, body: Bytes) -> ApiResult<usize> {
+    let bad = |m: &str| ApiError(StatusCode::BAD_REQUEST, m.to_string());
+    if q.printer.trim().is_empty() {
+        return Err(bad("Pick the label printer first."));
+    }
+    let page = q.width.div_ceil(8) * q.rows;
+    if page == 0 || body.is_empty() || !body.len().is_multiple_of(page) {
+        return Err(bad("The label data doesn't match its size."));
+    }
+    let pages: Vec<&[u8]> = body.chunks(page).collect();
+    let data = label::raster(q.tape, q.width, &pages).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    let printer = q.printer;
+    tokio::task::spawn_blocking(move || label::send(&printer, &data))
+        .await
+        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(|e| ApiError(StatusCode::BAD_GATEWAY, e))?;
+    Ok(Json(pages.len()))
 }
 
 #[derive(Deserialize)]

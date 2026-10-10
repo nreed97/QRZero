@@ -3,6 +3,7 @@ import { api } from "../api";
 import { OQRS, confirmedBy } from "../confirmations";
 import { PAPER_ACTIONS, cardDate, cardFreq, cardMode, cardTime, qf } from "../paper";
 import type { Qso } from "../types";
+import LabelBox from "./LabelBox";
 
 const LIMIT = 500;
 
@@ -57,47 +58,64 @@ function Contact({ rows, call }: { rows: Qso[]; call: string }) {
   );
 }
 
-/** Type a call: its QSOs newest first on top, the contact details for a card below. */
+/** Type a call: its QSOs newest first on top, the contact details and the label below. */
 export default function QslLookup({ logId }: { logId: number }) {
   const [call, setCall] = useState("");
   const [shown, setShown] = useState("");
   const [rows, setRows] = useState<Qso[] | null>(null);
   const [total, setTotal] = useState(0);
+  const [partial, setPartial] = useState(false);
   const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [cur, setCur] = useState(0);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  /** QSOs just printed, waiting to be marked sent. */
+  const [printed, setPrinted] = useState<Qso[] | null>(null);
   const box = useRef<HTMLInputElement>(null);
+  const labelBtns = useRef<HTMLDivElement>(null);
 
   useEffect(() => box.current?.focus(), []);
 
   const query = async (c: string, keepPicks = false) => {
-    const r = await api.search(logId, { exact_call: c }, 0, LIMIT, "newest");
+    let r = await api.search(logId, { exact_call: c }, 0, LIMIT, "newest");
+    let loose = false;
+    if (!r.rows.length) {
+      // Nothing exact: calls that start with what was typed, like the log's own search.
+      r = await api.search(logId, { call: c }, 0, LIMIT, "newest");
+      loose = r.rows.length > 0;
+    }
     setRows(r.rows);
     setTotal(r.total);
+    setPartial(loose);
     setShown(c);
+    setCur(0);
     // A new call starts with nothing ticked; after marking, the ticks stay.
-    setPicked((cur) => new Set(keepPicks ? r.rows.filter((q) => cur.has(q.id)).map((q) => q.id) : []));
+    setPicked((now) => new Set(keepPicks ? r.rows.filter((q) => now.has(q.id)).map((q) => q.id) : []));
   };
 
   const go = async () => {
     const c = call.trim().toUpperCase();
     if (!c) return;
     setMsg(null);
+    setPrinted(null);
     try {
       await query(c);
-      setCall("");
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
     }
     box.current?.focus();
+    box.current?.select();
   };
 
-  const mark = async (key: string) => {
+  /** What goes on the label: the ticked QSOs, or the highlighted one when nothing is ticked. */
+  const forLabel = rows ? (picked.size ? rows.filter((q) => picked.has(q.id)) : rows[cur] ? [rows[cur]] : []) : [];
+
+  const mark = async (key: string, ids = forLabel.map((q) => q.id)) => {
     const a = PAPER_ACTIONS.find((x) => x.key === key)!;
-    const ids = [...picked];
     try {
       await api.markQsos(ids, a.fields());
       await query(shown, true);
       setMsg({ text: `${a.label}: ${ids.length} QSO${ids.length === 1 ? "" : "s"}.`, ok: true });
+      setPrinted(null);
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
     }
@@ -119,20 +137,39 @@ export default function QslLookup({ logId }: { logId: number }) {
     setPicked(next);
   };
 
+  // Keys, as in a quick lookup tool: Up/Down move in the list, F2 ticks, F5 prints, F6 saves.
+  const keys = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && e.target === box.current) void go();
+    else if (rows?.length && (e.key === "ArrowDown" || e.key === "ArrowUp") && e.target === box.current) {
+      e.preventDefault();
+      setCur((c) => Math.max(0, Math.min(rows.length - 1, c + (e.key === "ArrowDown" ? 1 : -1))));
+    } else if (rows?.length && e.key === "F2") {
+      e.preventDefault();
+      const q = rows[cur];
+      toggle(q.id, !picked.has(q.id));
+      setCur(Math.min(rows.length - 1, cur + 1));
+    } else if (e.key === "F5" || e.key === "F6") {
+      e.preventDefault();
+      labelBtns.current?.querySelectorAll<HTMLButtonElement>(".label-box .row button")[e.key === "F5" ? 0 : 1]?.click();
+    }
+  };
+
+  const sentCount = printed?.length ?? 0;
+
   return (
-    <div className="ql">
+    <div className="ql" onKeyDown={keys}>
       <div className="row">
         <label className="f call">
           <span>Call</span>
-          <input ref={box} value={call} onChange={(e) => setCall(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === "Enter" && go()} autoCapitalize="characters" spellCheck={false} />
+          <input ref={box} value={call} onChange={(e) => setCall(e.target.value.toUpperCase())} autoCapitalize="characters" spellCheck={false} />
         </label>
         <button className="primary" onClick={go} disabled={!call.trim()}>Find</button>
         {rows && rows.length > 0 && (
           <>
             <label className="f w-xl">
-              <span>Mark selected as</span>
-              <select value="" disabled={!picked.size} onChange={(e) => e.target.value && void mark(e.target.value)}>
-                <option value="">{picked.size ? `${picked.size} selected…` : "Select QSOs…"}</option>
+              <span>Mark as</span>
+              <select value="" onChange={(e) => e.target.value && void mark(e.target.value)}>
+                <option value="">{picked.size ? `${picked.size} ticked…` : "Highlighted QSO…"}</option>
                 {PAPER_ACTIONS.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
               </select>
             </label>
@@ -140,23 +177,36 @@ export default function QslLookup({ logId }: { logId: number }) {
           </>
         )}
       </div>
-      {msg && <p className={msg.ok ? "ok" : "err"}>{msg.text}</p>}
+      <p className={`ql-msg ${msg ? (msg.ok ? "ok" : "err") : ""}`}>{msg?.text}</p>
+      {printed && (
+        <p className="ql-after">
+          Mark {sentCount} QSO{sentCount === 1 ? "" : "s"} sent?{" "}
+          <button onClick={() => mark("sent-b", printed.map((q) => q.id))}>Via bureau</button>{" "}
+          <button onClick={() => mark("sent-d", printed.map((q) => q.id))}>Direct</button>{" "}
+          <button onClick={() => setPrinted(null)}>Not now</button>
+        </p>
+      )}
       {rows && rows.length === 0 && <p className="muted">No QSOs with {shown} in this log.</p>}
-      {!rows && <p className="muted small">Type a callsign and press Enter.</p>}
+      {!rows && <p className="muted small">Type a callsign and press Enter. Up and Down pick a QSO, F2 ticks it, F5 prints the label, F6 saves it as an image.</p>}
       {rows && rows.length > 0 && (
         <>
+          <p className="muted small">
+            {total} QSO{total === 1 ? "" : "s"} with <b>{shown}</b>, newest first{total > rows.length ? ` (showing ${rows.length})` : ""}.
+            {partial && <span className="warn"> No exact match; showing calls that start with {shown}.</span>}
+          </p>
           <div className="ql-list">
             <table className="list">
               <thead>
                 <tr>
                   <th><input type="checkbox" aria-label="All" checked={picked.size === rows.length} onChange={(e) => setPicked(new Set(e.target.checked ? rows.map((q) => q.id) : []))} /></th>
-                  <th>Date</th><th>UTC</th><th>MHz</th><th>Mode</th><th>Sent</th><th>Rcvd</th><th>Me</th><th>Card</th>
+                  <th>Call</th><th>Date</th><th>UTC</th><th>MHz</th><th>Mode</th><th>Sent</th><th>Rcvd</th><th>Me</th><th>Card</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((q) => (
-                  <tr key={q.id}>
-                    <td><input type="checkbox" checked={picked.has(q.id)} onChange={(e) => toggle(q.id, e.target.checked)} aria-label={`Pick ${cardDate(qf(q, "QSO_DATE"))} ${cardTime(qf(q, "TIME_ON"))}`} /></td>
+                {rows.map((q, i) => (
+                  <tr key={q.id} className={i === cur ? "sel" : ""} onClick={() => setCur(i)}>
+                    <td onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={picked.has(q.id)} onChange={(e) => toggle(q.id, e.target.checked)} aria-label={`Pick ${cardDate(qf(q, "QSO_DATE"))} ${cardTime(qf(q, "TIME_ON"))}`} /></td>
+                    <td className="call">{qf(q, "CALL")}</td>
                     <td className="mono">{cardDate(qf(q, "QSO_DATE"))}</td>
                     <td className="mono">{cardTime(qf(q, "TIME_ON"))}</td>
                     <td className="mono">{cardFreq(q)}</td>
@@ -170,8 +220,15 @@ export default function QslLookup({ logId }: { logId: number }) {
               </tbody>
             </table>
           </div>
-          <p className="muted small">{total} QSO{total === 1 ? "" : "s"}, newest first{total > rows.length ? ` (showing ${rows.length})` : ""}.</p>
-          <Contact rows={rows} call={shown} />
+          <div className="ql-bottom">
+            <Contact rows={rows} call={shown} />
+            <div ref={labelBtns}>
+              <p className="muted small">
+                Label: {picked.size ? `${picked.size} ticked QSO${picked.size === 1 ? "" : "s"}` : "the highlighted QSO (tick more to add them)"}.
+              </p>
+              <LabelBox qsos={forLabel} hints onMessage={(text, ok) => setMsg({ text, ok })} onPrinted={setPrinted} />
+            </div>
+          </div>
         </>
       )}
     </div>

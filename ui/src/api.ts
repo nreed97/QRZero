@@ -65,6 +65,9 @@ export const api = {
     json<Qso>("PUT", `/qsos/${id}`, { location_id: locationId, fields }),
   deleteQsos: (ids: number[]) => json<number>("POST", "/qsos/delete", { ids }),
   markQsos: (ids: number[], fields: Fields) => json<number>("POST", "/qsos/mark", { ids, fields }),
+  labelPrinters: () => json<string[]>("GET", "/label/printers"),
+  labelPrint: async (printer: string, tape: number, width: number, rows: number, bits: Uint8Array) =>
+    (await request("POST", `/label/print?${new URLSearchParams({ printer, tape: String(tape), width: String(width), rows: String(rows) })}`, undefined, bits as BodyInit)).json() as Promise<number>,
   /** Looks the QSOs up on QRZ and fills in their blank fields. */
   lookupQsos: (ids: number[]) => json<{ updated: number; errors: string[] }>("POST", "/qsos/lookup", { ids }),
   /** Sends the QSOs out through the "QSO logged" UDP connections. */
