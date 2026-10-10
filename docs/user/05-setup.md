@@ -76,7 +76,7 @@ Logs are completely separate, for example one per operator sharing the computer.
 
 ## Callsign lookup
 
-On the **Callsign lookup** tab, turn on QRZ.com lookups and enter your QRZ username and password. Lookups need a QRZ XML subscription. **Save and test login** checks the details straight away.
+On the **Callsign lookup** tab, turn on QRZ.com lookups and enter your QRZ username and password. Lookups need a QRZ XML subscription. **Save and test login** checks the details straight away. If QRZ refuses the login, the entry panel says so and points you here. QRZero doesn't ask QRZ again with the same wrong login for a minute; saving a new username or password clears that at once, and leaving the call box again looks the call up with the new login.
 
 Settings pages with a **Save** button (and the QSL window's **Online services** page) also have **Save and close**, which saves and then closes the window. The *Saved.* note fades out after a couple of seconds, so if you save again it shows again.
 

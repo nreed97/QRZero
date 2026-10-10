@@ -243,10 +243,18 @@ export default function EntryPanel({ logId, stationCall, location, layout: baseL
         if (v && !touched.has(key) && !key.startsWith("MY_")) fill[key] = v;
       }
       setLookupFill(fill);
-      if (r.error) setStatus({ text: `Lookup: ${r.error}`, kind: "err" });
+      if (r.error) {
+        setStatus({ text: `Lookup: ${r.error}`, kind: "err" });
+        lookedUp.current = ""; // leaving the call field again tries once more, e.g. after fixing the login
+      } else {
+        setStatus((st) => (st.text.startsWith("Lookup") ? { text: "", kind: "" } : st));
+      }
       return { fill };
     } catch (e) {
-      if (seq === lookupSeq.current) setStatus({ text: `Lookup failed: ${(e as Error).message}`, kind: "err" });
+      if (seq === lookupSeq.current) {
+        setStatus({ text: `Lookup failed: ${(e as Error).message}`, kind: "err" });
+        lookedUp.current = "";
+      }
       return null;
     }
   };

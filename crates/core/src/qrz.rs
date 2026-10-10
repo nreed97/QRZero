@@ -19,7 +19,13 @@ pub struct QrzClient {
     username: String,
     password: String,
     session_key: Option<String>,
+    /// When and why the last login was refused. Until `LOGIN_BACKOFF` has passed, lookups fail with
+    /// the same message without asking QRZ again, so a wrong password isn't retried on every call.
+    login_failure: Option<(std::time::Instant, String)>,
 }
+
+/// How long a refused login is remembered. A new client (made when the credentials change) starts clean.
+const LOGIN_BACKOFF: std::time::Duration = std::time::Duration::from_secs(60);
 
 #[derive(Debug, Default)]
 struct Response {
@@ -41,6 +47,7 @@ impl QrzClient {
             username: username.to_string(),
             password: password.to_string(),
             session_key: None,
+            login_failure: None,
         }
     }
 
@@ -49,6 +56,11 @@ impl QrzClient {
     }
 
     async fn login(&mut self) -> Result<String> {
+        if let Some((at, msg)) = &self.login_failure {
+            if at.elapsed() < LOGIN_BACKOFF {
+                return Err(Error::Lookup(msg.clone()));
+            }
+        }
         let resp = self
             .get(&[
                 ("username", self.username.as_str()),
@@ -59,17 +71,21 @@ impl QrzClient {
         match resp.key {
             Some(key) => {
                 self.session_key = Some(key.clone());
+                self.login_failure = None;
                 Ok(key)
             }
-            None => Err(Error::Lookup(
-                resp.error.unwrap_or_else(|| "QRZ login failed".into()),
-            )),
+            None => {
+                let msg = resp.error.unwrap_or_else(|| "QRZ login failed".into());
+                self.login_failure = Some((std::time::Instant::now(), msg.clone()));
+                Err(Error::Lookup(msg))
+            }
         }
     }
 
     /// Checks the username and password by logging in.
     pub async fn test_login(&mut self) -> Result<()> {
         self.session_key = None;
+        self.login_failure = None;
         self.login().await.map(|_| ())
     }
 
