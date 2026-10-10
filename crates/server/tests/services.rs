@@ -1,6 +1,7 @@
 //! The DX cluster and QSL uploads, against stand-in services.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -29,7 +30,9 @@ impl Api {
     async fn new(qrz: String, clublog: String) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let mut cfg = Config::local(dir.path().to_path_buf());
-        cfg.secret_service = format!("QRZero-test-{}", std::process::id());
+        // Tests run in parallel and the Windows credential store is shared, so each server gets its own entries.
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        cfg.secret_service = format!("QRZero-test-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::SeqCst));
         cfg.update_cty = false;
         cfg.qsl_endpoints.qrz = qrz;
         cfg.qsl_endpoints.clublog = clublog;
