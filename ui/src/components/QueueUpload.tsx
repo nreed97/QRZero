@@ -11,6 +11,8 @@ interface Props {
   save: () => Promise<boolean>;
   /** Called after an upload or a removal so the page's counts refresh. */
   onChange: () => void;
+  /** TQSL station location to sign this upload under (LoTW only; empty: as mapped). */
+  location?: string;
 }
 
 const fmtDate = (d: string) => (d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}` : d);
@@ -20,7 +22,7 @@ const fmtDate = (d: string) => (d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 
  * the service hasn't been sent in that range); QSOs ticked there can be removed from
  * the queue, then "Upload" sends the rest.
  */
-export default function QueueUpload({ service, name, ready, save, onChange }: Props) {
+export default function QueueUpload({ service, name, ready, save, onChange, location = "" }: Props) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [queue, setQueue] = useState<QslQueue | null>(null);
@@ -73,7 +75,7 @@ export default function QueueUpload({ service, name, ready, save, onChange }: Pr
     setMsg(null);
     try {
       if (!(await save())) return;
-      const run = await api.qslQueueUpload(service, from, to);
+      const run = await api.qslQueueUpload(service, from, to, location);
       await show();
       const parts = [`${run.uploaded} uploaded`];
       if (run.duplicates) parts.push(`${run.duplicates} already there`);
