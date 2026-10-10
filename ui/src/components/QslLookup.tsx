@@ -221,7 +221,7 @@ export default function QslLookup({ logId }: { logId: number }) {
             </table>
           </div>
           <div className="ql-bottom">
-            <Contact rows={rows} call={shown} />
+            <Contact rows={rows} call={qf(rows[0], "CALL") || shown} />
             <div ref={labelBtns}>
               <p className="muted small">
                 Label: {picked.size ? `${picked.size} ticked QSO${picked.size === 1 ? "" : "s"}` : "the highlighted QSO (tick more to add them)"}.
