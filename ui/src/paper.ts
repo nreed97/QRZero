@@ -13,8 +13,8 @@ export const PAPER_ACTIONS: { key: string; label: string; fields: () => Fields }
   { key: "queue", label: "Queue a card to send", fields: () => ({ QSL_SENT: "Q" }) },
   { key: "sent-b", label: "Card sent via bureau", fields: () => ({ QSL_SENT: "Y", QSLSDATE: today(), QSL_SENT_VIA: "B" }) },
   { key: "sent-d", label: "Card sent direct", fields: () => ({ QSL_SENT: "Y", QSLSDATE: today(), QSL_SENT_VIA: "D" }) },
-  { key: "rcvd-b", label: "Card received via bureau", fields: () => ({ QSL_RCVD: "Y", QSLRDATE: today(), QSL_RCVD_VIA: "B" }) },
-  { key: "rcvd-d", label: "Card received direct", fields: () => ({ QSL_RCVD: "Y", QSLRDATE: today(), QSL_RCVD_VIA: "D" }) },
+  { key: "rcvd-b", label: "Card received via bureau, queue a reply", fields: () => ({ QSL_RCVD: "Y", QSLRDATE: today(), QSL_RCVD_VIA: "B" }) },
+  { key: "rcvd-d", label: "Card received direct, queue a reply", fields: () => ({ QSL_RCVD: "Y", QSLRDATE: today(), QSL_RCVD_VIA: "D" }) },
   { key: "none", label: "Not sending a card", fields: () => ({ QSL_SENT: "N" }) },
 ];
 
@@ -25,21 +25,18 @@ export const cardTime = (t: string) => t.slice(0, 4);
 export const cardFreq = (q: Qso) => (qf(q, "FREQ") ? Number(qf(q, "FREQ")).toFixed(3) : qf(q, "BAND"));
 export const cardMode = (q: Qso) => qf(q, "SUBMODE") || qf(q, "MODE");
 
-export type GroupBy = "none" | "bureau" | "manager";
+export type GroupBy = "none" | "bureau";
 
 export interface Pile { key: string; title: string; qsos: Qso[] }
 
-/** Splits the queue into piles for a mailing: by the entity's outgoing bureau (cards with a QSL manager get their own pile per manager), or by manager. */
+/** Splits the queue into piles for a mailing: one per entity's outgoing bureau; cards with a QSL manager get their own pile per manager. */
 export function piles(queue: Qso[], by: GroupBy): Pile[] {
   if (by === "none") return [{ key: "", title: "", qsos: queue }];
   const map = new Map<string, Pile>();
   for (const q of queue) {
     const via = qf(q, "QSL_VIA").trim().toUpperCase();
     let key: string, title: string;
-    if (by === "manager") {
-      key = via ? `1|${via}` : "2|";
-      title = via ? `Manager ${via}` : "No manager (bureau or direct)";
-    } else if (via) {
+    if (via) {
       key = `2|${via}`;
       title = `Via manager ${via}`;
     } else {

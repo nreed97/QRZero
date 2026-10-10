@@ -1,5 +1,5 @@
 import type { UpdateInfo, ContestList, DxpedList, DxpedPlanned, PropagationReport } from "./types";
-import type { ClubAwards, LotwWaiting, QslService, QslDownload, AwardHint, SlotGrid, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, ReplyEntry, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
+import type { ClubAwards, LotwWaiting, QslService, QslDownload, AwardHint, SlotGrid, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
 function sessionToken(): string {
@@ -65,6 +65,9 @@ export const api = {
     json<Qso>("PUT", `/qsos/${id}`, { location_id: locationId, fields }),
   deleteQsos: (ids: number[]) => json<number>("POST", "/qsos/delete", { ids }),
   markQsos: (ids: number[], fields: Fields) => json<number>("POST", "/qsos/mark", { ids, fields }),
+  labelPrinters: () => json<string[]>("GET", "/label/printers"),
+  labelPrint: async (printer: string, tape: number, width: number, rows: number, bits: Uint8Array) =>
+    (await request("POST", `/label/print?${new URLSearchParams({ printer, tape: String(tape), width: String(width), rows: String(rows) })}`, undefined, bits as BodyInit)).json() as Promise<number>,
   /** Looks the QSOs up on QRZ and fills in their blank fields. */
   lookupQsos: (ids: number[]) => json<{ updated: number; errors: string[] }>("POST", "/qsos/lookup", { ids }),
   /** Sends the QSOs out through the "QSO logged" UDP connections. */
@@ -91,11 +94,6 @@ export const api = {
   search: (logId: number, filter: QsoFilter, offset: number, limit: number, sort = "newest") =>
     json<{ total: number; rows: Qso[] }>("POST", `/logs/${logId}/qsos/search`, { filter, offset, limit, sort }),
   lookup: (logId: number, call: string) => json<LookupResult>("GET", `/logs/${logId}/lookup/${encodeURIComponent(call)}`),
-  replies: (logId: number) => json<ReplyEntry[]>("GET", `/logs/${logId}/replies`),
-  addReply: (logId: number, call: string) => json<boolean>("POST", `/logs/${logId}/replies`, { call }),
-  saveReply: (logId: number, call: string, received: string, note: string) =>
-    json<boolean>("PUT", `/logs/${logId}/replies/${encodeURIComponent(call)}`, { received, note }),
-  deleteReply: (logId: number, call: string) => json<boolean>("DELETE", `/logs/${logId}/replies/${encodeURIComponent(call)}`),
   notes: (logId: number, q: string, offset: number, limit: number) =>
     json<{ total: number; rows: Note[] }>("GET", `/logs/${logId}/notes?${new URLSearchParams({ q, offset: String(offset), limit: String(limit) })}`),
   note: (logId: number, call: string) => json<Note | null>("GET", `/logs/${logId}/notes/${encodeURIComponent(call)}`),

@@ -60,7 +60,7 @@ See [FTx monitor and other programs](08-ftx-monitor) for the full steps, and [UD
 
 ## 7. QSL services
 
-Choose **QSL** from the **☰** menu, then the **Online services** tab. Enter your login for each service you use (LoTW, QRZ Logbook, Club Log, eQSL), set the **QSOs from** date, and tick the automatic upload if you want new QSOs sent in the background. The **Cards to send** tab keeps your paper card queue and prints labels. Passwords are kept in the system's password store, not in a settings file. See [QSL: LoTW, QRZ, Club Log, eQSL and paper cards](10-qsl).
+Choose **QSL** from the **☰** menu, then the **Online services** tab. Enter your login for each service you use (LoTW, QRZ Logbook, Club Log, eQSL), set the **QSOs from** date, and tick the automatic upload if you want new QSOs sent in the background. The **Queue** tab keeps your paper card queue and prints labels. Passwords are kept in the system's password store, not in a settings file. See [QSL: LoTW, QRZ, Club Log, eQSL and paper cards](10-qsl).
 
 ## 8. Where to find things
 
@@ -72,7 +72,7 @@ Choose **QSL** from the **☰** menu, then the **Online services** tab. Enter yo
 | Move, hide or pop out panes | The **Layout** menu; [Arranging the window](06-layout) |
 | See DX spots | The **Cluster** and **Band map** tabs; [DX cluster](09-cluster), [Band map](13-band-map) |
 | Check what I still need for DXCC, WAS and other awards | The **Awards** tab; [Awards](11-awards) |
-| Find a station's QSOs for a QSL card | **QSL Detail Lookup…** in the ☰ menu, or Alt+Q |
+| Send or answer paper QSL cards | Queue them in the Log tab, then **QSL Queue…** in the ☰ menu, or Alt+Q |
 | Send confirmations | **QSL** in the ☰ menu |
 | Back up or restore my log | **Settings → Backups** |
 | Search this guide | The search box at the top of the Help window |

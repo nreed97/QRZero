@@ -290,3 +290,27 @@ fn pending_uploads_and_marking() {
     qsl_only.insert("QSL_RCVD".into(), "Y".into());
     assert_eq!(st.update_qso(a.id, a2.location_id, &qsl_only).unwrap().fields[key], "Y");
 }
+
+#[test]
+fn paper_queue_holds_only_queued_cards_and_marking_touches_only_the_ids_given() {
+    let (mut st, log) = setup();
+    let q = |call: &str, sent: &str| {
+        let mut v = vec![("CALL", call), ("QSO_DATE", "20240101"), ("TIME_ON", "1200"), ("BAND", "20m"), ("MODE", "CW")];
+        if !sent.is_empty() {
+            v.push(("QSL_SENT", sent));
+        }
+        f(&v)
+    };
+    let a = st.insert_qso(log, None, &q("W1AW", "")).unwrap();
+    let b = st.insert_qso(log, None, &q("W1AW", "")).unwrap();
+    st.insert_qso(log, None, &q("K1ABC", "R")).unwrap();
+    st.insert_qso(log, None, &q("K2ABC", "Y")).unwrap();
+    st.insert_qso(log, None, &q("K3ABC", "N")).unwrap();
+    assert!(st.paper_queue(log).unwrap().is_empty(), "requested, sent, not-sent and blank are not queued");
+
+    // Queue one of two QSOs with the same station: only that one joins the queue.
+    st.mark_qsos(&[a.id], &f(&[("QSL_SENT", "Q")])).unwrap();
+    let queue = st.paper_queue(log).unwrap();
+    assert_eq!(queue.iter().map(|q| q.id).collect::<Vec<_>>(), [a.id]);
+    assert!(!queue.iter().any(|q| q.id == b.id));
+}

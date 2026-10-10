@@ -15,16 +15,16 @@ test("key presses become bindings", () => {
 
 test("the defaults match the keys QRZero always had", () => {
   const def = (id: string) => bindingFor(SHORTCUTS.find((s) => s.id === id)!, {});
-  expect(def("qsllookup")).toBe("Alt+Q");
+  expect(def("qslqueue")).toBe("Alt+Q");
   expect(def("help")).toBe("F1");
   expect(def("editsave")).toBe("Ctrl+S");
   expect(def("radioswap")).toBe("`");
 });
 
 test("conflicts and unsafe keys are refused", () => {
-  expect(problemWith("Alt+Q", {}, "settings")).toMatch(/QSL Detail Lookup/);
-  expect(problemWith("Alt+Q", {}, "qsllookup")).toBeNull();
-  expect(problemWith("Alt+Q", { qsllookup: null }, "settings")).toBeNull();
+  expect(problemWith("Alt+Q", {}, "settings")).toMatch(/QSL Queue/);
+  expect(problemWith("Alt+Q", {}, "qslqueue")).toBeNull();
+  expect(problemWith("Alt+Q", { qslqueue: null }, "settings")).toBeNull();
   expect(problemWith("Q", {}, "settings")).toMatch(/Ctrl or Alt/);
   expect(problemWith("Ctrl+C", {}, "settings")).toMatch(/Windows/);
   expect(problemWith("Alt+3", {}, "settings")).toMatch(/always does something else/);
