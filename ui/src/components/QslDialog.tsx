@@ -96,7 +96,6 @@ function Online({ callsigns, locations, onClose }: Props) {
   const [cfg, setCfg] = useState<QslConfig | null>(null);
   const [qrzKeys, setQrzKeys] = useState<Record<string, string>>({});
   const [clPassword, setClPassword] = useState("");
-  const [clKey, setClKey] = useState("");
   const [lotwPassword, setLotwPassword] = useState("");
   const [eqslPassword, setEqslPassword] = useState("");
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -145,7 +144,6 @@ function Online({ callsigns, locations, onClose }: Props) {
       const secrets = {
         qrz_keys: Object.fromEntries(Object.entries(qrzKeys).filter(([, v]) => v.trim())),
         ...(clPassword ? { clublog_password: clPassword } : {}),
-        ...(clKey ? { clublog_app_key: clKey } : {}),
         ...(lotwPassword ? { lotw_password: lotwPassword } : {}),
         ...(eqslPassword ? { eqsl_password: eqslPassword } : {}),
       };
@@ -154,7 +152,6 @@ function Online({ callsigns, locations, onClose }: Props) {
       setCfg(r.config);
       setQrzKeys({});
       setClPassword("");
-      setClKey("");
       setLotwPassword("");
       setEqslPassword("");
       setMsg({ text: "Saved.", ok: true });
@@ -358,7 +355,6 @@ function Online({ callsigns, locations, onClose }: Props) {
           <div className="row">
             <label className="f w-l"><span>Club Log email</span><input value={cfg.clublog_email} onChange={(e) => set({ clublog_email: e.target.value })} /></label>
             <label className="f w-m"><span>Password</span><input type="password" value={clPassword} placeholder={o.secrets.clublog_password ? "saved" : ""} onChange={(e) => setClPassword(e.target.value)} /></label>
-            <label className="f w-l"><span>Club Log API key</span><input type="password" value={clKey} placeholder={o.secrets.clublog_app_key ? "saved" : "from clublog.org"} onChange={(e) => setClKey(e.target.value)} /></label>
           </div>
           <div className="row">
             <span className="muted small">Callsigns:</span>

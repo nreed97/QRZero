@@ -60,7 +60,7 @@ When you edit a QSO that was already uploaded, QRZero marks it modified and send
 
 ## Club Log
 
-Enter your Club Log email and password, a Club Log **API key** (request one from Club Log's helpdesk), and tick the callsigns to upload. Each callsign goes to its own log on Club Log.
+Enter your Club Log email and password (an application password works if you use two-step login) and tick the callsigns to upload. There is no API key to enter; QRZero carries its own. Each callsign goes to its own log on Club Log.
 
 ## eQSL
 
