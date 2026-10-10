@@ -90,6 +90,11 @@ export default function App() {
   const [layout, setLayout, layoutLoaded] = usePref<EntryLayout>("entry_layout", DEFAULT_LAYOUT);
   const [modeLayouts, setModeLayouts, modeLayoutsLoaded] = usePref<ModeLayouts>("entry_layouts", {});
   const [columns, setColumns] = usePref<string[]>("grid_columns", DEFAULT_COLUMNS);
+  const [colWidths, setColWidthsState] = useState<Record<string, number>>(() => localGet<Record<string, number>>("qrzero.colWidths", {}));
+  const setColWidths = (w: Record<string, number>) => {
+    setColWidthsState(w);
+    localSet("qrzero.colWidths", w);
+  };
   const [general, setGeneral] = usePref<GeneralPrefs>("general", { units: "km" });
   const display = useDisplay();
   const radios = useRadios();
@@ -409,7 +414,7 @@ export default function App() {
         {notice && <span className="notice" role="status">{notice}</span>}
         <span className="muted">{currentLog?.qso_count.toLocaleString() ?? 0} QSOs</span>
         <Clock localTime={display.localTime} />
-        <LayoutMenu ws={ws} onChange={setWs} onShow={(id) => setWs({ ...wsRef.current, root: dockBack(wsRef.current.root, id) })} onFocusWindow={focusWindow} />
+        <LayoutMenu ws={ws} columns={columns} widths={colWidths} onColumns={(c, w) => { setColumns(c); setColWidths(w); }} onChange={setWs} onShow={(id) => setWs({ ...wsRef.current, root: dockBack(wsRef.current.root, id) })} onFocusWindow={focusWindow} />
         <MainMenu onPick={setDialog} />
       </header>
 
@@ -462,6 +467,8 @@ export default function App() {
                 onExportSelected={() => setDialog("export")}
                 columns={columns}
                 onColumns={setColumns}
+                widths={colWidths}
+                onWidths={setColWidths}
                 locations={locations}
                 stepper={stepper}
                 editingId={editing?.id ?? null}

@@ -3,8 +3,15 @@ import { localGet, localSet } from "../prefs";
 import { confirmDelete } from "../display";
 import { allPanes, DEFAULT_WORKSPACE, PANES, removePane, sanitize, type PaneId, type Workspace } from "../workspace";
 
+/** The Log tab's columns, saved with a layout. */
+interface LogCols { columns: string[]; widths: Record<string, number> }
+type SavedLayout = Workspace & { logColumns?: LogCols };
+
 interface Props {
   ws: Workspace;
+  columns: string[];
+  widths: Record<string, number>;
+  onColumns: (columns: string[], widths: Record<string, number>) => void;
   onChange: (ws: Workspace) => void;
   onShow: (id: PaneId) => void;
   onFocusWindow: (id: PaneId) => void;
@@ -13,9 +20,9 @@ interface Props {
 const SAVED = "qrzero.layouts";
 
 /** Top-bar menu: saved layouts, lock, and which panes are shown. */
-export default function LayoutMenu({ ws, onChange, onShow, onFocusWindow }: Props) {
+export default function LayoutMenu({ ws, columns, widths, onColumns, onChange, onShow, onFocusWindow }: Props) {
   const [open, setOpen] = useState(false);
-  const [saved, setSaved] = useState<Record<string, Workspace>>(() => localGet<{ items: Record<string, Workspace> }>(SAVED, { items: {} }).items);
+  const [saved, setSaved] = useState<Record<string, SavedLayout>>(() => localGet<{ items: Record<string, SavedLayout> }>(SAVED, { items: {} }).items);
   const [current, setCurrent] = useState(() => localGet(`${SAVED}.current`, { name: "" }).name);
   const box = useRef<HTMLDivElement>(null);
 
@@ -33,7 +40,7 @@ export default function LayoutMenu({ ws, onChange, onShow, onFocusWindow }: Prop
     };
   }, [open]);
 
-  const store = (items: Record<string, Workspace>, name: string) => {
+  const store = (items: Record<string, SavedLayout>, name: string) => {
     setSaved(items);
     setCurrent(name);
     localSet(SAVED, { items });
@@ -43,7 +50,7 @@ export default function LayoutMenu({ ws, onChange, onShow, onFocusWindow }: Prop
   const saveAs = () => {
     const name = prompt("Name for this layout (for example Laptop, or FT8 evening):", current || "")?.trim();
     if (!name) return;
-    store({ ...saved, [name]: ws }, name);
+    store({ ...saved, [name]: { ...ws, logColumns: { columns, widths } } }, name);
   };
 
   const load = (name: string) => {
@@ -51,6 +58,9 @@ export default function LayoutMenu({ ws, onChange, onShow, onFocusWindow }: Prop
     if (!w) return;
     store(saved, name);
     onChange(w);
+    // Layouts saved before columns were included leave the current columns alone.
+    const lc = saved[name].logColumns;
+    if (lc && Array.isArray(lc.columns) && lc.columns.length) onColumns(lc.columns.filter((k) => typeof k === "string"), lc.widths && typeof lc.widths === "object" ? lc.widths : {});
     setOpen(false);
   };
 
