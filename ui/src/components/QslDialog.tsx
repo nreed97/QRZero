@@ -79,7 +79,7 @@ type Tab = "lookup" | "cards" | "reply" | "online";
 
 export default function QslDialog(props: Props & { tab?: Tab }) {
   const [tab, setTab] = useState<Tab>(props.tab ?? "lookup");
-  const tabs: [Tab, string][] = [["lookup", "Card lookup"], ["cards", "Cards to send"], ["reply", "To reply to"], ["online", "Online services"]];
+  const tabs: [Tab, string][] = [["lookup", "QSL Detail Lookup"], ["cards", "Cards to send"], ["reply", "To reply to"], ["online", "Online services"]];
   return (
     <Modal title="QSL" onClose={props.onClose} wide>
       <nav className="tabs">

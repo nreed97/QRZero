@@ -13,7 +13,7 @@ export interface ShortcutDef {
 
 /** Shortcuts the operator can change. The ids are what is saved, so never reuse one. */
 export const SHORTCUTS: ShortcutDef[] = [
-  { id: "qsllookup", label: "Card lookup", where: "Anywhere", def: "Alt+Q" },
+  { id: "qsllookup", label: "QSL Detail Lookup", where: "Anywhere", def: "Alt+Q" },
   { id: "help", label: "User guide", where: "Anywhere", def: "F1" },
   { id: "settings", label: "Settings", where: "Anywhere", def: null },
   { id: "qsl", label: "QSL: LoTW, QRZ, Club Log", where: "Anywhere", def: null },

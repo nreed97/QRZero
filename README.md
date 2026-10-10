@@ -201,11 +201,11 @@ Choose **QSL: LoTW, QRZ, Club Log…** from the ☰ menu. Each QSO keeps its sta
 - **QRZ Logbook, Club Log and eQSL.** Upload new QSOs on a timer (15 minutes by default) or on demand, per callsign; edited QSOs are sent again. eQSL confirmations can be downloaded, and LoTW and eQSL downloads can run once a day.
 - **Confirmation status.** The QSO editor shows LoTW, card, eQSL, QRZ and Club Log together with a one-line summary, and the log has **LoTW R**, **QSL R**, **QRZ R**, **OQRS** and **Confirmed** columns. Your Club Log OQRS requests are tracked as a reminder.
 - **Paper cards.** Queue cards from the log, print Avery 5160/L7160 or 5163/L7163 address labels (several QSOs with one station share a label), then mark them sent via bureau or direct. Mark received cards the same way.
-- **Card lookup** (☰ menu or <kbd>Alt</kbd>+<kbd>Q</kbd>) is for answering cards in bulk: type a call, press Enter, and see that station's QSOs newest first with the card status, QSL manager and address.
+- **QSL Detail Lookup** (☰ menu or <kbd>Alt</kbd>+<kbd>Q</kbd>) is for answering cards in bulk: type a call, press Enter, and see that station's QSOs newest first with the card status, QSL manager and address.
 
 | | |
 | --- | --- |
-| ![Paper cards](docs/screenshots/qsl-paper.png) | ![Card lookup](docs/screenshots/qsl-lookup.png) |
+| ![Paper cards](docs/screenshots/qsl-paper.png) | ![QSL Detail Lookup](docs/screenshots/qsl-lookup.png) |
 
 ## ADIF import and export
 

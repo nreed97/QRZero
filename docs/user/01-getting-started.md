@@ -72,7 +72,7 @@ Choose **QSL** from the **☰** menu, then the **Online services** tab. Enter yo
 | Move, hide or pop out panes | The **Layout** menu; [Arranging the window](06-layout) |
 | See DX spots | The **Cluster** and **Band map** tabs; [DX cluster](09-cluster), [Band map](13-band-map) |
 | Check what I still need for DXCC, WAS and other awards | The **Awards** tab; [Awards](11-awards) |
-| Find a station's QSOs for a QSL card | **Card lookup…** in the ☰ menu, or Alt+Q |
+| Find a station's QSOs for a QSL card | **QSL Detail Lookup…** in the ☰ menu, or Alt+Q |
 | Send confirmations | **QSL** in the ☰ menu |
 | Back up or restore my log | **Settings → Backups** |
 | Search this guide | The search box at the top of the Help window |

@@ -307,8 +307,8 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByText("Nothing waiting for a reply.")).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
 
-  // Card lookup: type a call, Enter, results with the queued card.
-  await fromMenu(page, /^Card lookup/);
+  // QSL Detail Lookup: type a call, Enter, results with the queued card.
+  await fromMenu(page, /^QSL Detail Lookup/);
   const lookup = page.getByRole("dialog", { name: "QSL" });
   await lookup.getByLabel("Call").fill("k1abc");
   await lookup.getByLabel("Call").press("Enter");
