@@ -29,9 +29,10 @@ The first time QRZero starts, the setup wizard walks you through:
 1. **Your callsign**, plus any calls you held before (so old QSOs are labelled correctly).
 2. **Callsign lookup**: your QRZ.com login, if you have an XML subscription. Skip it if not. If you turn it on, QRZero looks up your own call to fill in your home details.
 3. **Home location**: name, grid square, city, state, zones.
-4. **Equipment**: the radios, antennas and amplifiers at home. Optional.
-5. **Entry fields**: pick a starting layout (general/DX, CW, CW clubs, parks and summits, satellites, casual contesting). You can change every field later.
-6. **Import a log**: bring in an ADIF file from your old logger. Optional.
+4. **Equipment**: the radios, antennas and amplifiers at home. For an antenna, tick the bands it covers; QRZero then picks it for you when you log on those bands. Optional.
+5. **Entry fields**: pick a starting layout (general/DX, CW, CW clubs, parks and summits, satellites, casual contesting). Pick CW clubs to get SKCC, NAQCC, FISTS and CWops number fields. You can change every field later.
+6. **Confirmations**: tick the services you use (Club Log, QRZ Logbook, LoTW, eQSL) and enter their logins. New QSOs then go to them a couple of minutes after you log. For LoTW, pick your TQSL station location. Optional; the **QSL** window has the full options, including paper cards and upload timers.
+7. **Import a log**: bring in an ADIF file from your old logger. Optional.
 
 Every step except the callsign can be skipped. You can run the wizard again from **Settings → General**; it never removes anything. More in [Callsigns, locations and logs](05-setup).
 

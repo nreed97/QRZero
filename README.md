@@ -47,7 +47,7 @@ The first time QRZero starts, a setup wizard walks you through the basics. Every
 | ![Callsign step](docs/screenshots/wizard-1-callsign.png) | ![Home location step](docs/screenshots/wizard-3-location.png) |
 | 1. Your callsign, plus any calls you held before, so old QSOs are labelled correctly. 2. Your QRZ.com login if you have an XML subscription. | 3. Your home location: name, grid, city, state, zones. |
 | ![Equipment step](docs/screenshots/wizard-4-equipment.png) | ![Entry fields step](docs/screenshots/wizard-5-fields.png) |
-| 4. Your radios, antennas and amplifiers. | 5. A starting layout for the entry form: general/DX, CW, CW clubs, parks and summits, satellites or casual contesting. 6. Import an ADIF log. |
+| 4. Your radios, antennas (with the bands each covers) and amplifiers. | 5. A starting layout for the entry form: general/DX, CW, CW clubs, parks and summits, satellites or casual contesting. 6. Your Club Log, QRZ Logbook, LoTW and eQSL logins. 7. Import an ADIF log. |
 
 ### Coming from another logger
 
