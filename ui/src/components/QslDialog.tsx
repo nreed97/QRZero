@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { onLive } from "../live";
 import type { Location, QslConfig, QslDownload, QslOverview, QslRun, QslService, StationCallsign } from "../types";
+import SaveBar from "./SaveBar";
 import Modal from "./Modal";
 import PaperQsl from "./PaperQsl";
 import QslLookup from "./QslLookup";
@@ -90,12 +91,11 @@ export default function QslDialog(props: Props & { tab?: Tab }) {
   );
 }
 
-function Online({ callsigns, locations }: Props) {
+function Online({ callsigns, locations, onClose }: Props) {
   const [o, setO] = useState<QslOverview | null>(null);
   const [cfg, setCfg] = useState<QslConfig | null>(null);
   const [qrzKeys, setQrzKeys] = useState<Record<string, string>>({});
   const [clPassword, setClPassword] = useState("");
-  const [clKey, setClKey] = useState("");
   const [lotwPassword, setLotwPassword] = useState("");
   const [eqslPassword, setEqslPassword] = useState("");
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -144,7 +144,6 @@ function Online({ callsigns, locations }: Props) {
       const secrets = {
         qrz_keys: Object.fromEntries(Object.entries(qrzKeys).filter(([, v]) => v.trim())),
         ...(clPassword ? { clublog_password: clPassword } : {}),
-        ...(clKey ? { clublog_app_key: clKey } : {}),
         ...(lotwPassword ? { lotw_password: lotwPassword } : {}),
         ...(eqslPassword ? { eqsl_password: eqslPassword } : {}),
       };
@@ -153,12 +152,13 @@ function Online({ callsigns, locations }: Props) {
       setCfg(r.config);
       setQrzKeys({});
       setClPassword("");
-      setClKey("");
       setLotwPassword("");
       setEqslPassword("");
       setMsg({ text: "Saved.", ok: true });
+      return true;
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
+      return false;
     }
   };
 
@@ -309,6 +309,10 @@ function Online({ callsigns, locations }: Props) {
             <label className="check"><input type="checkbox" checked={cfg.qrz_enabled} onChange={(e) => set({ qrz_enabled: e.target.checked })} /> Upload new QSOs automatically</label>
             <label className="f w-s"><span>Every (min)</span><input value={cfg.qrz_interval_min} disabled={!cfg.qrz_enabled} inputMode="numeric" onChange={(e) => set({ qrz_interval_min: Math.max(1, Number(e.target.value) || 15) })} /></label>
           </div>
+          <div className="row">
+            <label className="check"><input type="checkbox" checked={cfg.qrz_live} onChange={(e) => set({ qrz_live: e.target.checked })} /> Upload shortly after a QSO is logged or edited</label>
+            <label className="f w-s"><span>Wait (min)</span><input value={cfg.qrz_live_delay_min} disabled={!cfg.qrz_live} inputMode="numeric" onChange={(e) => set({ qrz_live_delay_min: Math.min(60, Math.max(1, Number(e.target.value) || 2)) })} /></label>
+          </div>
           <p className="small muted">Each logbook on QRZ.com has its own API key (QRZ Logbook, Settings, API). QRZ needs an XML subscription for the API.</p>
           <table className="list">
             <tbody>
@@ -345,9 +349,12 @@ function Online({ callsigns, locations }: Props) {
             <label className="f w-s"><span>Every (min)</span><input value={cfg.clublog_interval_min} disabled={!cfg.clublog_enabled} inputMode="numeric" onChange={(e) => set({ clublog_interval_min: Math.max(1, Number(e.target.value) || 15) })} /></label>
           </div>
           <div className="row">
+            <label className="check"><input type="checkbox" checked={cfg.clublog_live} onChange={(e) => set({ clublog_live: e.target.checked })} /> Upload shortly after a QSO is logged or edited</label>
+            <label className="f w-s"><span>Wait (min)</span><input value={cfg.clublog_live_delay_min} disabled={!cfg.clublog_live} inputMode="numeric" onChange={(e) => set({ clublog_live_delay_min: Math.min(60, Math.max(1, Number(e.target.value) || 2)) })} /></label>
+          </div>
+          <div className="row">
             <label className="f w-l"><span>Club Log email</span><input value={cfg.clublog_email} onChange={(e) => set({ clublog_email: e.target.value })} /></label>
             <label className="f w-m"><span>Password</span><input type="password" value={clPassword} placeholder={o.secrets.clublog_password ? "saved" : ""} onChange={(e) => setClPassword(e.target.value)} /></label>
-            <label className="f w-l"><span>Club Log API key</span><input type="password" value={clKey} placeholder={o.secrets.clublog_app_key ? "saved" : "from clublog.org"} onChange={(e) => setClKey(e.target.value)} /></label>
           </div>
           <div className="row">
             <span className="muted small">Callsigns:</span>
@@ -369,6 +376,10 @@ function Online({ callsigns, locations }: Props) {
           <div className="row">
             <label className="check"><input type="checkbox" checked={cfg.eqsl_enabled} onChange={(e) => set({ eqsl_enabled: e.target.checked })} /> Upload new QSOs automatically</label>
             <label className="f w-s"><span>Every (min)</span><input value={cfg.eqsl_interval_min} disabled={!cfg.eqsl_enabled} inputMode="numeric" onChange={(e) => set({ eqsl_interval_min: Math.max(1, Number(e.target.value) || 15) })} /></label>
+          </div>
+          <div className="row">
+            <label className="check"><input type="checkbox" checked={cfg.eqsl_live} onChange={(e) => set({ eqsl_live: e.target.checked })} /> Upload shortly after a QSO is logged or edited</label>
+            <label className="f w-s"><span>Wait (min)</span><input value={cfg.eqsl_live_delay_min} disabled={!cfg.eqsl_live} inputMode="numeric" onChange={(e) => set({ eqsl_live_delay_min: Math.min(60, Math.max(1, Number(e.target.value) || 2)) })} /></label>
           </div>
           <div className="row">
             <label className="f w-m"><span>eQSL username</span><input value={cfg.eqsl_username} onChange={(e) => set({ eqsl_username: e.target.value.toUpperCase() })} /></label>
@@ -397,11 +408,7 @@ function Online({ callsigns, locations }: Props) {
         </fieldset>
         )}
 
-        <div className="row">
-          <span className="spacer" />
-          {msg && <span className={msg.ok ? "ok" : "err"}>{msg.text}</span>}
-          <button className="primary" onClick={save}>Save</button>
-        </div>
+        <SaveBar msg={msg} onSave={save} onClose={onClose} />
       </div>
   );
 }

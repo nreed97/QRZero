@@ -208,6 +208,12 @@ export interface LotwMapping { callsign: string; location_id: number; station_lo
 export interface QslConfig {
   interval_min: number;
   qrz_interval_min: number;
+  qrz_live: boolean;
+  qrz_live_delay_min: number;
+  clublog_live: boolean;
+  clublog_live_delay_min: number;
+  eqsl_live: boolean;
+  eqsl_live_delay_min: number;
   clublog_interval_min: number;
   eqsl_interval_min: number;
   qrz_enabled: boolean;
@@ -238,13 +244,13 @@ export interface NewConfirm { award: AwardKind; key: string; name: string; colum
 export interface QslDownload { at: number; running: boolean; received: number; confirmed: number; unmatched: string[]; unmatched_count: number; new_awards: NewConfirm[]; auto: boolean; error: string | null }
 export interface QslOverview {
   config: QslConfig;
-  secrets: { qrz_calls: string[]; clublog_password: boolean; clublog_app_key: boolean; lotw_password: boolean; eqsl_password: boolean };
+  secrets: { qrz_calls: string[]; clublog_password: boolean; lotw_password: boolean; eqsl_password: boolean };
   pending: { qrz: number; clublog: number; eqsl: number; lotw: { mapping: LotwMapping; pending: number }[] };
   runs: Partial<Record<QslService, QslRun>>;
   downloads: Partial<Record<"lotw" | "eqsl", QslDownload>>;
   tqsl: { path: string | null; found: boolean; locations: string[] };
 }
-export interface QslSecrets { qrz_keys?: Record<string, string>; clublog_password?: string; clublog_app_key?: string; lotw_password?: string; eqsl_password?: string }
+export interface QslSecrets { qrz_keys?: Record<string, string>; clublog_password?: string; lotw_password?: string; eqsl_password?: string }
 
 export type AwardKind = "dxcc" | "was" | "waz" | "wpx" | "wac" | "itu" | "vucc" | "iota" | "counties";
 export type AwardStatus = "worked" | "confirmed";
