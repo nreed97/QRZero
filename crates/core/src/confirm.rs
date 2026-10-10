@@ -159,21 +159,14 @@ pub async fn eqsl_confirmations(
 }
 
 /// Downloads the QSOs QRZ Logbook reports as confirmed (QRZ.com's own match, or
-/// LoTW's, which QRZ honors) for the logbook that `api_key` belongs to. `since`
-/// (YYYY-MM-DD; empty for all) limits it to QSOs QRZ changed since then.
-pub async fn qrz_confirmations(endpoint: &str, api_key: &str, since: &str) -> Result<Vec<Fields>, QslError> {
+/// LoTW's, which QRZ honors) for the logbook that `api_key` belongs to, a page at a time.
+pub async fn qrz_confirmations(endpoint: &str, api_key: &str) -> Result<Vec<Fields>, QslError> {
     const PAGE: usize = 1000;
     let http = download_client();
     let mut out: Vec<Fields> = Vec::new();
     let mut after = 0u64;
     loop {
-        let mut opt = format!("TYPE:ADIF,STATUS:CONFIRMED,MAX:{PAGE}");
-        if after > 0 {
-            opt.push_str(&format!(",AFTERLOGID:{after}"));
-        }
-        if let Some(d) = Some(since.trim()).filter(|d| !d.is_empty()) {
-            opt.push_str(&format!(",MODSINCE:{d}"));
-        }
+        let opt = format!("TYPE:ADIF,STATUS:CONFIRMED,MAX:{PAGE},AFTERLOGID:{after}");
         let body = form_encode(&[("KEY", api_key.trim()), ("ACTION", "FETCH"), ("OPTION", &opt)]);
         let resp = http
             .post(endpoint)
@@ -196,7 +189,7 @@ pub async fn qrz_confirmations(endpoint: &str, api_key: &str, since: &str) -> Re
         match result {
             "OK" => {}
             // No QSOs matched.
-            "FAIL" if reason.to_ascii_lowercase().contains("no log entries") || reason.to_ascii_lowercase().contains("no matching") => break,
+            "FAIL" if reason.to_ascii_lowercase().starts_with("no ") => break,
             "AUTH" => return Err(QslError::Auth(if reason.is_empty() { "invalid QRZ API key".into() } else { reason })),
             "FAIL" if reason.to_ascii_lowercase().contains("key") => return Err(QslError::Auth(reason)),
             other => return Err(QslError::Service(format!("QRZ {other}: {reason}"))),
@@ -205,10 +198,11 @@ pub async fn qrz_confirmations(endpoint: &str, api_key: &str, since: &str) -> Re
         let n = records.len();
         let top = records.iter().filter_map(|r| r.get("APP_QRZLOG_LOGID").and_then(|v| v.trim().parse::<u64>().ok())).max().unwrap_or(0);
         out.extend(records);
-        if n < PAGE || top <= after {
+        // AFTERLOGID is inclusive, so the next page starts one past the highest id seen.
+        if n < PAGE || top < after {
             break;
         }
-        after = top;
+        after = top + 1;
     }
     Ok(out)
 }

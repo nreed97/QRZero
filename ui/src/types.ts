@@ -236,7 +236,6 @@ export interface QslConfig {
   eqsl_nickname: string;
   eqsl_calls: string[];
   eqsl_rcvd_since: string;
-  qrz_rcvd_since: string;
   clublog_rcvd_since: string;
   confirm_daily: boolean;
   lotw_download_enabled: boolean;

@@ -73,8 +73,7 @@ pub struct QslConfig {
     /// Station callsigns uploaded to the eQSL account.
     pub eqsl_calls: Vec<String>,
     pub eqsl_rcvd_since: String,
-    /// QRZ Logbook and Club Log confirmations already downloaded up to this date (YYYY-MM-DD; empty: all).
-    pub qrz_rcvd_since: String,
+    /// Club Log matches already downloaded up to this date (YYYY-MM-DD; empty: all).
     pub clublog_rcvd_since: String,
     /// Download new eQSL confirmations once a day. (Older versions also
     /// downloaded LoTW's with it; see `lotw_download_enabled`.)
@@ -139,7 +138,6 @@ impl Default for QslConfig {
             eqsl_nickname: String::new(),
             eqsl_calls: Vec::new(),
             eqsl_rcvd_since: String::new(),
-            qrz_rcvd_since: String::new(),
             clublog_rcvd_since: String::new(),
             confirm_daily: false,
             lotw_download_enabled: false,
@@ -845,7 +843,7 @@ impl Qsl {
                 }
                 let mut all = Vec::new();
                 for key in keys {
-                    match confirm::qrz_confirmations(&self.endpoints.qrz, &key, &cfg.qrz_rcvd_since).await {
+                    match confirm::qrz_confirmations(&self.endpoints.qrz, &key).await {
                         Ok(r) => all.extend(r),
                         Err(e) => {
                             d.error = Some(e.to_string());
@@ -853,7 +851,8 @@ impl Qsl {
                         }
                     }
                 }
-                (ConfirmService::Qrz, all, Some(today_iso()))
+                // QRZ has no "confirmed since" filter, so every download asks for them all.
+                (ConfirmService::Qrz, all, None)
             }
             _ => {
                 let (Some(password), Some(app_key)) = (self.secret("clublog-password").filter(|_| !cfg.clublog_email.is_empty()), self.clublog_app_key()) else {
@@ -936,7 +935,6 @@ impl Qsl {
             match name {
                 "lotw" => c.lotw_rcvd_since = next,
                 "eqsl" => c.eqsl_rcvd_since = next,
-                "qrz" => c.qrz_rcvd_since = next,
                 _ => c.clublog_rcvd_since = next,
             }
             if let Ok(text) = serde_json::to_string(&c) {

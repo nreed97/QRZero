@@ -69,7 +69,7 @@ Paste each callsign's logbook **API key** (on QRZ.com: Logbook, Settings, API); 
 
 When you edit a QSO that was already uploaded, QRZero marks it modified and sends the corrected version.
 
-**Download confirmations** asks QRZ for the QSOs in your logbook it shows as confirmed, and sets **QRZ R** (with the date) on the matching QSOs. QRZ also counts the LoTW confirmations it knows of, so a QSO QRZ confirmed from LoTW is marked as a QRZ confirmation too; it does not set LoTW R. It checks every callsign you ticked, and the next download only asks for QSOs QRZ changed since the last one. A download never adds QSOs to your log.
+**Download confirmations** asks QRZ for the QSOs in your logbook it shows as confirmed, and sets **QRZ R** (with the date) on the matching QSOs. QRZ also counts the LoTW confirmations it knows of, so a QSO QRZ confirmed from LoTW is marked as a QRZ confirmation too; it does not set LoTW R. It checks every callsign you ticked and asks QRZ for all its confirmed QSOs each time, a page at a time, so a big logbook takes a moment. A download never adds QSOs to your log.
 
 ## Club Log
 

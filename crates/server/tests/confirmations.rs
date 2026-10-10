@@ -54,7 +54,7 @@ async fn mock(uploads: Arc<Mutex<Vec<String>>>) -> QslEndpoints {
         if !body.contains("KEY=QRZ-KEY") {
             return "RESULT=AUTH&REASON=invalid+api+key".to_string();
         }
-        assert!(body.contains("STATUS%3ACONFIRMED"), "{body}");
+        assert!(body.contains("STATUS%3ACONFIRMED") && body.contains("AFTERLOGID%3A0"), "{body}");
         let adi = record(&[("CALL", "JA1XYZ"), ("BAND", "20m"), ("MODE", "CW"), ("QSO_DATE", "20260101"), ("TIME_ON", "120500"), ("APP_QRZLOG_LOGID", "77")]);
         format!("RESULT=OK&COUNT=1&LOGIDS=77&ADIF={}", adi.replace('<', "&lt;").replace('>', "&gt;"))
     });
