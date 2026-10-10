@@ -20,7 +20,7 @@ Log grid columns for all of this: **LoTW R**, **QSL R**, **QRZ R**, **Club Log R
 
 ## Online services
 
-The **Online services** tab has one page per service: **LoTW**, **QRZ Logbook**, **Club Log** and **eQSL**. Pick one across the top. **Save** stays at the bottom for all of them. QRZ Logbook, Club Log and eQSL can also upload **shortly after a QSO is logged or edited** (**Wait (min)**, 2 to start with, 1 to 60); every change restarts the wait, so quick corrections go up in one piece. LoTW never does this; it stays manual or on its own download timer. To send particular QSOs, right-click them in the log and pick **Upload to** a service. QRZ Logbook, Club Log and eQSL each have their own **Upload new QSOs automatically** tick and **Every (min)** interval on their page, so one service can upload every 5 minutes while another is off or runs once an hour. After an upgrade each keeps the interval you had before. LoTW uploads only when you click **Sign and upload**, but it can download confirmations on a timer: tick **Download confirmations automatically** on its page and set **Every (min)** (once a day is 1440; on after an upgrade if you had the daily download on).  Rarely used LoTW options (upload by date range, moving from another logger) are under **Upload by date range, moving from another logger**.
+The **Online services** tab has one page per service: **LoTW**, **QRZ Logbook**, **Club Log** and **eQSL**. Pick one across the top. **Save** stays at the bottom for all of them. QRZ Logbook, Club Log and eQSL each have one **Upload new QSOs automatically** tick on their page, with a **Wait (min)** box beside it (2 to start with, 1 to 60). A QSO you log or edit goes up that many minutes later; every change restarts the wait, so quick corrections go up in one piece. Every 15 minutes QRZero also sweeps for anything still waiting (an import, or an upload that failed). Each service is switched on or off on its own. After an upgrade, a service that had either the timer or the "shortly after" tick on keeps uploading automatically. To send particular QSOs right away, right-click them in the log and pick **Upload to** a service. LoTW uploads only when you click **Sign and upload**, but it can download confirmations on a timer: tick **Download confirmations automatically** on its page and set **Every (min)** (once a day is 1440; on after an upgrade if you had the daily download on).  Rarely used LoTW options (upload by date range, moving from another logger) are under **Upload by date range, moving from another logger**.
 
 ## LoTW
 
@@ -72,7 +72,7 @@ The list shows up to 2000 QSOs; **Upload** sends all of them, not only the ones 
 
 ## QRZ Logbook
 
-Paste each callsign's logbook **API key** (on QRZ.com: Logbook, Settings, API); saving a key ticks that callsign for upload. Untick a callsign to pause it. **Test** checks the key. With **Upload new QSOs automatically** ticked, new QSOs go up every few minutes (15 by default; change **Every (min)** beside it). **Upload now** sends what's waiting straight away.
+Paste each callsign's logbook **API key** (on QRZ.com: Logbook, Settings, API); saving a key ticks that callsign for upload. Untick a callsign to pause it. **Test** checks the key. With **Upload new QSOs automatically** ticked, new and edited QSOs go up a couple of minutes after you log them (change **Wait (min)** beside it). **Upload now** sends what's waiting straight away.
 
 When you edit a QSO that was already uploaded, QRZero marks it modified and sends the corrected version.
 
@@ -86,7 +86,7 @@ Enter your Club Log email and password (an application password works if you use
 
 ## eQSL
 
-Enter your eQSL username and password, plus the **QTH nickname** if your eQSL account has more than one, and tick the callsigns to upload. Uploads work like QRZ and Club Log: on the timer, or with **Upload now**. **Download confirmations** fetches eQSLs from your eQSL inbox and sets **eQSL R** on the matching QSOs.
+Enter your eQSL username and password, plus the **QTH nickname** if your eQSL account has more than one, and tick the callsigns to upload. Uploads work like QRZ and Club Log: automatically after the wait, or with **Upload now**. **Download confirmations** fetches eQSLs from your eQSL inbox and sets **eQSL R** on the matching QSOs.
 
 Tick **Download eQSL confirmations once a day** on the eQSL page to have this done for you.
 

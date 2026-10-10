@@ -20,6 +20,8 @@ use crate::station::{cty_facts, Hub};
 const BATCH: i64 = 500;
 /// Shortest wait (minutes) before a live upload, so a burst of edits goes up once.
 const LIVE_MIN: u32 = 1;
+/// Minutes between sweeps of everything not yet uploaded, for services set to upload automatically.
+const SWEEP_MIN: u64 = 15;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LotwMapping {
@@ -32,19 +34,16 @@ pub struct LotwMapping {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct QslConfig {
-    /// The one interval older versions used for every service. Kept so an
-    /// upgrade gives each service its own copy of it (see `normalize`).
-    pub interval_min: u32,
-    /// Minutes between automatic uploads, per service (0: take `interval_min`).
-    pub qrz_interval_min: u32,
-    pub clublog_interval_min: u32,
-    pub eqsl_interval_min: u32,
-    /// Upload a new or edited QSO a short while after it is saved, instead of
-    /// waiting for the timer. Each edit within the delay restarts it.
+    /// Settings from older versions, read only so `normalize` can carry them over:
+    /// "upload shortly after logging" became "upload automatically".
+    #[serde(skip_serializing)]
     pub qrz_live: bool,
+    #[serde(skip_serializing)]
     pub clublog_live: bool,
+    #[serde(skip_serializing)]
     pub eqsl_live: bool,
-    /// Minutes to wait after the last change (1 to 60; 0: not set yet, `normalize` fills 2).
+    /// Minutes to wait after a QSO is logged or edited before uploading it, per
+    /// service; every change restarts the wait (1 to 60; 0: not set, `normalize` fills 2).
     pub qrz_live_delay_min: u32,
     pub clublog_live_delay_min: u32,
     pub eqsl_live_delay_min: u32,
@@ -88,8 +87,7 @@ pub struct QslConfig {
 }
 
 impl QslConfig {
-    /// Gives a service without its own interval (settings saved by an older
-    /// version) the interval it used so far, and keeps all of them in range.
+    /// Carries settings from older versions over, and keeps every value in range.
     fn normalize(&mut self) {
         if self.lotw_download_interval_min == 0 {
             // Before this setting, "once a day" also downloaded LoTW.
@@ -100,23 +98,16 @@ impl QslConfig {
         for d in [&mut self.qrz_live_delay_min, &mut self.clublog_live_delay_min, &mut self.eqsl_live_delay_min] {
             *d = if *d == 0 { 2 } else { (*d).clamp(LIVE_MIN, 60) };
         }
-        let old = if self.interval_min == 0 { 15 } else { self.interval_min };
-        for m in [&mut self.qrz_interval_min, &mut self.clublog_interval_min, &mut self.eqsl_interval_min] {
-            if *m == 0 {
-                *m = old;
-            }
-            *m = (*m).clamp(1, 24 * 60);
-        }
+        // The old "upload shortly after logging" tick is now the one automatic upload.
+        self.qrz_enabled |= std::mem::take(&mut self.qrz_live);
+        self.clublog_enabled |= std::mem::take(&mut self.clublog_live);
+        self.eqsl_enabled |= std::mem::take(&mut self.eqsl_live);
     }
 }
 
 impl Default for QslConfig {
     fn default() -> Self {
         QslConfig {
-            interval_min: 15,
-            qrz_interval_min: 0,
-            clublog_interval_min: 0,
-            eqsl_interval_min: 0,
             qrz_live: false,
             clublog_live: false,
             eqsl_live: false,
@@ -388,7 +379,7 @@ impl Qsl {
         })
     }
 
-    /// Uploads to QRZ, Club Log and eQSL, each on its own interval, and
+    /// Sweeps QRZ, Club Log and eQSL for QSOs not yet uploaded (the live upload does the rest), and
     /// downloads confirmations once a day when that is on.
     pub fn start(self: &Arc<Self>) {
         self.start_live();
@@ -400,13 +391,11 @@ impl Qsl {
                 tokio::time::sleep(Duration::from_secs(30)).await;
                 let Some(q) = me.upgrade() else { return };
                 let cfg = q.config();
-                for (svc, on, minutes) in [
-                    ("qrz", cfg.qrz_enabled, cfg.qrz_interval_min),
-                    ("clublog", cfg.clublog_enabled, cfg.clublog_interval_min),
-                    ("eqsl", cfg.eqsl_enabled, cfg.eqsl_interval_min),
-                ] {
+                // A slow sweep behind the live upload, for QSOs that arrive another way
+                // (an import) or whose upload failed.
+                for (svc, on) in [("qrz", cfg.qrz_enabled), ("clublog", cfg.clublog_enabled), ("eqsl", cfg.eqsl_enabled)] {
                     let since = *last.entry(svc).or_insert(begin);
-                    if on && since.elapsed() >= Duration::from_secs(60 * minutes.clamp(1, 24 * 60) as u64) {
+                    if on && since.elapsed() >= Duration::from_secs(60 * SWEEP_MIN) {
                         last.insert(svc, std::time::Instant::now());
                         q.upload(svc).await;
                     }
@@ -448,9 +437,9 @@ impl Qsl {
                         let Some(q) = me.upgrade() else { return };
                         let cfg = q.config();
                         for (svc, live, delay) in [
-                            ("qrz", cfg.qrz_live, cfg.qrz_live_delay_min),
-                            ("clublog", cfg.clublog_live, cfg.clublog_live_delay_min),
-                            ("eqsl", cfg.eqsl_live, cfg.eqsl_live_delay_min),
+                            ("qrz", cfg.qrz_enabled, cfg.qrz_live_delay_min),
+                            ("clublog", cfg.clublog_enabled, cfg.clublog_live_delay_min),
+                            ("eqsl", cfg.eqsl_enabled, cfg.eqsl_live_delay_min),
                         ] {
                             if live {
                                 due.insert(svc, std::time::Instant::now() + Duration::from_secs(60 * delay as u64));
@@ -467,7 +456,7 @@ impl Qsl {
                         let cfg = q.config();
                         for svc in ready {
                             due.remove(svc);
-                            let live = match svc { "qrz" => cfg.qrz_live, "clublog" => cfg.clublog_live, _ => cfg.eqsl_live };
+                            let live = match svc { "qrz" => cfg.qrz_enabled, "clublog" => cfg.clublog_enabled, _ => cfg.eqsl_enabled };
                             if live {
                                 q.upload(svc).await;
                             }
@@ -551,7 +540,7 @@ impl Qsl {
         cfg.normalize();
         let today = Utc::now().format("%Y-%m-%d").to_string();
         // Turning a service on starts from today, so an imported log isn't sent again.
-        for (on, date) in [(cfg.qrz_enabled || cfg.qrz_live, &mut cfg.qrz_since), (cfg.clublog_enabled || cfg.clublog_live, &mut cfg.clublog_since), (cfg.eqsl_enabled || cfg.eqsl_live, &mut cfg.eqsl_since)] {
+        for (on, date) in [(cfg.qrz_enabled, &mut cfg.qrz_since), (cfg.clublog_enabled, &mut cfg.clublog_since), (cfg.eqsl_enabled, &mut cfg.eqsl_since)] {
             if on && date.trim().is_empty() {
                 *date = today.clone();
             }
@@ -1113,18 +1102,16 @@ mod tests {
     }
 
     #[test]
-    fn upgrade_keeps_each_services_interval() {
-        // Settings saved before per-service intervals only have `interval_min`.
-        let mut c: QslConfig = serde_json::from_str(r#"{"interval_min":40,"qrz_enabled":true}"#).unwrap();
+    fn older_settings_carry_over() {
+        // The old "upload shortly after logging" tick, or the timer tick, becomes "upload automatically".
+        let mut c: QslConfig = serde_json::from_str(r#"{"interval_min":40,"clublog_live":true,"eqsl_enabled":true}"#).unwrap();
         c.normalize();
-        assert_eq!((c.qrz_interval_min, c.clublog_interval_min, c.eqsl_interval_min), (40, 40, 40));
+        assert!(c.clublog_enabled && c.eqsl_enabled && !c.qrz_enabled);
+        assert_eq!((c.qrz_live_delay_min, c.clublog_live_delay_min), (2, 2));
+        assert!(!serde_json::to_string(&c).unwrap().contains("_live\""), "the old tick isn't saved again");
         assert!(!c.lotw_download_enabled && c.lotw_download_interval_min == 1440);
         let mut d: QslConfig = serde_json::from_str(r#"{"confirm_daily":true}"#).unwrap();
         d.normalize();
         assert!(d.lotw_download_enabled, "daily LoTW download carries over");
-        // Afterwards they are independent.
-        c.clublog_interval_min = 5;
-        c.normalize();
-        assert_eq!((c.qrz_interval_min, c.clublog_interval_min), (40, 5));
     }
 }
