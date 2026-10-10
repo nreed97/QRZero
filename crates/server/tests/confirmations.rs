@@ -51,10 +51,13 @@ async fn mock(uploads: Arc<Mutex<Vec<String>>>) -> QslEndpoints {
     });
     // QRZ Logbook: the confirmed QSOs, with the ADIF angle brackets as entities like the real service.
     let qrz = post(|body: String| async move {
+        if body.contains("KEY=QRZ-EMPTY") {
+            return "RESULT=FAIL&COUNT=0&REASON=No+log+entries+found".to_string();
+        }
         if !body.contains("KEY=QRZ-KEY") {
             return "RESULT=AUTH&REASON=invalid+api+key".to_string();
         }
-        assert!(body.contains("STATUS%3ACONFIRMED") && body.contains("AFTERLOGID%3A0"), "{body}");
+        assert!(body.contains("STATUS%3ACONFIRMED") && body.contains("AFTERLOGID%3A0") && body.contains("MAX%3A250"), "{body}");
         let adi = record(&[("CALL", "JA1XYZ"), ("BAND", "20m"), ("MODE", "CW"), ("QSO_DATE", "20260101"), ("TIME_ON", "120500"), ("APP_QRZLOG_LOGID", "77")]);
         format!("RESULT=OK&COUNT=1&LOGIDS=77&ADIF={}", adi.replace('<', "&lt;").replace('>', "&gt;"))
     });
@@ -328,6 +331,12 @@ async fn qrz_and_clublog_confirmations() {
     assert_eq!(ja["QRZCOM_QSO_UPLOAD_STATUS"], "Y", "a confirmed QSO is on QRZ");
     assert_eq!(ja["QRZCOM_QSO_DOWNLOAD_DATE"].as_str().unwrap().len(), 8);
     assert!(api.fields(log, "W1AW").await.get("QRZCOM_QSO_DOWNLOAD_STATUS").is_none());
+
+    // A logbook with nothing confirmed answers FAIL; that is zero confirmations, not an error.
+    api.put("/qsl", json!({"config": api.get("/qsl").await["config"].clone(), "secrets": {"qrz_keys": {"N0CALL": "QRZ-EMPTY"}}})).await;
+    let d = api.post("/qsl/download/qrz", json!(null)).await;
+    assert!(d["error"].is_null() && d["received"] == 0, "{d}");
+    api.put("/qsl", json!({"config": api.get("/qsl").await["config"].clone(), "secrets": {"qrz_keys": {"N0CALL": "QRZ-KEY"}}})).await;
 
     // The match for VK2XYZ has no mode and is dropped; ZZ9ZZ isn't in the log.
     let d = api.post("/qsl/download/clublog", json!(null)).await;

@@ -10,7 +10,7 @@ use chrono::{NaiveDate, NaiveTime};
 
 use crate::adif::{self, Fields};
 use crate::band::{band_for_freq, normalize_band};
-use crate::qsl::{form_encode, http_client, upload_record, QslError, Upload, USER_AGENT};
+use crate::qsl::{form_encode, http_client, upload_record, url_decode, QslError, Upload, USER_AGENT};
 
 /// Production LoTW report endpoint.
 pub const LOTW_REPORT_ENDPOINT: &str = "https://lotw.arrl.org/lotwuser/lotwreport.adi";
@@ -161,7 +161,8 @@ pub async fn eqsl_confirmations(
 /// Downloads the QSOs QRZ Logbook reports as confirmed (QRZ.com's own match, or
 /// LoTW's, which QRZ honors) for the logbook that `api_key` belongs to, a page at a time.
 pub async fn qrz_confirmations(endpoint: &str, api_key: &str) -> Result<Vec<Fields>, QslError> {
-    const PAGE: usize = 1000;
+    // QRZ's own recommended page size; a larger MAX may be cut short by the server.
+    const PAGE: usize = 250;
     let http = download_client();
     let mut out: Vec<Fields> = Vec::new();
     let mut after = 0u64;
@@ -185,14 +186,21 @@ pub async fn qrz_confirmations(endpoint: &str, api_key: &str) -> Result<Vec<Fiel
             None => (text.as_str(), None),
         };
         let result = head.split('&').find_map(|p| p.strip_prefix("RESULT=")).unwrap_or("");
-        let reason = head.split('&').find_map(|p| p.strip_prefix("REASON=")).unwrap_or("").replace('+', " ");
+        let reason = url_decode(head.split('&').find_map(|p| p.strip_prefix("REASON=")).unwrap_or("")).trim().to_string();
+        let count = head.split('&').find_map(|p| p.strip_prefix("COUNT=")).and_then(|c| c.trim().parse::<u64>().ok());
         match result {
             "OK" => {}
             // No QSOs matched.
-            "FAIL" if reason.to_ascii_lowercase().starts_with("no ") => break,
+            // QRZ answers FAIL, not OK, when nothing matches: the page after the last one,
+            // sometimes with no reason at all. On the first page a reason-less FAIL is
+            // reported, since it can't be told apart from a refused request.
+            "FAIL" if count == Some(0) || reason.to_ascii_lowercase().starts_with("no ") || (reason.is_empty() && !out.is_empty()) => break,
             "AUTH" => return Err(QslError::Auth(if reason.is_empty() { "invalid QRZ API key".into() } else { reason })),
             "FAIL" if reason.to_ascii_lowercase().contains("key") => return Err(QslError::Auth(reason)),
-            other => return Err(QslError::Service(format!("QRZ {other}: {reason}"))),
+            other => return Err(QslError::Service(format!(
+                "QRZ {other}: {}",
+                if reason.is_empty() { format!("no reason given (reply: {}); nothing confirmed, or the request was refused", visible_text(&text)) } else { reason }
+            ))),
         }
         let records = adi.map(qrz_adif).map(|a| adif::parse(a.as_bytes()).records).unwrap_or_default();
         let n = records.len();
