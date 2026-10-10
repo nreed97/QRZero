@@ -300,7 +300,9 @@ fn router(state: Shared) -> Router {
         .route("/qsl/upload/{service}", post(qsl_upload))
         .route("/qsl/upload/{service}/qsos", post(qsl_upload_qsos))
         .route("/qsl/targets", get(qsl_targets))
-        .route("/qsl/lotw/range", get(qsl_lotw_waiting).post(qsl_lotw_range))
+        .route("/qsl/queue/{service}", get(qsl_queue))
+        .route("/qsl/queue/{service}/upload", post(qsl_queue_upload))
+        .route("/qsl/queue/{service}/remove", post(qsl_queue_remove))
         .route("/qsl/download/{service}", post(qsl_download))
         .merge(backups::routes())
         .layer(middleware::from_fn_with_state(state.clone(), require_token))
@@ -1658,19 +1660,28 @@ async fn qsl_download(State(s): State<Shared>, Path(service): Path<String>) -> A
     Ok(Json(s.qsl.download(&service, false).await))
 }
 
+/// A date range, YYYY-MM-DD; a blank start is the start of the log, a blank end has no end.
 #[derive(Deserialize)]
 struct RangeBody {
+    #[serde(default)]
     from: String,
+    #[serde(default)]
     to: String,
 }
 
-async fn qsl_lotw_waiting(State(s): State<Shared>, Query(q): Query<RangeBody>) -> ApiResult<serde_json::Value> {
-    let v = s.qsl.lotw_waiting(&q.from, &q.to).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+/// The QSOs a service would be sent for a date range, up to 2000 of them.
+async fn qsl_queue(State(s): State<Shared>, Path(service): Path<String>, Query(q): Query<RangeBody>) -> ApiResult<qsl::Queue> {
+    let v = s.qsl.queue(&service, &q.from, &q.to, 2000).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
     Ok(Json(v))
 }
 
-async fn qsl_lotw_range(State(s): State<Shared>, Json(b): Json<RangeBody>) -> ApiResult<qsl::Run> {
-    Ok(Json(s.qsl.upload_lotw(Some((&b.from, &b.to))).await))
+async fn qsl_queue_upload(State(s): State<Shared>, Path(service): Path<String>, Json(b): Json<RangeBody>) -> ApiResult<qsl::Run> {
+    Ok(Json(s.qsl.upload_range(&service, &b.from, &b.to).await))
+}
+
+async fn qsl_queue_remove(State(s): State<Shared>, Path(service): Path<String>, Json(b): Json<IdsBody>) -> ApiResult<serde_json::Value> {
+    let n = s.qsl.unqueue(&service, &b.ids).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(serde_json::json!({ "removed": n })))
 }
 
 async fn qsl_targets(State(s): State<Shared>) -> Json<Vec<&'static str>> {

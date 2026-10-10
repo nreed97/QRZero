@@ -400,9 +400,18 @@ async fn lotw_upload_needed_by_date_range() {
     cfg["lotw"] = json!([{"callsign": "N0CALL", "location_id": loc, "station_location": "Home QTH"}]);
     api.put("/qsl", json!({"config": cfg, "secrets": {"qrz_keys": {}}})).await;
 
-    let w = api.get("/qsl/lotw/range?from=2025-06-01&to=2025-06-03").await;
-    assert_eq!(w["locations"][0]["waiting"], 2, "{w}");
-    let run = api.post("/qsl/lotw/range", json!({"from": "2025-06-01", "to": "2025-06-03"})).await;
+    let w = api.get("/qsl/queue/lotw?from=2025-06-01&to=2025-06-03").await;
+    assert_eq!(w["total"], 2, "{w}");
+    assert_eq!(w["rows"][0]["call"], "A1AA", "{w}");
+    // Taking a QSO out of the queue keeps it out of the upload.
+    let c3 = w["rows"][1]["id"].as_i64().unwrap();
+    api.post("/qsl/queue/lotw/remove", json!({"ids": [c3]})).await;
+    assert_eq!(api.get("/qsl/queue/lotw?from=2025-06-01&to=2025-06-03").await["total"], 1);
+    let mut f = api.get(&format!("/qsos/{c3}")).await;
+    f["fields"]["LOTW_QSL_SENT"] = json!("N");
+    api.put(&format!("/qsos/{c3}"), json!({"location_id": loc, "fields": f["fields"]})).await;
+    assert_eq!(api.get("/qsl/queue/lotw?from=2025-06-01&to=2025-06-03").await["total"], 2);
+    let run = api.post("/qsl/queue/lotw/upload", json!({"from": "2025-06-01", "to": "2025-06-03"})).await;
     assert_eq!(run["uploaded"], 2, "{run}");
     let args = std::fs::read_to_string(&record).unwrap();
     assert!(args.contains("<CALL:4>A1AA") && args.contains("<CALL:4>C3CC"), "{args}");
@@ -412,6 +421,43 @@ async fn lotw_upload_needed_by_date_range() {
     assert_eq!(a["LOTW_QSLSDATE"].as_str().unwrap().len(), 8);
     assert!(api.fields(log, "D4DD").await.get("LOTW_QSL_SENT").is_none());
 
-    let bad = api.post("/qsl/lotw/range", json!({"from": "2025-06-03", "to": "2025-06-01"})).await;
+    let bad = api.post("/qsl/queue/lotw/upload", json!({"from": "2025-06-03", "to": "2025-06-01"})).await;
     assert!(bad["error"].as_str().unwrap().contains("before"), "{bad}");
+}
+
+#[tokio::test]
+async fn qrz_queue_preview_remove_and_range_upload() {
+    let seen = Seen::default();
+    let (qrz, clublog) = mock_services(seen.clone()).await;
+    let api = Api::new(qrz, clublog).await;
+    let (log, loc) = api.setup().await;
+    let mut ids = Vec::new();
+    for (call, date) in [("A1AA", "20250601"), ("B2BB", "20250602"), ("C3CC", "20250603"), ("D4DD", "20250701")] {
+        let f = json!({"CALL": call, "QSO_DATE": date, "TIME_ON": "2330", "BAND": "20m", "FREQ": "14.025", "MODE": "CW", "STATION_CALLSIGN": "N0CALL"});
+        ids.push(api.post(&format!("/logs/{log}/qsos"), json!({"location_id": loc, "fields": f})).await["id"].as_i64().unwrap());
+    }
+    let mut cfg = api.get("/qsl").await["config"].clone();
+    cfg["qrz_calls"] = json!(["N0CALL"]);
+    cfg["qrz_since"] = json!("2030-01-01"); // the range overrides this
+    api.put("/qsl", json!({"config": cfg, "secrets": {"qrz_keys": {"N0CALL": "GOOD-KEY"}}})).await;
+
+    // Everything not yet sent, then a date range with the ends included.
+    let all = api.get("/qsl/queue/qrz").await;
+    assert_eq!(all["total"], 4, "{all}");
+    let q = api.get("/qsl/queue/qrz?from=2025-06-02&to=2025-06-03").await;
+    assert_eq!(q["total"], 2, "{q}");
+    assert_eq!(q["rows"][0]["call"], "B2BB");
+    assert_eq!(q["rows"][0]["band"], "20m");
+    assert_eq!(q["rows"][0]["time"], "2330");
+
+    // Remove B2BB: it is marked ignore and stays out of the preview and the upload.
+    api.post("/qsl/queue/qrz/remove", json!({"ids": [ids[1]]})).await;
+    assert_eq!(api.fields(log, "B2BB").await["QRZCOM_QSO_UPLOAD_STATUS"], "I");
+    assert_eq!(api.get("/qsl/queue/qrz?from=2025-06-02&to=2025-06-03").await["total"], 1);
+    let run = api.post("/qsl/queue/qrz/upload", json!({"from": "2025-06-02", "to": "2025-06-03"})).await;
+    assert_eq!(run["uploaded"], 1, "{run}");
+    assert_eq!(api.fields(log, "C3CC").await["QRZCOM_QSO_UPLOAD_STATUS"], "Y");
+    assert!(api.fields(log, "A1AA").await.get("QRZCOM_QSO_UPLOAD_STATUS").is_none());
+    assert!(api.fields(log, "D4DD").await.get("QRZCOM_QSO_UPLOAD_STATUS").is_none());
+    assert_eq!(api.get("/qsl/queue/qrz").await["total"], 2);
 }

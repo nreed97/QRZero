@@ -4,7 +4,7 @@ import type { Fields, Qso } from "./types";
 import { fmtDate, fmtTime } from "./util";
 import { fmtFreq } from "./display";
 import { modeLabel, type ModeGroup } from "./modes";
-import { confirmedShort, OQRS } from "./confirmations";
+import { CLUBLOG_RCVD, confirmedShort, OQRS } from "./confirmations";
 
 export type Width = "s" | "m" | "l" | "xl";
 
@@ -188,6 +188,7 @@ export const COLUMNS: ColumnDef[] = [
   { key: "QSL_SENT", label: "QSL S", width: "46px", get: f("QSL_SENT") },
   { key: "QSL_RCVD", label: "QSL R", width: "46px", get: f("QSL_RCVD") },
   { key: "QRZCOM_QSO_DOWNLOAD_STATUS", label: "QRZ R", width: "46px", get: f("QRZCOM_QSO_DOWNLOAD_STATUS") },
+  { key: CLUBLOG_RCVD, label: "Club Log R", width: "62px", get: f(CLUBLOG_RCVD) },
   { key: OQRS, label: "OQRS", width: "46px", get: f(OQRS) },
   { key: "confirmed", label: "Confirmed", width: "70px", get: (q) => confirmedShort(q.fields) },
   { key: "SKCC", label: "SKCC", width: "60px", get: f("SKCC") },
