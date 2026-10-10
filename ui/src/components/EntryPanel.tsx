@@ -71,7 +71,8 @@ function radioMode(r: Radio): string | null {
 // Lookup fields logged even when they aren't shown in the form.
 const CARRIED = ["CQZ", "ITUZ", "CONT", "LAT", "LON", "IOTA", "EMAIL", "QSL_VIA", "DXCC", "COUNTRY", "GRIDSQUARE", "STATE", "CNTY", "NAME", "QTH", "NOTES"];
 // About one contact only, so never filled in from the last QSO with the same call.
-const PER_QSO = new Set(["COMMENT", "QSLMSG", "STX", "SRX", "STX_STRING", "SRX_STRING", "RST_SENT", "RST_RCVD"]);
+// SKCC is here because a blank number means it wasn't exchanged on that QSO, and SKCC awards count only QSOs that have one.
+const PER_QSO = new Set(["SKCC", "COMMENT", "QSLMSG", "STX", "SRX", "STX_STRING", "SRX_STRING", "RST_SENT", "RST_RCVD"]);
 
 // Picked equipment ids; -1 is "none", and antenna 0 is "Auto (by band)".
 interface Gear { rig?: number; antenna?: number; amplifier?: number }

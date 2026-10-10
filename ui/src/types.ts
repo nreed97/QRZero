@@ -208,6 +208,12 @@ export interface LotwMapping { callsign: string; location_id: number; station_lo
 export interface QslConfig {
   interval_min: number;
   qrz_interval_min: number;
+  qrz_live: boolean;
+  qrz_live_delay_min: number;
+  clublog_live: boolean;
+  clublog_live_delay_min: number;
+  eqsl_live: boolean;
+  eqsl_live_delay_min: number;
   clublog_interval_min: number;
   eqsl_interval_min: number;
   qrz_enabled: boolean;

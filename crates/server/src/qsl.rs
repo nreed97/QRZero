@@ -18,6 +18,8 @@ use serde_json::json;
 use crate::station::{cty_facts, Hub};
 
 const BATCH: i64 = 500;
+/// Shortest wait (minutes) before a live upload, so a burst of edits goes up once.
+const LIVE_MIN: u32 = 1;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LotwMapping {
@@ -37,6 +39,15 @@ pub struct QslConfig {
     pub qrz_interval_min: u32,
     pub clublog_interval_min: u32,
     pub eqsl_interval_min: u32,
+    /// Upload a new or edited QSO a short while after it is saved, instead of
+    /// waiting for the timer. Each edit within the delay restarts it.
+    pub qrz_live: bool,
+    pub clublog_live: bool,
+    pub eqsl_live: bool,
+    /// Minutes to wait after the last change (1 to 60; 0: not set yet, `normalize` fills 2).
+    pub qrz_live_delay_min: u32,
+    pub clublog_live_delay_min: u32,
+    pub eqsl_live_delay_min: u32,
     pub qrz_enabled: bool,
     /// Only QSOs from this date (YYYY-MM-DD) on are uploaded.
     pub qrz_since: String,
@@ -81,6 +92,9 @@ impl QslConfig {
             self.lotw_download_enabled = self.confirm_daily;
         }
         self.lotw_download_interval_min = self.lotw_download_interval_min.clamp(1, 7 * 24 * 60);
+        for d in [&mut self.qrz_live_delay_min, &mut self.clublog_live_delay_min, &mut self.eqsl_live_delay_min] {
+            *d = if *d == 0 { 2 } else { (*d).clamp(LIVE_MIN, 60) };
+        }
         let old = if self.interval_min == 0 { 15 } else { self.interval_min };
         for m in [&mut self.qrz_interval_min, &mut self.clublog_interval_min, &mut self.eqsl_interval_min] {
             if *m == 0 {
@@ -98,6 +112,12 @@ impl Default for QslConfig {
             qrz_interval_min: 0,
             clublog_interval_min: 0,
             eqsl_interval_min: 0,
+            qrz_live: false,
+            clublog_live: false,
+            eqsl_live: false,
+            qrz_live_delay_min: 0,
+            clublog_live_delay_min: 0,
+            eqsl_live_delay_min: 0,
             qrz_enabled: false,
             qrz_since: String::new(),
             qrz_calls: Vec::new(),
@@ -271,6 +291,7 @@ impl Qsl {
     /// Uploads to QRZ, Club Log and eQSL, each on its own interval, and
     /// downloads confirmations once a day when that is on.
     pub fn start(self: &Arc<Self>) {
+        self.start_live();
         let me = Arc::downgrade(self);
         tokio::spawn(async move {
             let mut last: BTreeMap<&'static str, std::time::Instant> = BTreeMap::new();
@@ -299,6 +320,58 @@ impl Qsl {
                     if on && ready && since.elapsed() >= Duration::from_secs(60 * minutes as u64) {
                         last.insert(key, std::time::Instant::now());
                         q.download(svc, true).await;
+                    }
+                }
+            }
+        });
+    }
+
+    /// Live upload: a new or edited QSO starts (or restarts) each live service's
+    /// delay; when it runs out, everything pending goes up.
+    fn start_live(self: &Arc<Self>) {
+        let me = Arc::downgrade(self);
+        let (_, mut rx) = self.hub.subscribe();
+        tokio::spawn(async move {
+            let mut due: BTreeMap<&'static str, std::time::Instant> = BTreeMap::new();
+            let mut tick = tokio::time::interval(Duration::from_secs(2));
+            loop {
+                tokio::select! {
+                    ev = rx.recv() => {
+                        let changed = match ev {
+                            Ok(raw) => serde_json::from_str::<serde_json::Value>(&raw).is_ok_and(|v| is_qso_change(&v)),
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => true,
+                            Err(_) => return,
+                        };
+                        if !changed {
+                            continue;
+                        }
+                        let Some(q) = me.upgrade() else { return };
+                        let cfg = q.config();
+                        for (svc, live, delay) in [
+                            ("qrz", cfg.qrz_live, cfg.qrz_live_delay_min),
+                            ("clublog", cfg.clublog_live, cfg.clublog_live_delay_min),
+                            ("eqsl", cfg.eqsl_live, cfg.eqsl_live_delay_min),
+                        ] {
+                            if live {
+                                due.insert(svc, std::time::Instant::now() + Duration::from_secs(60 * delay as u64));
+                            }
+                        }
+                    }
+                    _ = tick.tick() => {
+                        let now = std::time::Instant::now();
+                        let ready: Vec<&'static str> = due.iter().filter(|(_, t)| **t <= now).map(|(s, _)| *s).collect();
+                        if ready.is_empty() {
+                            continue;
+                        }
+                        let Some(q) = me.upgrade() else { return };
+                        let cfg = q.config();
+                        for svc in ready {
+                            due.remove(svc);
+                            let live = match svc { "qrz" => cfg.qrz_live, "clublog" => cfg.clublog_live, _ => cfg.eqsl_live };
+                            if live {
+                                q.upload(svc).await;
+                            }
+                        }
                     }
                 }
             }
@@ -378,7 +451,7 @@ impl Qsl {
         cfg.normalize();
         let today = Utc::now().format("%Y-%m-%d").to_string();
         // Turning a service on starts from today, so an imported log isn't sent again.
-        for (on, date) in [(cfg.qrz_enabled, &mut cfg.qrz_since), (cfg.clublog_enabled, &mut cfg.clublog_since), (cfg.eqsl_enabled, &mut cfg.eqsl_since)] {
+        for (on, date) in [(cfg.qrz_enabled || cfg.qrz_live, &mut cfg.qrz_since), (cfg.clublog_enabled || cfg.clublog_live, &mut cfg.clublog_since), (cfg.eqsl_enabled || cfg.eqsl_live, &mut cfg.eqsl_since)] {
             if on && date.trim().is_empty() {
                 *date = today.clone();
             }
@@ -429,8 +502,44 @@ impl Qsl {
         self.hub.emit(json!({"type": "qsl", "service": name, "run": run}));
     }
 
-    /// Uploads everything pending to QRZ or Club Log.
+    /// Uploads everything pending to QRZ, Club Log or eQSL.
     pub async fn upload(&self, name: &str) -> Run {
+        self.upload_some(name, None).await
+    }
+
+    /// Uploads the given QSOs (whatever their sent status) to a configured service.
+    pub async fn upload_ids(&self, name: &str, ids: &[i64]) -> Run {
+        if name == "lotw" {
+            let only: HashSet<i64> = ids.iter().copied().collect();
+            let _busy = self.busy.lock().await;
+            self.set_run(LOTW.name, Run { running: true, at: Utc::now().timestamp(), ..Run::default() });
+            let run = self.lotw_run(None, Some(&only)).await;
+            self.set_run(LOTW.name, run.clone());
+            return run;
+        }
+        self.upload_some(name, Some(ids)).await
+    }
+
+    /// Services that are set up well enough to upload to, for the log's right-click menu.
+    pub fn targets(&self) -> Vec<&'static str> {
+        let cfg = self.config();
+        let mut out = Vec::new();
+        if cfg.qrz_calls.iter().any(|c| self.secret(&qrz_secret(c)).is_some()) {
+            out.push("qrz");
+        }
+        if !cfg.clublog_calls.is_empty() && !cfg.clublog_email.is_empty() && self.secret("clublog-password").is_some() && self.clublog_app_key().is_some() {
+            out.push("clublog");
+        }
+        if !cfg.eqsl_calls.is_empty() && !cfg.eqsl_username.is_empty() && self.secret("eqsl-password").is_some() {
+            out.push("eqsl");
+        }
+        if !cfg.lotw.is_empty() {
+            out.push("lotw");
+        }
+        out
+    }
+
+    async fn upload_some(&self, name: &str, only: Option<&[i64]>) -> Run {
         let svc = match name {
             "qrz" => &QRZ,
             "clublog" => &CLUBLOG,
@@ -439,7 +548,7 @@ impl Qsl {
         };
         let _busy = self.busy.lock().await;
         self.set_run(svc.name, Run { running: true, at: Utc::now().timestamp(), ..Run::default() });
-        let run = self.upload_service(svc).await;
+        let run = self.upload_service(svc, only).await;
         self.set_run(svc.name, run.clone());
         run
     }
@@ -454,7 +563,7 @@ impl Qsl {
             .or_else(|| self.secret("clublog-app-key"))
     }
 
-    async fn upload_service(&self, svc: &Service) -> Run {
+    async fn upload_service(&self, svc: &Service, only: Option<&[i64]>) -> Run {
         let mut run = Run { at: Utc::now().timestamp(), ..Run::default() };
         let cfg = self.config();
         let (calls, date) = match svc.name {
@@ -499,6 +608,16 @@ impl Qsl {
             let pending = self
                 .db(|st| {
                     let mut all = Vec::new();
+                    if let Some(ids) = only {
+                        // Picked by hand: any status, but only QSOs logged as this station callsign.
+                        for &id in ids {
+                            let q = st.get_qso(id)?;
+                            if q.fields.get("STATION_CALLSIGN").is_some_and(|c| c.eq_ignore_ascii_case(call)) {
+                                all.push(q);
+                            }
+                        }
+                        return Ok(all);
+                    }
                     for log in st.list_logs()? {
                         all.extend(st.pending_uploads(log.id, svc.status_key, std::slice::from_ref(call), None, since(date), BATCH)?);
                     }
@@ -507,7 +626,7 @@ impl Qsl {
                 .unwrap_or_default();
             let mut changed_logs = HashSet::new();
             for qso in pending {
-                if self.lock().refused.contains(&(svc.name, qso.id)) {
+                if only.is_none() && self.lock().refused.contains(&(svc.name, qso.id)) {
                     continue;
                 }
                 let result = match &client {
@@ -689,12 +808,12 @@ impl Qsl {
         };
         let _busy = self.busy.lock().await;
         self.set_run(LOTW.name, Run { running: true, at: Utc::now().timestamp(), ..Run::default() });
-        let run = self.lotw_run(bounds).await;
+        let run = self.lotw_run(bounds, None).await;
         self.set_run(LOTW.name, run.clone());
         run
     }
 
-    async fn lotw_run(&self, bounds: Option<(i64, i64)>) -> Run {
+    async fn lotw_run(&self, bounds: Option<(i64, i64)>, only: Option<&HashSet<i64>>) -> Run {
         let mut run = Run { at: Utc::now().timestamp(), ..Run::default() };
         let cfg = self.config();
         let Some(tqsl) = (if cfg.tqsl_path.is_empty() { qsl::find_tqsl() } else { Some(PathBuf::from(&cfg.tqsl_path)) }) else {
@@ -712,6 +831,16 @@ impl Qsl {
         }
         for m in &cfg.lotw {
             let pending = self.db(|st| {
+                if let Some(ids) = only {
+                    let mut all = Vec::new();
+                    for &id in ids {
+                        let q = st.get_qso(id)?;
+                        if q.location_id == Some(m.location_id) && q.fields.get("STATION_CALLSIGN").is_some_and(|c| c.eq_ignore_ascii_case(&m.callsign)) {
+                            all.push(q);
+                        }
+                    }
+                    return Ok(all);
+                }
                 let loc = st.get_location(m.location_id)?;
                 let (from, until) = bounds.unwrap_or_else(|| (since(&cfg.lotw_since), i64::MAX));
                 st.pending_uploads_between(loc.log_id, LOTW.status_key, std::slice::from_ref(&m.callsign), Some(m.location_id), from, until, 50_000)
@@ -773,6 +902,16 @@ impl Qsl {
     }
 }
 
+/// Whether a hub event means a QSO was logged or edited by the user (not our own
+/// uploads, paper marks or QRZ lookups, which report as `qso_logged` too).
+fn is_qso_change(v: &serde_json::Value) -> bool {
+    match v["type"].as_str() {
+        Some("qso_saved") => true,
+        Some("qso_logged") => v["added"].as_bool() == Some(true),
+        _ => false,
+    }
+}
+
 #[derive(Default, Deserialize)]
 #[serde(default)]
 pub struct SecretsUpdate {
@@ -794,6 +933,21 @@ mod tests {
     fn since_dates() {
         assert_eq!(since("2024-01-02"), 1_704_153_600);
         assert!(since("") >= Utc::now().timestamp() - 5, "no date means from now on");
+    }
+
+    #[test]
+    fn live_delay_has_a_minimum() {
+        let mut c = QslConfig { qrz_live_delay_min: 0, clublog_live_delay_min: 1, eqsl_live_delay_min: 1000, ..QslConfig::default() };
+        c.normalize();
+        assert_eq!((c.qrz_live_delay_min, c.clublog_live_delay_min, c.eqsl_live_delay_min), (2, 1, 60));
+    }
+
+    #[test]
+    fn only_saved_qsos_start_live_upload() {
+        assert!(is_qso_change(&json!({"type": "qso_saved"})));
+        assert!(is_qso_change(&json!({"type": "qso_logged", "added": true})));
+        assert!(!is_qso_change(&json!({"type": "qso_logged", "added": false, "source": "qrz"})));
+        assert!(!is_qso_change(&json!({"type": "qsl", "service": "qrz"})));
     }
 
     #[test]

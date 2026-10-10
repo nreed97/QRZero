@@ -5,7 +5,7 @@ import { OQRS_ACTIONS, PAPER_ACTIONS } from "../paper";
 import { BANDS, MODES } from "../modes";
 import { COLUMNS, DEFAULT_COLUMNS } from "../fields";
 import { localGet, localSet } from "../prefs";
-import type { Location, Qso, QsoFilter } from "../types";
+import type { Location, Qso, QsoFilter, QslService } from "../types";
 import { qrzPageUrl } from "./QrzPageLink";
 import SpotDialog, { type SpotRequest } from "./SpotDialog";
 import { useSpotStatus } from "../spot";
@@ -35,6 +35,8 @@ interface Props {
   editingId?: number | null;
 }
 
+const QSL_NAMES: Record<QslService, string> = { qrz: "QRZ Logbook", clublog: "Club Log", eqsl: "eQSL", lotw: "LoTW (TQSL)" };
+
 export default function LogGrid({ logId, refreshKey, filter, onFilter, selection, onSelection, onEdit, onDeleted, onExportSelected, columns, onColumns, locations, stepper, editingId }: Props) {
   useDisplay(); // redraw when the date or frequency format changes
   const [total, setTotal] = useState(0);
@@ -48,6 +50,8 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
   const head = useRef<HTMLDivElement>(null);
   const [moving, setMoving] = useState<{ key: string; to: number } | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; q: Qso } | null>(null);
+  /** Upload services that are set up, fetched when the right-click menu opens. */
+  const [targets, setTargets] = useState<QslService[]>([]);
   const [notice, setNotice] = useState("");
   const [spot, setSpot] = useState<SpotRequest | null>(null);
   const spotStatus = useSpotStatus(!!menu);
@@ -217,6 +221,27 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
       setNotice(r.updated ? `Filled in ${plural(r.updated)} from QRZ.` : "Nothing to fill in from QRZ.");
       if (r.errors.length) setError(r.errors.slice(0, 3).join("; ") + (r.errors.length > 3 ? ` and ${r.errors.length - 3} more` : ""));
       if (r.updated) onDeleted();
+    } catch (e) {
+      setNotice("");
+      setError((e as Error).message);
+    }
+  };
+
+  const uploadQsos = async (service: QslService, ids: number[]) => {
+    setError("");
+    setNotice(`Uploading to ${QSL_NAMES[service]}…`);
+    try {
+      const r = await api.qslUploadQsos(service, ids);
+      const bits = [`${r.uploaded} uploaded`];
+      if (r.duplicates) bits.push(`${r.duplicates} already there`);
+      if (r.rejected.length) bits.push(`${r.rejected.length} refused (${r.rejected[0]})`);
+      if (r.error) {
+        setNotice("");
+        setError(`${QSL_NAMES[service]}: ${r.error}`);
+      } else {
+        setNotice(`${QSL_NAMES[service]}: ${bits.join(", ")}.`);
+      }
+      onDeleted();
     } catch (e) {
       setNotice("");
       setError((e as Error).message);
@@ -422,6 +447,7 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
                   e.preventDefault();
                   if (!selection.has(q.id)) onSelection(new Set([q.id]));
                   setMenu({ x: e.clientX, y: e.clientY, q });
+                  api.qslTargets().then(setTargets, () => setTargets([]));
                 }}
                 title={q ? "Double-click or Enter to edit; right-click for more" : undefined}
               >
@@ -459,6 +485,9 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
                 );
               })()}
               <button role="menuitem" onClick={act(() => void sendQsos(ids))}>Send {what} through UDP connections</button>
+              {targets.map((t) => (
+                <button key={t} role="menuitem" onClick={act(() => void uploadQsos(t, ids))}>Upload {what} to {QSL_NAMES[t]}</button>
+              ))}
               <hr />
               <button role="menuitem" onClick={act(() => void markPaper("oqrs", ids))}>Mark OQRS requested ({what})</button>
               <button role="menuitem" onClick={act(() => void markPaper("sent-b", ids))}>Card sent via bureau ({what})</button>

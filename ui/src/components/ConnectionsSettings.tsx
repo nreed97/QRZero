@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import { api } from "../api";
+import SaveBar from "./SaveBar";
 import type { RunStatus, StartupApp, UdpConnection, UdpEvent, UdpFormat } from "../types";
 
 const EVENTS: [UdpEvent, string][] = [
@@ -45,7 +46,7 @@ const PRESETS: [string, Partial<UdpConnection>][] = [
 
 type Msg = { text: string; ok: boolean } | null;
 
-export function UdpConnectionsTab() {
+export function UdpConnectionsTab({ onClose }: { onClose: () => void }) {
   const [list, setList] = useState<UdpConnection[] | null>(null);
   const [status, setStatus] = useState<Record<string, RunStatus>>({});
   const [msg, setMsg] = useState<Msg>(null);
@@ -65,15 +66,17 @@ export function UdpConnectionsTab() {
       setList(r.connections);
       setStatus(r.status);
       setMsg({ text: "Saved.", ok: true });
+      return true;
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
+      return false;
     }
   };
   const test = async (c: UdpConnection) => {
     setSent("");
     try {
       const r = await api.testUdpConnection(c);
-      setMsg({ text: `Test sent to ${c.host}:${c.port}${c.name ? ` (${c.name})` : ""}:`, ok: true });
+      setMsg({ text: `Test sent to ${c.host}:${c.port}${c.name ? ` (${c.name})` : ""}. What was sent is shown above.`, ok: true });
       setSent(r.sent);
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
@@ -159,14 +162,13 @@ export function UdpConnectionsTab() {
         Radio changes are sent only when the frequency, mode or TX changes, at most four times a second per radio.
         For WSJT-X relays, also see "Pass on to" under Radios and programs; both work.
       </p>
-      {msg && <p className={msg.ok ? "ok" : "err"}>{msg.text}</p>}
       {sent && <pre className="udp-sent">{sent}</pre>}
-      <div className="buttons"><button className="primary" onClick={save}>Save</button></div>
+      <SaveBar msg={msg} onSave={save} onClose={onClose} />
     </div>
   );
 }
 
-export function StartupAppsTab() {
+export function StartupAppsTab({ onClose }: { onClose: () => void }) {
   const [list, setList] = useState<StartupApp[] | null>(null);
   const [status, setStatus] = useState<Record<string, RunStatus>>({});
   const [msg, setMsg] = useState<Msg>(null);
@@ -184,8 +186,10 @@ export function StartupAppsTab() {
       setList(r.apps);
       setStatus(r.status);
       setMsg({ text: "Saved.", ok: true });
+      return true;
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
+      return false;
     }
   };
   const launch = async (a: StartupApp) => {
@@ -234,8 +238,7 @@ export function StartupAppsTab() {
         program alone when one with the same file name is already running (Windows only). A program that fails to
         start shows why under Last start.
       </p>
-      {msg && <p className={msg.ok ? "ok" : "err"}>{msg.text}</p>}
-      <div className="buttons"><button className="primary" onClick={save}>Save</button></div>
+      <SaveBar msg={msg} onSave={save} onClose={onClose} />
     </div>
   );
 }

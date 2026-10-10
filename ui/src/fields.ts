@@ -111,7 +111,7 @@ export const PRESETS: { id: string; name: string; description: string; layout: E
   {
     id: "cwclubs",
     name: "CW clubs",
-    description: "SKCC, NAQCC, FISTS and CWops numbers. They fill in from your last QSO with the call.",
+    description: "SKCC, NAQCC, FISTS and CWops numbers. NAQCC, FISTS and CWops fill in from your last QSO with the call; SKCC is only what you type.",
     layout: { rows: [keys("NAME", "QTH", "STATE", "SKCC", "NAQCC", "FISTS", "CWOPS"), [{ key: "COMMENT", width: "xl" }, { key: "TX_PWR", sticky: true }]] },
   },
   {

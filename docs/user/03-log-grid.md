@@ -24,6 +24,7 @@ Right-click a row for a menu. It acts on the selected rows when you right-click 
 - **Fill from QRZ** looks each call up on QRZ and fills in name, QTH, state, grid and the rest wherever the QSO has nothing. Nothing you already have is changed. It needs your QRZ login (Settings, **Callsign lookup**).
 - **View CALL on QRZ.com** (one row only) opens that station's page on QRZ.com in your web browser. It needs no login.
 - **Send through UDP connections** sends the QSOs again to every **QSO logged** connection under Settings, **UDP connections**, just as if they had been logged now. Use it to push older contacts into another program. See [UDP connections](16-udp-and-startup.md).
+- **Upload to QRZ Logbook / Club Log / eQSL / LoTW (TQSL)** appears for each service that is set up under QSL. It uploads the chosen QSOs right away, even ones already sent, and updates their sent status. QSOs only go to a service for the station callsigns ticked there (and, for LoTW, the locations with a TQSL station location). See [QSL](10-qsl.md).
 - **Export** and **Delete** do the same as the buttons above the grid.
 
 When you click a row in the **Awards** tab, the log shows only those QSOs and a button such as **DXCC 291 ×** appears above the grid. Click it to show all QSOs again.

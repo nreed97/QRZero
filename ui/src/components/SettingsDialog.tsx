@@ -3,6 +3,7 @@ import { api } from "../api";
 import type { ClusterConfig, ClusterNode, CtyStatus, Equipment, Fields, IntegrationStatus, Integrations, Location, Log, Settings, StationCallsign } from "../types";
 import type { EntryLayout, ModeLayouts } from "../fields";
 import Modal from "./Modal";
+import SaveBar from "./SaveBar";
 import EquipmentTree from "./EquipmentTree";
 import EntryFieldsEditor from "./EntryFieldsEditor";
 import { StartupAppsTab, UdpConnectionsTab } from "./ConnectionsSettings";
@@ -173,11 +174,11 @@ export default function SettingsDialog(props: Props) {
         </>
       )}
       {tab === "fields" && <EntryFieldsEditor layout={props.layout} onChange={props.onLayout} modeLayouts={props.modeLayouts} onModeLayouts={props.onModeLayouts} />}
-      {tab === "lookup" && <LookupTab />}
-      {tab === "radios" && <RadiosTab />}
-      {tab === "udp" && <UdpConnectionsTab />}
-      {tab === "startup" && <StartupAppsTab />}
-      {tab === "cluster" && <ClusterTab />}
+      {tab === "lookup" && <LookupTab onClose={props.onClose} />}
+      {tab === "radios" && <RadiosTab onClose={props.onClose} />}
+      {tab === "udp" && <UdpConnectionsTab onClose={props.onClose} />}
+      {tab === "startup" && <StartupAppsTab onClose={props.onClose} />}
+      {tab === "cluster" && <ClusterTab onClose={props.onClose} />}
       {tab === "awards" && <AwardsTab />}
       {tab === "backups" && <BackupsTab />}
       {tab === "keyboard" && <KeyboardTab />}
@@ -308,7 +309,7 @@ function LogsTab({ logs, logId, onSwitchLog, guard }: Props & { guard: Guard }) 
   );
 }
 
-function LookupTab() {
+function LookupTab({ onClose }: { onClose: () => void }) {
   const [s, setS] = useState<Settings | null>(null);
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -325,8 +326,10 @@ function LookupTab() {
       setS(await api.saveSettings(body));
       setPassword("");
       setMsg({ text: "Saved.", ok: true });
+      return true;
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
+      return false;
     }
   };
   const test = async () => {
@@ -352,16 +355,14 @@ function LookupTab() {
         </label>
       </div>
       <p className="small muted">On Windows the password is kept in Windows Credential Manager, not in the log file.</p>
-      {msg && <p className={msg.ok ? "ok" : "err"}>{msg.text}</p>}
-      <div className="buttons">
+      <SaveBar msg={msg} onSave={save} onClose={onClose}>
         <button onClick={test} disabled={!s.qrz_username}>Save and test login</button>
-        <button className="primary" onClick={save}>Save</button>
-      </div>
+      </SaveBar>
     </div>
   );
 }
 
-function RadiosTab() {
+function RadiosTab({ onClose }: { onClose: () => void }) {
   const [cfg, setCfg] = useState<Integrations | null>(null);
   const [status, setStatus] = useState<IntegrationStatus | null>(null);
   const [cty, setCty] = useState<CtyStatus | null>(null);
@@ -380,8 +381,10 @@ function RadiosTab() {
       setCfg(r.config);
       setStatus(r.status);
       setMsg({ text: "Saved.", ok: true });
+      return true;
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
+      return false;
     }
   };
   const ctyRun = async (fn: () => Promise<CtyStatus>) => {
@@ -474,8 +477,7 @@ function RadiosTab() {
         {status?.rotator && <p className="small">Status: {status.rotator}</p>}
       </fieldset>
 
-      {msg && <p className={msg.ok ? "ok" : "err"}>{msg.text}</p>}
-      <div className="buttons"><button className="primary" onClick={save}>Save</button></div>
+      <SaveBar msg={msg} onSave={save} onClose={onClose} />
 
       <fieldset>
         <legend>Country file</legend>
@@ -541,7 +543,7 @@ function NeededAlertsSettings() {
   );
 }
 
-function ClusterTab() {
+function ClusterTab({ onClose }: { onClose: () => void }) {
   const [cfg, setCfg] = useState<ClusterConfig | null>(null);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   useEffect(() => {
@@ -561,8 +563,10 @@ function ClusterTab() {
       const r = await api.saveCluster({ ...cfg, nodes: cfg.nodes.filter((n) => n.host.trim()) });
       setCfg(r.config);
       setMsg({ text: "Saved.", ok: true });
+      return true;
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
+      return false;
     }
   };
 
@@ -608,8 +612,7 @@ function ClusterTab() {
         <span>minutes</span>
       </div>
       <label className="check"><input type="checkbox" checked={cfg.auto_connect} onChange={(e) => setCfg({ ...cfg, auto_connect: e.target.checked })} /> Connect when QRZero starts</label>
-      {msg && <p className={msg.ok ? "ok" : "err"}>{msg.text}</p>}
-      <div className="buttons"><button className="primary" onClick={save}>Save</button></div>
+      <SaveBar msg={msg} onSave={save} onClose={onClose} />
     </div>
   );
 }
