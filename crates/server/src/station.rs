@@ -1266,20 +1266,7 @@ impl Hub {
                     }
                 }
             }
-            M::RadioInfo { station, radio_nr, freq_hz, mode, is_transmitting, .. } => {
-                let state = RigState {
-                    connected: true,
-                    freq_hz,
-                    mode: n1mm_mode(&mode).to_string(),
-                    data: n1mm_mode(&mode).is_empty(),
-                    rig_mode: mode,
-                    tx: is_transmitting,
-                    error: None,
-                    ..Default::default()
-                };
-                let name = if station.is_empty() { format!("N1MM radio {radio_nr}") } else { format!("N1MM {station} radio {radio_nr}") };
-                self.set_radio(Radio { key: format!("n1mm:{station}:{radio_nr}"), name, source: "n1mm", can_tune: false, state });
-            }
+            // N1MM's RadioInfo is ignored: the radio connection itself is the source of frequency and mode.
             _ => {}
         }
     }
@@ -1745,17 +1732,6 @@ fn decode_mode(m: &str) -> &str {
         "`" => "FST4",
         "&" => "MSK144",
         other => other,
-    }
-}
-
-fn n1mm_mode(m: &str) -> &'static str {
-    match m.to_ascii_uppercase().as_str() {
-        "CW" => "CW",
-        "USB" | "LSB" | "SSB" => "SSB",
-        "AM" => "AM",
-        "FM" => "FM",
-        "RTTY" => "RTTY",
-        _ => "",
     }
 }
 
