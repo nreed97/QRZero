@@ -20,7 +20,7 @@ When radios are connected, the **Radio** box appears in the QSO panel's title ba
 
 - Typing a frequency and leaving the box tunes the radio.
 - Changing the mode sets the radio's mode (FT8, FT4 and other digital modes use the radio's USB data mode).
-- Picking a station in the FTx monitor or a spot tunes the radio to it.
+- Double-clicking a spot (Cluster, Band map, Needed now, Watch list, DXpeditions) fills it in and tunes the radio to it. A single click only fills in the QSO panel. Picking a station in the FTx monitor never retunes the radio.
 
 Choose **manual** to type frequency and mode yourself.
 
@@ -39,13 +39,13 @@ Radios that don't report split show and log one frequency, as before.
 
 ### Split from spots
 
-When you click a cluster or band map spot whose comment says where the DX is listening, QRZero tunes the radio to the spot and sets split with the transmit frequency to match:
+When you double-click a cluster or band map spot whose comment says where the DX is listening, QRZero tunes the radio to the spot and sets split with the transmit frequency to match:
 
 - `UP 5`, `UP5`, `UP 5K`: 5 kHz above the spot. A bare `UP` means 1 kHz. `UP 5-10` uses the lower figure, 5.
 - `DN 2` or `DOWN 2`: 2 kHz below.
 - `QSX 14.205` (MHz), `QSX 14205` (kHz) or `QSX 205` (the last three digits of the spot's kHz). `LISTENING` and `LSN` work the same way.
 
-Anything more than 100 kHz from the spot is ignored. Spots that set split show it in the row's tooltip. Clicking a spot that doesn't say turns split off, so the radio never keeps the last station's transmit frequency.
+Anything more than 100 kHz from the spot is ignored. Spots that set split show it in the row's tooltip. Double-clicking a spot that doesn't say turns split off, so the radio never keeps the last station's transmit frequency.
 
 WSJT-X and N1MM radios are listed too (when those programs are connected), so the panel can follow them, but they can't be tuned from QRZero.
 

@@ -73,8 +73,8 @@ export default function DxpedPane({ act }: { act: PaneActions }) {
     if (await save([...mine(), draft])) setDraft(null);
   };
 
-  const pick = (i: DxpedItem) =>
-    act.onPick(i.spot ? { call: i.spot.call, grid: i.spot.grid, band: i.spot.band, mode: i.spot.mode, freq_hz: i.spot.freq_hz } : { call: i.call, grid: null, band: null, mode: "", freq_hz: 0 });
+  const pick = (i: DxpedItem, qsy = false) =>
+    act.onPick(i.spot ? { call: i.spot.call, grid: i.spot.grid, band: i.spot.band, mode: i.spot.mode, freq_hz: i.spot.freq_hz, qsy } : { call: i.call, grid: null, band: null, mode: "", freq_hz: 0 });
 
   const shown = (list?.items ?? []).filter((i) => !onlyNeeded || i.needed || i.need.unknown);
   // On the air now first, needed ones ahead of the rest.
@@ -124,7 +124,7 @@ export default function DxpedPane({ act }: { act: PaneActions }) {
             </thead>
             <tbody>
               {shown.map((i) => (
-                <tr key={`${i.manual ? "m" : "f"}${i.id}-${i.call}-${i.start}`} className={i.needed ? "need" : "dim"} onClick={() => pick(i)} title={i.spot ? `Click to tune to ${i.spot.call}` : `Click to fill in ${i.call}`}>
+                <tr key={`${i.manual ? "m" : "f"}${i.id}-${i.call}-${i.start}`} className={i.needed ? "need" : "dim"} onClick={() => pick(i)} onDoubleClick={() => pick(i, true)} title={i.spot ? `Click to fill in ${i.spot.call}; double-click to tune too` : `Click to fill in ${i.call}`}>
                   <td className="mono watch-call">{i.call}</td>
                   <td>{i.active ? <b>Now</b> : "Soon"} <span className="muted">{dates(i)}</span></td>
                   <td className="dxped-need" title={needText(i)}>{needText(i)}</td>

@@ -253,7 +253,8 @@ export default function BandMapPane({ ctx, act }: { ctx: PopContext; act: PaneAc
           className={`bm-label ${group ? `mode-${group}` : ""} ${worked ? "worked" : ""} ${s.watched ? "watched" : ""}`}
           style={{ ...style, opacity: Math.max(0.4, 1 - (age / fadeOver) * 0.6) }}
           onClick={() => act.onPick({ call: s.call, grid: null, band: s.band, mode: s.mode, freq_hz: s.freq_hz, tx_freq_hz: s.tx_freq_hz ?? undefined })}
-          title={`${s.call}  ${(s.freq_hz / 1000).toFixed(1)} kHz  ${s.mode}${group ? ` (${MODE_GROUP_NAME[group]})` : ""}\n${s.entity?.name ?? ""}\nSpotted by ${s.spotter} at ${s.time.slice(0, 2)}:${s.time.slice(2, 4)}${s.comment ? `\n${s.comment}` : ""}\nClick to fill in and tune`}
+          onDoubleClick={() => act.onPick({ call: s.call, grid: null, band: s.band, mode: s.mode, freq_hz: s.freq_hz, tx_freq_hz: s.tx_freq_hz ?? undefined, qsy: true })}
+          title={`${s.call}  ${(s.freq_hz / 1000).toFixed(1)} kHz  ${s.mode}${group ? ` (${MODE_GROUP_NAME[group]})` : ""}\n${s.entity?.name ?? ""}\nSpotted by ${s.spotter} at ${s.time.slice(0, 2)}:${s.time.slice(2, 4)}${s.comment ? `\n${s.comment}` : ""}\nClick to fill in; double-click to fill in and tune`}
         >
           <span className="call">{s.call}</span>
           <span className="age">{ageText(age)}</span>
@@ -284,6 +285,7 @@ export default function BandMapPane({ ctx, act }: { ctx: PopContext; act: PaneAc
                 key={d.call}
                 className={`${isNeeded(d.needed) ? "needed" : ""} ${d.needed && !d.needed.new_call_band ? "worked" : ""} ${d.cq ? "cq" : ""}`}
                 onClick={() => act.onPick({ call: d.call!, grid: d.grid, band: d.band, mode: d.mode, freq_hz: d.freq_hz })}
+                onDoubleClick={() => act.onPick({ call: d.call!, grid: d.grid, band: d.band, mode: d.mode, freq_hz: d.freq_hz, qsy: true })}
                 title={`${d.message}\n${d.snr} dB  ${d.df} Hz  ${d.entity?.name ?? ""}${needText(d.needed) ? `\nNew ${needText(d.needed)}` : ""}`}
               >
                 {d.call}

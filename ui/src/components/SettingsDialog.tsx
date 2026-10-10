@@ -521,7 +521,7 @@ function NeededAlertsSettings() {
         <input type="checkbox" checked={c.sound} onChange={(e) => { setNeededConfig({ sound: e.target.checked }); if (e.target.checked) beep(780); }} /> Play a sound when a needed station is spotted
       </label>
       <label className="check">
-        <input type="checkbox" checked={c.popup} onChange={(e) => setNeededConfig({ popup: e.target.checked })} /> Show a popup (click it to tune to the station)
+        <input type="checkbox" checked={c.popup} onChange={(e) => setNeededConfig({ popup: e.target.checked })} /> Show a popup (click it to fill in the station, double-click to tune too)
       </label>
       <div className="row">
         <label>

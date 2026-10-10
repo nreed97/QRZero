@@ -52,6 +52,8 @@ export interface Prefill {
   tx_freq_hz?: number;
   /** From the FTx monitor: choose the radio of the instance that decoded it (or one on that band) and don't retune. */
   ftx?: { rig_key: string | null };
+  /** Double-click: tune the radio too. A single click only fills in the form. */
+  qsy?: boolean;
 }
 
 /** MHz as typed in the entry panel: 14.025 or 14.07412. */
@@ -273,7 +275,7 @@ export default function EntryPanel({ logId, stationCall, location, layout: baseL
     callRef.current?.focus();
   };
 
-  // A station picked in the FTx monitor (or a spot): fill it in and tune to it.
+  // A station picked in the FTx monitor (or a spot): fill it in; a double-click also tunes to it.
   useEffect(() => {
     if (!prefill) return;
     clear();
@@ -289,7 +291,9 @@ export default function EntryPanel({ logId, stationCall, location, layout: baseL
       else if (!target && radio?.source !== "wsjtx") {
         if (prefill.band) setBand(prefill.band);
       }
-    } else if (radio?.can_tune && prefill.freq_hz) {
+    } else if (radio?.can_tune) {
+      // Single click: the call is filled in and the radio is left alone. Double-click tunes it.
+      if (!prefill.qsy || !prefill.freq_hz) { void runLookup(prefill.call); return; }
       // A spot that says where it listens sets split; any other spot turns a split left over from the last one off.
       const split = prefill.tx_freq_hz ? { tx_freq_hz: prefill.tx_freq_hz } : radio.split ? { split: false } : undefined;
       api.tune(radio.key, prefill.freq_hz, m ?? undefined, split).catch((e) => setStatus({ text: `Couldn't tune: ${(e as Error).message}`, kind: "err" }));

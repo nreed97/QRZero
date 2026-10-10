@@ -106,9 +106,9 @@ export default function WatchPane({ ctx, act }: { ctx: PopContext; act: PaneActi
   };
   const toggle = (e: WatchEntry) => void save(entries.map((x) => (x.id === e.id ? { ...x, enabled: !x.enabled } : x)));
 
-  const pick = (h: WatchHit) => {
+  const pick = (h: WatchHit, qsy = false) => {
     markSeen();
-    act.onPick({ call: h.call, grid: h.grid, band: h.band, mode: h.mode, freq_hz: h.freq_hz });
+    act.onPick({ call: h.call, grid: h.grid, band: h.band, mode: h.mode, freq_hz: h.freq_hz, qsy });
   };
 
   const setSoundOn = (on: boolean) => {
@@ -246,7 +246,7 @@ export default function WatchPane({ ctx, act }: { ctx: PopContext; act: PaneActi
       </div>
       <div className="watch-hits">
         {hits.length === 0 ? (
-          <div className="watch-empty muted small">No hits yet. They show here as watched stations are spotted or decoded; click one to tune to it.</div>
+          <div className="watch-empty muted small">No hits yet. They show here as watched stations are spotted or decoded; click one to fill it in, double-click to tune too.</div>
         ) : (
           <table className="watch-table hits">
             <thead>
@@ -254,7 +254,7 @@ export default function WatchPane({ ctx, act }: { ctx: PopContext; act: PaneActi
             </thead>
             <tbody>
               {hits.map((h) => (
-                <tr key={`${h.time}-${h.seq}`} className={h.time > seenAt ? "new" : ""} onClick={() => pick(h)} title={`Click to tune to ${h.call}`}>
+                <tr key={`${h.time}-${h.seq}`} className={h.time > seenAt ? "new" : ""} onClick={() => pick(h)} onDoubleClick={() => pick(h, true)} title={`Click to fill in ${h.call}; double-click to tune too`}>
                   <td className="mono">{utc(h.time)}</td>
                   <td className="mono watch-call">{h.call}</td>
                   <td className="mono num">{(h.freq_hz / 1000).toFixed(1)}</td>
