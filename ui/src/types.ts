@@ -383,3 +383,5 @@ export interface UdpConnection {
 }
 export interface RunStatus { ok: boolean; text: string }
 export interface StartupApp { id: number; enabled: boolean; path: string; args: string; skip_if_running: boolean }
+
+export interface UpdateInfo { enabled: boolean; current: string; update: { version: string; url: string } | null }

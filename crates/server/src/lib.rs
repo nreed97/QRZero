@@ -32,6 +32,7 @@ mod startup;
 mod station;
 mod udp_out;
 mod contests;
+mod updates;
 mod dxped;
 mod watch;
 
@@ -67,6 +68,8 @@ pub struct Config {
     pub dxped_url: String,
     /// WA7BNM's contest calendar feed (tests point this at a stand-in).
     pub contests_url: String,
+    /// GitHub releases list for the update check (tests point this at a stand-in).
+    pub updates_url: String,
     /// Start the programs listed under Settings, Startup programs.
     pub launch_apps: bool,
 }
@@ -84,6 +87,7 @@ impl Config {
             propagation_url: propagation::DEFAULT_URL.to_string(),
             dxped_url: dxped::DEFAULT_URL.to_string(),
             contests_url: contests::DEFAULT_URL.to_string(),
+            updates_url: updates::DEFAULT_URL.to_string(),
             launch_apps: true,
         }
     }
@@ -145,7 +149,9 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
     hub.start(cfg.update_cty);
     hub.dxped.set_url(cfg.dxped_url);
     hub.contests.set_url(cfg.contests_url);
+    hub.updates.set_url(cfg.updates_url);
     if cfg.update_cty {
+        updates::spawn(&hub);
         // Keeps the DXpedition calendar fresh in the background (weak, so it never holds the database open).
         let weak = Arc::downgrade(&hub);
         tokio::spawn(async move {
@@ -278,6 +284,7 @@ fn router(state: Shared) -> Router {
         .route("/watch/hits", get(watch_hits))
         .route("/dxpeditions", get(dxped_get).put(dxped_put))
         .route("/dxpeditions/refresh", post(dxped_refresh))
+        .route("/updates", get(updates_get).put(updates_put))
         .route("/contests", get(contests_get))
         .route("/contests/refresh", post(contests_refresh))
         .route("/cluster", get(cluster_get).put(cluster_put))
@@ -1454,6 +1461,24 @@ async fn watch_put(State(s): State<Shared>, Json(entries): Json<Vec<watch::Watch
 
 fn dxped_view(s: &Shared) -> serde_json::Value {
     s.hub.dxped.view(&s.hub, chrono::Utc::now().date_naive())
+}
+
+#[derive(Deserialize)]
+struct UpdatesBody {
+    enabled: bool,
+}
+
+async fn updates_get(State(s): State<Shared>) -> Json<serde_json::Value> {
+    Json(s.hub.updates.view(updates::enabled(&s.hub)))
+}
+
+/// Turns the check on or off; turning it on checks right away.
+async fn updates_put(State(s): State<Shared>, Json(b): Json<UpdatesBody>) -> ApiResult<serde_json::Value> {
+    updates::set_enabled(&s.hub, b.enabled).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    if b.enabled {
+        updates::check(&s.hub).await;
+    }
+    Ok(Json(s.hub.updates.view(b.enabled)))
 }
 
 fn contests_view(s: &Shared) -> serde_json::Value {

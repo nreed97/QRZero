@@ -419,6 +419,9 @@ table.list.fields input:not([type=checkbox]), table.list.fields select { width: 
 .bottom > .grid { margin: 0; flex: 1 1 0; min-width: 0; border-top: none; }
 .bottom > .ftx { flex: 1 1 0; min-width: 0; }
 .bottom.pane-split > .grid { flex: 1.2 1 0; }
+.update-notice { font-size: 12px; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.update-notice a { color: var(--accent); text-decoration: underline; }
+.update-notice .link-x { border: 0; background: none; color: var(--muted); padding: 0 3px; cursor: pointer; font-size: 14px; line-height: 1; }
 .notice { font-size: 12px; color: var(--accent); max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .ftx { background: var(--panel); border: 1px solid var(--line); border-top: none; border-radius: 0 0 3px 3px; display: flex; flex-direction: column; }
