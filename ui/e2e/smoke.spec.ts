@@ -81,7 +81,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.locator(".grid-row", { hasText: "W1AW" })).toContainText("K3");
 
   // Drag the Rig heading (added last) in front of Call.
-  const heads = page.locator(".grid > .grid-head .col-head");
+  const heads = page.locator(".grid .grid-head .col-head");
   const rig = await heads.filter({ hasText: /^Rig$/ }).boundingBox();
   const callHead = await heads.filter({ hasText: /^Call$/ }).boundingBox();
   await page.mouse.move(rig!.x + 10, rig!.y + rig!.height / 2);
@@ -455,6 +455,30 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.reload();
   await expect(page.getByRole("button", { name: "Layout: Test layout" })).toBeVisible();
   await expect(page.locator(".ws-group", { has: page.getByRole("tab", { name: "Cluster" }) }).getByRole("tab")).toHaveCount(1);
+  // The layout also remembers the Log tab's columns: hide Rig, then load the layout to bring it back.
+  const rigHead = page.locator(".grid .grid-head .col-head").filter({ hasText: /^Rig$/ });
+  await expect(rigHead).toBeVisible();
+  await page.getByRole("button", { name: "Columns" }).click();
+  await page.locator(".column-picker label.chip", { hasText: /^Rig$/ }).locator("input").uncheck();
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(rigHead).toHaveCount(0);
+  await page.getByRole("button", { name: /^Layout/ }).click();
+  await page.getByRole("menuitem", { name: "Test layout", exact: true }).click();
+  await expect(rigHead).toBeVisible();
+  // With more columns than fit, the Log scrolls sideways inside its own pane: the heading moves with the rows and the page doesn't.
+  await page.getByRole("button", { name: "Columns" }).click();
+  for (const l of [/^Comment$/, /^Contest$/, /^Country$/, /^QTH$/, /^Name$/]) {
+    const box = page.locator(".column-picker label.chip", { hasText: l }).locator("input");
+    if (!(await box.isChecked())) await box.check();
+  }
+  await page.getByRole("button", { name: "Done" }).click();
+  await page.setViewportSize({ width: 700, height: 800 });
+  const body = page.locator(".grid-body");
+  expect(await body.evaluate((e) => e.scrollWidth > e.clientWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await body.evaluate((e) => (e.scrollLeft = 120));
+  expect(await page.locator(".grid-head").evaluate((e) => e.getBoundingClientRect().left)).toBeLessThan(0);
+  await page.setViewportSize({ width: 1280, height: 720 });
   // ...and even with the browser's storage wiped, as happens when the desktop app restarts on a new address.
   await page.waitForTimeout(600); // the copy to the database is saved shortly after a change
   await page.evaluate(() => localStorage.clear());

@@ -99,6 +99,7 @@ function Online({ callsigns, locations, onClose }: Props) {
   const [eqslPassword, setEqslPassword] = useState("");
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [busy, setBusy] = useState("");
+  const [lotwLoc, setLotwLoc] = useState("");
   const [svc, setSvc] = useState<"lotw" | "qrz" | "clublog" | "eqsl">("lotw");
 
   const load = () =>
@@ -166,7 +167,7 @@ function Online({ callsigns, locations, onClose }: Props) {
     setMsg(null);
     try {
       await save();
-      await api.qslUpload(service);
+      await api.qslUpload(service, service === "lotw" ? lotwLoc : "");
       await load();
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
@@ -242,6 +243,18 @@ function Online({ callsigns, locations, onClose }: Props) {
             </tbody>
           </table>
           <div className="row">
+            <label className="f w-l">
+              <span>Upload under</span>
+              <select value={lotwLoc} onChange={(e) => setLotwLoc(e.target.value)} aria-label="TQSL station location for this upload">
+                <option value="">(as set above)</option>
+                {o.tqsl.locations.map((n) => <option key={n}>{n}</option>)}
+              </select>
+            </label>
+            <label className="check" title="Passes each QSO's My location details (state, county, grid, zones) to TQSL, which then uses them instead of the station location's. Your QSOs are not changed.">
+              <input type="checkbox" checked={cfg.lotw_use_log_qth} onChange={(e) => set({ lotw_use_log_qth: e.target.checked })} /> Use QTH details from the log
+            </label>
+          </div>
+          <div className="row">
             <button className="primary" disabled={!!busy || !cfg.lotw.length} onClick={() => upload("lotw")}>
               {busy === "lotw" ? "Signing and uploading…" : `Sign and upload ${lotwPending} QSO${lotwPending === 1 ? "" : "s"} to LoTW`}
             </button>
@@ -249,7 +262,7 @@ function Online({ callsigns, locations, onClose }: Props) {
           </div>
           <details className="more">
             <summary>Upload by date range, moving from another logger</summary>
-            <QueueUpload service="lotw" name="LoTW" ready={cfg.lotw.length > 0} save={save} onChange={load} />
+            <QueueUpload service="lotw" name="LoTW" ready={cfg.lotw.length > 0} save={save} onChange={load} location={lotwLoc} />
             <p className="small muted"><b>Moving from another logger?</b> Download confirmations before your first upload. Matching QSOs are marked sent and confirmed, so they aren't uploaded again.</p>
           </details>
           <p className="small muted">To download confirmations (for awards), enter your LoTW website login. It's not your TQSL password.</p>

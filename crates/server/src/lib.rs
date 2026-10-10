@@ -1667,6 +1667,14 @@ struct RangeBody {
     from: String,
     #[serde(default)]
     to: String,
+    #[serde(default)]
+    location: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct LotwBody {
+    location: Option<String>,
 }
 
 /// The QSOs a service would be sent for a date range, up to 2000 of them.
@@ -1676,7 +1684,7 @@ async fn qsl_queue(State(s): State<Shared>, Path(service): Path<String>, Query(q
 }
 
 async fn qsl_queue_upload(State(s): State<Shared>, Path(service): Path<String>, Json(b): Json<RangeBody>) -> ApiResult<qsl::Run> {
-    Ok(Json(s.qsl.upload_range(&service, &b.from, &b.to).await))
+    Ok(Json(s.qsl.upload_range(&service, &b.from, &b.to, b.location.as_deref()).await))
 }
 
 async fn qsl_queue_remove(State(s): State<Shared>, Path(service): Path<String>, Json(b): Json<IdsBody>) -> ApiResult<serde_json::Value> {
@@ -1693,9 +1701,9 @@ async fn qsl_upload_qsos(State(s): State<Shared>, Path(service): Path<String>, J
     Ok(Json(s.qsl.upload_ids(&service, &b.ids).await))
 }
 
-async fn qsl_upload(State(s): State<Shared>, Path(service): Path<String>) -> ApiResult<qsl::Run> {
+async fn qsl_upload(State(s): State<Shared>, Path(service): Path<String>, body: axum::body::Bytes) -> ApiResult<qsl::Run> {
     let run = match service.as_str() {
-        "lotw" => s.qsl.upload_lotw(None).await,
+        "lotw" => s.qsl.upload_lotw(None, serde_json::from_slice::<LotwBody>(&body).ok().and_then(|b| b.location).as_deref()).await,
         other => s.qsl.upload(other).await,
     };
     Ok(Json(run))

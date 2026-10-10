@@ -33,6 +33,8 @@ Save arrangements you switch between, such as **Laptop** and **Shack, 2 screens*
 1. Arrange the panes.
 2. Choose **Layout**, **Save layout as…** and give it a name.
 
+A saved layout also remembers which columns the **Log** tab shows, and their order and widths. That lets you keep, say, a wide **Searching** layout with extra columns for scrolling through the log, and a plain **Operating** one for everyday use. Layouts saved by an older version don't include columns; loading one leaves your current columns as they are, and saving it again adds them.
+
 Pick a saved layout from **Layout** to switch to it, popped-out windows included. **Reset to default** goes back to the starting arrangement. Layouts, like your column choices, filters and other window settings, are kept in your log database, so they survive restarts and updates and come back with a restored backup.
 
 **Lock panes** stops tabs being dragged or hidden by accident. You can still resize panes while they are locked.

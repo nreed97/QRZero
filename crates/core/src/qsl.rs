@@ -268,6 +268,9 @@ pub struct TqslJob {
     pub tqsl_path: PathBuf,
     /// Station location name as defined in TQSL.
     pub station_location: String,
+    /// Let the MY_* fields in the file (state, county, grid, zones) override the station
+    /// location's details, per QSO (`-f update`).
+    pub use_log_qth: bool,
     /// ADIF file to sign and upload.
     pub adif_path: PathBuf,
 }
@@ -276,10 +279,14 @@ impl TqslJob {
     /// Arguments for an unattended sign-and-upload:
     /// `-d` (no date-range dialog), `-q` (quiet), `-x` (exit when done),
     /// `-a compliant` (sign only valid QSOs, skipping already-signed dupes and
-    /// out-of-range ones instead of aborting), `-l <location>`, `-u` (upload), `<file>`.
+    /// out-of-range ones instead of aborting), `-l <location>`, `-f update` (QTH from the log, if asked), `-u` (upload), `<file>`.
     pub fn args(&self) -> Vec<OsString> {
         let mut a: Vec<OsString> = ["-d", "-q", "-x", "-a", "compliant", "-l"].iter().map(OsString::from).collect();
         a.push(OsString::from(&self.station_location));
+        if self.use_log_qth {
+            a.push(OsString::from("-f"));
+            a.push(OsString::from("update"));
+        }
         a.push(OsString::from("-u"));
         a.push(self.adif_path.clone().into_os_string());
         a
@@ -527,10 +534,14 @@ mod tests {
         let job = TqslJob {
             tqsl_path: "tqsl".into(),
             station_location: "Home QTH".into(),
+            use_log_qth: false,
             adif_path: "/tmp/up load.adi".into(),
         };
         let args: Vec<String> = job.args().into_iter().map(|a| a.into_string().unwrap()).collect();
         assert_eq!(args, ["-d", "-q", "-x", "-a", "compliant", "-l", "Home QTH", "-u", "/tmp/up load.adi"]);
+        let job = TqslJob { use_log_qth: true, ..job };
+        let args: Vec<String> = job.args().into_iter().map(|a| a.into_string().unwrap()).collect();
+        assert_eq!(args[5..], ["-l", "Home QTH", "-f", "update", "-u", "/tmp/up load.adi"]);
         let o = |c| {
             let t = tqsl_outcome(c);
             (t.ok, t.uploaded)

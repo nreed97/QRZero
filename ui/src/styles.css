@@ -282,13 +282,14 @@ kbd { font: 11px var(--mono); opacity: 0.75; margin-left: 4px; }
 .map-info { display: flex; gap: 14px; padding: 3px 8px; border-top: 1px solid var(--line); font: 12px var(--mono); white-space: nowrap; overflow: hidden; }
 
 /* Log grid */
-.grid { flex: 1; min-height: 0; margin: 0 6px 6px; }
+.grid { flex: 1; min-height: 0; min-width: 0; margin: 0 6px 6px; overflow: hidden; }
 .grid-tools { display: flex; gap: 6px; align-items: center; padding: 4px 6px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .grid-tools input:not([type=checkbox]) { width: 190px; }
 .grid-tools .check { margin: 0; }
 .column-picker { display: flex; flex-wrap: wrap; gap: 2px 4px; align-items: center; padding: 4px 6px; border-bottom: 1px solid var(--line); background: var(--panel-2); }
 .grid-head, .grid-row { display: grid; align-items: center; }
-.grid-head { padding: 2px 0; border-bottom: 1px solid var(--line); background: var(--title); font-size: 12px; font-weight: 600; }
+.grid-inner { position: relative; }
+.grid-head { position: sticky; top: 0; z-index: 2; box-sizing: border-box; height: 24px; padding: 2px 0; border-bottom: 1px solid var(--line); background: var(--title); font-size: 12px; font-weight: 600; }
 .grid-head span, .grid-row span { padding: 0 5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .grid-body { flex: 1; overflow: auto; position: relative; min-height: 100px; }
 .grid-row { position: absolute; top: 0; left: 0; right: 0; font: 12.5px var(--mono); border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent); }
