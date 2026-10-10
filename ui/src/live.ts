@@ -19,7 +19,7 @@ export type LiveEvent =
   | { type: "cluster_line"; text: string }
   | { type: "cluster_state"; state: string; connected: boolean }
   | { type: "qsl"; service: QslService; run: QslRun }
-  | { type: "qsl_download"; service: "lotw" | "eqsl"; run: QslDownload }
+  | { type: "qsl_download"; service: QslService; run: QslDownload }
   | { type: "watch_hit"; hit: WatchHit }
   | { type: "error"; message: string };
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../api";
 import { CUSTOM_PREFIX, DEFAULT_LAYOUT, ENTRY_FIELDS, fieldDef, type EntryLayout, type ModeLayouts } from "../fields";
-import { confirmedText, OQRS, OQRS_DATE } from "../confirmations";
+import { CLUBLOG_RCVD, CLUBLOG_RDATE, confirmedText, OQRS, OQRS_DATE } from "../confirmations";
 import { BANDS, MODES, bandForFreq } from "../modes";
 import { usePref } from "../prefs";
 import type { Equipment, Fields, Location, Qso, StationCallsign } from "../types";
@@ -50,7 +50,7 @@ function timeIn(text: string): string {
   return m ? m[1] + m[2] + (m[3] ?? "") : text;
 }
 
-const DATE_KEYS = ["QSO_DATE", "QSO_DATE_OFF", "LOTW_QSLSDATE", "LOTW_QSLRDATE", "QSLSDATE", "QSLRDATE", "EQSL_QSLSDATE", "EQSL_QSLRDATE", "QRZCOM_QSO_UPLOAD_DATE", "QRZCOM_QSO_DOWNLOAD_DATE", "CLUBLOG_QSO_UPLOAD_DATE", OQRS_DATE];
+const DATE_KEYS = ["QSO_DATE", "QSO_DATE_OFF", "LOTW_QSLSDATE", "LOTW_QSLRDATE", "QSLSDATE", "QSLRDATE", "EQSL_QSLSDATE", "EQSL_QSLRDATE", "QRZCOM_QSO_UPLOAD_DATE", "QRZCOM_QSO_DOWNLOAD_DATE", "CLUBLOG_QSO_UPLOAD_DATE", CLUBLOG_RDATE, OQRS_DATE];
 const TIME_KEYS = ["TIME_ON", "TIME_OFF"];
 const REQUIRED = ["CALL", "QSO_DATE", "TIME_ON"];
 
@@ -106,7 +106,7 @@ const QSL_ROWS: QslRow[] = [
   { name: "Card", sent: "QSL_SENT", sdate: "QSLSDATE", rcvd: "QSL_RCVD", rdate: "QSLRDATE", sentOpts: SENT },
   { name: "eQSL", sent: "EQSL_QSL_SENT", sdate: "EQSL_QSLSDATE", rcvd: "EQSL_QSL_RCVD", rdate: "EQSL_QSLRDATE", sentOpts: SENT },
   { name: "QRZ", sent: "QRZCOM_QSO_UPLOAD_STATUS", sdate: "QRZCOM_QSO_UPLOAD_DATE", rcvd: "QRZCOM_QSO_DOWNLOAD_STATUS", rdate: "QRZCOM_QSO_DOWNLOAD_DATE", sentOpts: UPLOAD },
-  { name: "Club Log", sent: "CLUBLOG_QSO_UPLOAD_STATUS", sdate: "CLUBLOG_QSO_UPLOAD_DATE", sentOpts: UPLOAD },
+  { name: "Club Log", sent: "CLUBLOG_QSO_UPLOAD_STATUS", sdate: "CLUBLOG_QSO_UPLOAD_DATE", rcvd: CLUBLOG_RCVD, rdate: CLUBLOG_RDATE, sentOpts: UPLOAD },
 ];
 
 /** Fields that have a place in the structured sections. */

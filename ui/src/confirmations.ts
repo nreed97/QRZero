@@ -3,6 +3,9 @@ import type { Fields } from "./types";
 /** Club Log OQRS has no ADIF field, so the request is kept in QRZero's own fields. */
 export const OQRS = "APP_QRZERO_OQRS";
 export const OQRS_DATE = "APP_QRZERO_OQRSDATE";
+/** Club Log has no ADIF field for its log matches either. */
+export const CLUBLOG_RCVD = "APP_QRZERO_CLUBLOG_RCVD";
+export const CLUBLOG_RDATE = "APP_QRZERO_CLUBLOG_RDATE";
 
 const yes = (v: string | undefined) => v === "Y" || v === "V";
 
@@ -13,6 +16,7 @@ export function confirmedBy(f: Fields): [string, string][] {
   if (yes(f.QSL_RCVD)) out.push(["C", "Card"]);
   if (yes(f.EQSL_QSL_RCVD)) out.push(["E", "eQSL"]);
   if (yes(f.QRZCOM_QSO_DOWNLOAD_STATUS)) out.push(["Q", "QRZ"]);
+  if (yes(f[CLUBLOG_RCVD])) out.push(["G", "Club Log"]);
   return out;
 }
 

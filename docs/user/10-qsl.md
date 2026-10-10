@@ -12,11 +12,11 @@ Every service has a **QSOs from** date. Only QSOs on or after it are uploaded. W
 
 The **QSL** section of the QSO editor shows every service in one place: sent and received for LoTW, card and eQSL, upload and received for QRZ, and your **Club Log OQRS** request. A line underneath sums it up, for example "Confirmed by LoTW, Card" or "Not confirmed yet. OQRS requested on Club Log."
 
-QSOs count as confirmed when LoTW R, QSL R (card), eQSL R or QRZ R is Y (or V). QRZ R is the standard ADIF field `QRZCOM_QSO_DOWNLOAD_STATUS`. QRZero doesn't download QRZ confirmations yet, so set it by hand if you want to track one.
+QSOs count as confirmed when LoTW R, QSL R (card), eQSL R, QRZ R or Club Log R is Y (or V). QRZ R is the standard ADIF field `QRZCOM_QSO_DOWNLOAD_STATUS`; **Download confirmations** on the QRZ Logbook page fills it. Club Log R (`APP_QRZERO_CLUBLOG_RCVD`, since ADIF has no field for it) is filled by **Download matches** on the Club Log page. Club Log and QRZ confirmations show in the log and the QSO editor but don't count toward the Awards tab, which uses LoTW, paper cards and eQSL.
 
 Club Log OQRS (online QSL request) has no ADIF field, so QRZero keeps your request in its own fields, `APP_QRZERO_OQRS` and `APP_QRZERO_OQRSDATE`. It doesn't talk to Club Log's OQRS queue; it's a reminder that you've asked. To mark many QSOs, select them in the log and pick **Paper QSL…, Mark OQRS requested**, or right-click.
 
-Log grid columns for all of this: **LoTW R**, **QSL R**, **QRZ R**, **OQRS** and **Confirmed** (letters for each confirming service: L LoTW, C card, E eQSL, Q QRZ).
+Log grid columns for all of this: **LoTW R**, **QSL R**, **QRZ R**, **Club Log R**, **OQRS** and **Confirmed** (letters for each confirming service: L LoTW, C card, E eQSL, Q QRZ, G Club Log).
 
 ## Online services
 
@@ -30,9 +30,9 @@ LoTW uploads use TQSL, already installed and set up with your certificate, and o
 2. For each callsign and location, pick the TQSL **station location** that matches it. QSOs from a location with no TQSL station location aren't uploaded.
 3. Click **Sign and upload**. QRZero hands the waiting QSOs to TQSL, which signs and uploads them quietly. QSOs TQSL reports as already on LoTW are marked as sent too.
 
-### Upload needed
+### Upload by date range
 
-To send everything LoTW is missing for a period, use the **Upload needed, from / to** dates under the LoTW button. QRZero counts the QSOs in that range (both days included, UTC) whose LoTW sent status is N or blank, and **Sign and upload** hands them to TQSL in one go, marking each as sent with today's date. The **QSOs from** date doesn't apply to this; the range you pick decides. QSOs from a location with no TQSL station location are skipped, as above.
+See **Uploading a date range by hand** below; LoTW has the same panel under **Upload by date range, moving from another logger**. TQSL signs and uploads whatever is listed.
 
 **Portable operation in another state.** Two things help:
 
@@ -59,15 +59,30 @@ After a LoTW or eQSL download that confirms QSOs, a **New toward your awards** l
 
 A confirmation matches a QSO when the call and band are the same, the mode is the same kind (CW, phone or digital) and the times are within 30 minutes. Confirmations that match nothing are counted as **not found in the log**; hover over that text to see them.
 
+## Uploading a date range by hand
+
+Every service page (LoTW, QRZ Logbook, Club Log, eQSL) has an **Upload by date range** panel for sending a batch yourself, for example after a trip or when you first set a service up.
+
+1. Pick **From** and **To** (both days are included, UTC). A blank date means no limit on that side. The service's **QSOs from** date doesn't apply here; the range you pick decides.
+2. Click **Show QSOs**. The list is every QSO in that range the service hasn't been sent (its status is N or blank), oldest first, for the callsigns you ticked on that page (for LoTW, the locations you matched to a TQSL station location). **Everything not yet sent** does the same with both dates blank, so it lists every QSO that service is missing.
+3. To leave some out, tick them and click **Remove … from queue**. They are marked Ignore for that service (status I), so this upload and the automatic uploads skip them from now on. To send one later, set its status back to N in the QSO editor.
+4. Click **Upload N QSOs**. What was listed is what goes, and each QSO sent is marked sent with today's date. The result line says how many went up and how many the service refused.
+
+The list shows up to 2000 QSOs; **Upload** sends all of them, not only the ones shown.
+
 ## QRZ Logbook
 
 Paste each callsign's logbook **API key** (on QRZ.com: Logbook, Settings, API); saving a key ticks that callsign for upload. Untick a callsign to pause it. **Test** checks the key. With **Upload new QSOs automatically** ticked, new QSOs go up every few minutes (15 by default; change **Every (min)** beside it). **Upload now** sends what's waiting straight away.
 
 When you edit a QSO that was already uploaded, QRZero marks it modified and sends the corrected version.
 
+**Download confirmations** asks QRZ for the QSOs in your logbook it shows as confirmed, and sets **QRZ R** (with the date) on the matching QSOs. QRZ also counts the LoTW confirmations it knows of, so a QSO QRZ confirmed from LoTW is marked as a QRZ confirmation too; it does not set LoTW R. It checks every callsign you ticked and asks QRZ for all its confirmed QSOs each time, a page at a time, so a big logbook takes a moment. A download never adds QSOs to your log.
+
 ## Club Log
 
 Enter your Club Log email and password (an application password works if you use two-step login) and tick the callsigns to upload. There is no API key to enter; QRZero carries its own. Each callsign goes to its own log on Club Log.
+
+**Download matches** gets the QSOs Club Log has matched against the other station's log (both of you uploaded the QSO) and sets **Club Log R** on the matching QSOs, as the editor's Club Log line shows. Matches work like LoTW's, within 15 minutes. Club Log asks for an **application password** here (Club Log, Settings, App Passwords), not your login password; if the download says the login was refused, that is the usual reason. The next download only asks for matches made since the last one. Matches with no mode, or for a QSO that isn't in your log, are counted but change nothing.
 
 ## eQSL
 

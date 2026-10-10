@@ -49,7 +49,25 @@ async fn mock(uploads: Arc<Mutex<Vec<String>>>) -> QslEndpoints {
             "<HTML>Result: 1 out of 1 records added<BR></HTML>".to_string()
         }
     });
+    // QRZ Logbook: the confirmed QSOs, with the ADIF angle brackets as entities like the real service.
+    let qrz = post(|body: String| async move {
+        if !body.contains("KEY=QRZ-KEY") {
+            return "RESULT=AUTH&REASON=invalid+api+key".to_string();
+        }
+        assert!(body.contains("STATUS%3ACONFIRMED") && body.contains("AFTERLOGID%3A0"), "{body}");
+        let adi = record(&[("CALL", "JA1XYZ"), ("BAND", "20m"), ("MODE", "CW"), ("QSO_DATE", "20260101"), ("TIME_ON", "120500"), ("APP_QRZLOG_LOGID", "77")]);
+        format!("RESULT=OK&COUNT=1&LOGIDS=77&ADIF={}", adi.replace('<', "&lt;").replace('>', "&gt;"))
+    });
+    // Club Log matches: rows of [call, dxcc, date, band id, mode].
+    let matches = get(|Query(q): Query<std::collections::HashMap<String, String>>| async move {
+        if q.get("password").map(String::as_str) != Some("clpw") || q.get("api").map(String::as_str) != Some("appkey") {
+            return (axum::http::StatusCode::FORBIDDEN, "Invalid login".to_string());
+        }
+        (axum::http::StatusCode::OK, r#"[["W1AW","291","2026-01-01 11:58:00","20","CW"],["VK2XYZ","150","2026-01-02 08:00:00","40",false],["ZZ9ZZ","1","2026-01-03 08:00:00","40","SSB"]]"#.to_string())
+    });
     let app = Router::new()
+        .route("/qrz", qrz)
+        .route("/getmatches.php", matches)
         .route("/lotwuser/lotwreport.adi", lotw)
         .route("/qslcard/DownloadInBox.cfm", inbox)
         .route("/downloadedfiles/abc.adi", file)
@@ -61,6 +79,8 @@ async fn mock(uploads: Arc<Mutex<Vec<String>>>) -> QslEndpoints {
         lotw_report: format!("http://{addr}/lotwuser/lotwreport.adi"),
         eqsl_inbox: format!("http://{addr}/qslcard/DownloadInBox.cfm"),
         eqsl_upload: format!("http://{addr}/qslcard/ImportADIF.cfm"),
+        qrz: format!("http://{addr}/qrz"),
+        clublog_matches: format!("http://{addr}/getmatches.php"),
         ..QslEndpoints::default()
     }
 }
@@ -281,4 +301,45 @@ async fn award_hints_follow_the_log() {
     // No band column (1.25m) and no mode: just the mixed cell.
     let h = hints("call=DL2XX&band=1.25m").await;
     assert_eq!(hint_cells(&h, "dxcc"), cells(&[("mixed", "worked")]));
+}
+
+#[tokio::test]
+async fn qrz_and_clublog_confirmations() {
+    let api = Api::new(mock(Arc::default()).await).await;
+    let (log, loc) = api.setup().await;
+    api.qso(log, loc, "JA1XYZ").await;
+    api.qso(log, loc, "W1AW").await;
+    api.qso(log, loc, "DL1BAD").await;
+
+    // Nothing to download from until the service is set up.
+    let d = api.post("/qsl/download/qrz", json!(null)).await;
+    assert!(d["error"].as_str().unwrap().contains("API key"), "{d}");
+
+    let mut cfg = api.get("/qsl").await["config"].clone();
+    cfg["qrz_calls"] = json!(["N0CALL"]);
+    cfg["clublog_calls"] = json!(["N0CALL"]);
+    cfg["clublog_email"] = json!("op@example.com");
+    api.put("/qsl", json!({"config": cfg, "secrets": {"qrz_keys": {"N0CALL": "QRZ-KEY"}, "clublog_password": "clpw", "clublog_app_key": "appkey"}})).await;
+
+    let d = api.post("/qsl/download/qrz", json!(null)).await;
+    assert_eq!((d["received"].as_u64(), d["confirmed"].as_u64()), (Some(1), Some(1)), "{d}");
+    let ja = api.fields(log, "JA1XYZ").await;
+    assert_eq!(ja["QRZCOM_QSO_DOWNLOAD_STATUS"], "Y");
+    assert_eq!(ja["QRZCOM_QSO_UPLOAD_STATUS"], "Y", "a confirmed QSO is on QRZ");
+    assert_eq!(ja["QRZCOM_QSO_DOWNLOAD_DATE"].as_str().unwrap().len(), 8);
+    assert!(api.fields(log, "W1AW").await.get("QRZCOM_QSO_DOWNLOAD_STATUS").is_none());
+
+    // The match for VK2XYZ has no mode and is dropped; ZZ9ZZ isn't in the log.
+    let d = api.post("/qsl/download/clublog", json!(null)).await;
+    assert_eq!((d["received"].as_u64(), d["confirmed"].as_u64(), d["unmatched_count"].as_u64()), (Some(2), Some(1), Some(1)), "{d}");
+    let w = api.fields(log, "W1AW").await;
+    assert_eq!(w["APP_QRZERO_CLUBLOG_RCVD"], "Y");
+    assert_eq!(w["CLUBLOG_QSO_UPLOAD_STATUS"], "Y");
+    assert!(api.fields(log, "DL1BAD").await.get("APP_QRZERO_CLUBLOG_RCVD").is_none());
+    assert!(d["new_awards"].as_array().unwrap().is_empty(), "only LoTW and eQSL count toward awards");
+
+    // A wrong password is reported, not swallowed.
+    api.put("/qsl", json!({"config": api.get("/qsl").await["config"].clone(), "secrets": {"clublog_password": "wrong"}})).await;
+    let d = api.post("/qsl/download/clublog", json!(null)).await;
+    assert!(d["error"].as_str().unwrap().contains("application password"), "{d}");
 }
