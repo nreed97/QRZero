@@ -34,6 +34,13 @@ LoTW uploads use TQSL, already installed and set up with your certificate, and o
 
 To send everything LoTW is missing for a period, use the **Upload needed, from / to** dates under the LoTW button. QRZero counts the QSOs in that range (both days included, UTC) whose LoTW sent status is N or blank, and **Sign and upload** hands them to TQSL in one go, marking each as sent with today's date. The **QSOs from** date doesn't apply to this; the range you pick decides. QSOs from a location with no TQSL station location are skipped, as above.
 
+**Portable operation in another state.** Two things help:
+
+- **Use QTH details from the log** (on by default) tells TQSL to take each QSO's own My location details (state, county, grid, zones) instead of the station location's, so QSOs made away from home are signed for where they were made. QRZero only passes the details along; it never changes the My location on your QSOs. This needs a TQSL that supports it (2.5 or newer). For best results the QSO should carry all of those details, which a QRZero location does for the QSOs logged from it.
+- **Upload under** picks a different TQSL station location for just this upload, in place of the ones set per callsign and location. Use it for a trip you've set up in TQSL. It applies to the whole upload (the button and the date range) and isn't remembered.
+
+For activations like POTA where you want everything in one place, give your portable location one TQSL station location and leave **Upload under** alone. You don't need a TQSL location per activation.
+
 If TQSL asks for your certificate password, it will show its own window.
 
 QSOs imported without a location are not uploaded to LoTW, since QRZero can't tell which station location they belong to. Edit them to give them a location first.

@@ -237,6 +237,7 @@ export interface QslConfig {
   confirm_daily: boolean;
   lotw_download_enabled: boolean;
   lotw_download_interval_min: number;
+  lotw_use_log_qth: boolean;
 }
 export type QslService = "qrz" | "clublog" | "lotw" | "eqsl";
 /** An award cell a download confirmed that its service had not confirmed before. */

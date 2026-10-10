@@ -1662,6 +1662,14 @@ async fn qsl_download(State(s): State<Shared>, Path(service): Path<String>) -> A
 struct RangeBody {
     from: String,
     to: String,
+    #[serde(default)]
+    location: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct LotwBody {
+    location: Option<String>,
 }
 
 async fn qsl_lotw_waiting(State(s): State<Shared>, Query(q): Query<RangeBody>) -> ApiResult<serde_json::Value> {
@@ -1670,7 +1678,7 @@ async fn qsl_lotw_waiting(State(s): State<Shared>, Query(q): Query<RangeBody>) -
 }
 
 async fn qsl_lotw_range(State(s): State<Shared>, Json(b): Json<RangeBody>) -> ApiResult<qsl::Run> {
-    Ok(Json(s.qsl.upload_lotw(Some((&b.from, &b.to))).await))
+    Ok(Json(s.qsl.upload_lotw(Some((&b.from, &b.to)), b.location.as_deref()).await))
 }
 
 async fn qsl_targets(State(s): State<Shared>) -> Json<Vec<&'static str>> {
@@ -1682,9 +1690,9 @@ async fn qsl_upload_qsos(State(s): State<Shared>, Path(service): Path<String>, J
     Ok(Json(s.qsl.upload_ids(&service, &b.ids).await))
 }
 
-async fn qsl_upload(State(s): State<Shared>, Path(service): Path<String>) -> ApiResult<qsl::Run> {
+async fn qsl_upload(State(s): State<Shared>, Path(service): Path<String>, body: axum::body::Bytes) -> ApiResult<qsl::Run> {
     let run = match service.as_str() {
-        "lotw" => s.qsl.upload_lotw(None).await,
+        "lotw" => s.qsl.upload_lotw(None, serde_json::from_slice::<LotwBody>(&body).ok().and_then(|b| b.location).as_deref()).await,
         other => s.qsl.upload(other).await,
     };
     Ok(Json(run))

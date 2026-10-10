@@ -80,6 +80,9 @@ pub struct QslConfig {
     pub lotw_download_enabled: bool,
     /// 0: not set yet (settings from an older version); `normalize` fills it.
     pub lotw_download_interval_min: u32,
+    /// Tell TQSL to use the MY_* details in each QSO (state, grid, zones) instead of the
+    /// station location's own (`-f update`). Records are never changed.
+    pub lotw_use_log_qth: bool,
 }
 
 impl QslConfig {
@@ -139,6 +142,7 @@ impl Default for QslConfig {
             confirm_daily: false,
             lotw_download_enabled: false,
             lotw_download_interval_min: 0,
+            lotw_use_log_qth: true,
         }
     }
 }
@@ -513,7 +517,7 @@ impl Qsl {
             let only: HashSet<i64> = ids.iter().copied().collect();
             let _busy = self.busy.lock().await;
             self.set_run(LOTW.name, Run { running: true, at: Utc::now().timestamp(), ..Run::default() });
-            let run = self.lotw_run(None, Some(&only)).await;
+            let run = self.lotw_run(None, Some(&only), None).await;
             self.set_run(LOTW.name, run.clone());
             return run;
         }
@@ -801,19 +805,21 @@ impl Qsl {
     /// Signs and uploads pending QSOs to LoTW with TQSL, one station location at a time.
     /// With `range` (first and last day, YYYY-MM-DD, both included) it sends every QSO
     /// in that range that isn't marked sent, whatever the "QSOs from" date says.
-    pub async fn upload_lotw(&self, range: Option<(&str, &str)>) -> Run {
+    pub async fn upload_lotw(&self, range: Option<(&str, &str)>, location: Option<&str>) -> Run {
         let bounds = match range.map(|(a, b)| day_range(a, b)).transpose() {
             Ok(b) => b,
             Err(e) => return Run { error: Some(e), at: Utc::now().timestamp(), ..Run::default() },
         };
         let _busy = self.busy.lock().await;
         self.set_run(LOTW.name, Run { running: true, at: Utc::now().timestamp(), ..Run::default() });
-        let run = self.lotw_run(bounds, None).await;
+        let run = self.lotw_run(bounds, None, location.filter(|l| !l.is_empty())).await;
         self.set_run(LOTW.name, run.clone());
         run
     }
 
-    async fn lotw_run(&self, bounds: Option<(i64, i64)>, only: Option<&HashSet<i64>>) -> Run {
+    /// With `location`, every mapped location's QSOs are signed for that TQSL station location
+    /// instead of the mapped one (the mapping still picks which QSOs go).
+    async fn lotw_run(&self, bounds: Option<(i64, i64)>, only: Option<&HashSet<i64>>, location: Option<&str>) -> Run {
         let mut run = Run { at: Utc::now().timestamp(), ..Run::default() };
         let cfg = self.config();
         let Some(tqsl) = (if cfg.tqsl_path.is_empty() { qsl::find_tqsl() } else { Some(PathBuf::from(&cfg.tqsl_path)) }) else {
@@ -863,7 +869,8 @@ impl Qsl {
                 run.error = Some(e.to_string());
                 return run;
             }
-            let job = TqslJob { tqsl_path: tqsl.clone(), station_location: m.station_location.clone(), adif_path: file.clone() };
+            let station_location = location.unwrap_or(&m.station_location).to_string();
+            let job = TqslJob { tqsl_path: tqsl.clone(), station_location, use_log_qth: cfg.lotw_use_log_qth, adif_path: file.clone() };
             let mut cmd = tokio::process::Command::new(&job.tqsl_path);
             cmd.args(job.args());
             #[cfg(windows)]
@@ -879,7 +886,7 @@ impl Qsl {
             };
             let outcome = qsl::tqsl_outcome(code);
             if !outcome.ok {
-                run.error = Some(format!("{} at {}: {} (TQSL code {code})", m.callsign, m.station_location, outcome.message));
+                run.error = Some(format!("{} at {}: {} (TQSL code {code})", m.callsign, job.station_location, outcome.message));
                 return run;
             }
             let ids: Vec<i64> = pending.iter().map(|q| q.id).collect();

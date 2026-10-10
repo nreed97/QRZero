@@ -173,11 +173,11 @@ export const api = {
   qsl: () => json<QslOverview>("GET", "/qsl"),
   saveQsl: (config: QslConfig, secrets: QslSecrets) => json<QslOverview>("PUT", "/qsl", { config, secrets }),
   testQrzLogbook: (callsign: string) => json<{ callsign: string }>("POST", "/qsl/qrz/test", { callsign }),
-  qslUpload: (service: QslService) => json<QslRun>("POST", `/qsl/upload/${service}`),
+  qslUpload: (service: QslService, location = "") => json<QslRun>("POST", `/qsl/upload/${service}`, { location }),
   qslTargets: () => json<QslService[]>("GET", "/qsl/targets"),
   qslUploadQsos: (service: QslService, ids: number[]) => json<QslRun>("POST", `/qsl/upload/${service}/qsos`, { ids }),
   lotwWaiting: (from: string, to: string) => json<LotwWaiting>("GET", `/qsl/lotw/range?from=${from}&to=${to}`),
-  lotwUploadRange: (from: string, to: string) => json<QslRun>("POST", "/qsl/lotw/range", { from, to }),
+  lotwUploadRange: (from: string, to: string, location = "") => json<QslRun>("POST", "/qsl/lotw/range", { from, to, location }),
   qslDownload: (service: "lotw" | "eqsl") => json<QslDownload>("POST", `/qsl/download/${service}`),
   propagation: (refresh = false) => json<PropagationReport>("GET", `/propagation${refresh ? "?refresh=true" : ""}`),
 };

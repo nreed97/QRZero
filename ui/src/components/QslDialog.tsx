@@ -98,6 +98,7 @@ function Online({ callsigns, locations, onClose }: Props) {
   const [eqslPassword, setEqslPassword] = useState("");
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [busy, setBusy] = useState("");
+  const [lotwLoc, setLotwLoc] = useState("");
   const [svc, setSvc] = useState<"lotw" | "qrz" | "clublog" | "eqsl">("lotw");
 
   const load = () =>
@@ -179,7 +180,7 @@ function Online({ callsigns, locations, onClose }: Props) {
     setMsg(null);
     try {
       await save();
-      await api.qslUpload(service);
+      await api.qslUpload(service, service === "lotw" ? lotwLoc : "");
       await load();
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
@@ -208,7 +209,7 @@ function Online({ callsigns, locations, onClose }: Props) {
     setMsg(null);
     try {
       await save();
-      await api.lotwUploadRange(rangeFrom, rangeTo);
+      await api.lotwUploadRange(rangeFrom, rangeTo, lotwLoc);
       await load();
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
@@ -267,6 +268,18 @@ function Online({ callsigns, locations, onClose }: Props) {
               )}
             </tbody>
           </table>
+          <div className="row">
+            <label className="f w-l">
+              <span>Upload under</span>
+              <select value={lotwLoc} onChange={(e) => setLotwLoc(e.target.value)} aria-label="TQSL station location for this upload">
+                <option value="">(as set above)</option>
+                {o.tqsl.locations.map((n) => <option key={n}>{n}</option>)}
+              </select>
+            </label>
+            <label className="check" title="Passes each QSO's My location details (state, county, grid, zones) to TQSL, which then uses them instead of the station location's. Your QSOs are not changed.">
+              <input type="checkbox" checked={cfg.lotw_use_log_qth} onChange={(e) => set({ lotw_use_log_qth: e.target.checked })} /> Use QTH details from the log
+            </label>
+          </div>
           <div className="row">
             <button className="primary" disabled={!!busy || !cfg.lotw.length} onClick={() => upload("lotw")}>
               {busy === "lotw" ? "Signing and uploading…" : `Sign and upload ${lotwPending} QSO${lotwPending === 1 ? "" : "s"} to LoTW`}
