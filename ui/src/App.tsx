@@ -59,6 +59,16 @@ function initialWorkspace(): WS {
   return saved;
 }
 
+// Ticks on its own so the once-a-second redraw doesn't re-render the whole window.
+function Clock({ localTime }: { localTime: boolean }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return <span className="clock" title={localTime ? "UTC, then your computer's time" : "UTC"}>{utcClock(now)}{localTime && <span className="muted"> ({localClock(now)} local)</span>}</span>;
+}
+
 export default function App() {
   const [logs, setLogs] = useState<Log[]>([]);
   const [logId, setLogId] = useState<number | null>(null);
@@ -77,7 +87,6 @@ export default function App() {
   const [selection, setSelection] = useState<Set<number>>(new Set());
   const [refreshKey, setRefreshKey] = useState(0);
   const [error, setError] = useState("");
-  const [now, setNow] = useState(new Date());
   const [layout, setLayout, layoutLoaded] = usePref<EntryLayout>("entry_layout", DEFAULT_LAYOUT);
   const [modeLayouts, setModeLayouts, modeLayoutsLoaded] = usePref<ModeLayouts>("entry_layouts", {});
   const [columns, setColumns] = usePref<string[]>("grid_columns", DEFAULT_COLUMNS);
@@ -104,11 +113,6 @@ export default function App() {
   useShortcut("help", () => setDialog((d) => (d === null ? "help" : d)));
   useShortcut("settings", () => setDialog((d) => (d === null ? "settings" : d)));
   useShortcut("qsl", () => setDialog((d) => (d === null ? "qsl" : d)));
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
 
   const loadLogs = useCallback(async () => {
     const list = await api.logs();
@@ -404,7 +408,7 @@ export default function App() {
         <UpdateNotice />
         {notice && <span className="notice" role="status">{notice}</span>}
         <span className="muted">{currentLog?.qso_count.toLocaleString() ?? 0} QSOs</span>
-        <span className="clock" title={display.localTime ? "UTC, then your computer's time" : "UTC"}>{utcClock(now)}{display.localTime && <span className="muted"> ({localClock(now)} local)</span>}</span>
+        <Clock localTime={display.localTime} />
         <LayoutMenu ws={ws} onChange={setWs} onShow={(id) => setWs({ ...wsRef.current, root: dockBack(wsRef.current.root, id) })} onFocusWindow={focusWindow} />
         <MainMenu onPick={setDialog} />
       </header>
