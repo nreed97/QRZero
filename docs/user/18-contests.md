@@ -18,7 +18,7 @@ Contests that have finished are dropped.
 | **When (UTC)** | Start and end. A contest with several parts (some VHF and sprint contests) shows from the first start to the last end; the calendar's page has the details. |
 | (next column) | **ends in** for a contest on the air now, **in** for one still to come. |
 | **Mode** | CW, Phone and/or Digital when the contest's name says so (for example "CW", "SSB", "RTTY"). **Any** when it doesn't, as in a mixed-mode contest. |
-| **Rules** | Opens the contest's page on the calendar, which links to the sponsor's rules. |
+| **Details** | Opens the contest's page on the WA7BNM calendar, which has the dates, bands and a link to the sponsor's rules. |
 
 **On now** comes first, then **Upcoming**, each in date order.
 

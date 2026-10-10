@@ -64,7 +64,7 @@ export default function ContestsPane() {
       <td className="mono">{stamp(c.start)} - {stamp(c.end)}</td>
       <td>{c.start <= now ? `ends in ${span(c.end - now)}` : `in ${span(c.start - now)}`}</td>
       <td>{c.modes.length ? c.modes.map((m) => MODE_NAME[m] ?? m).join(", ") : <span className="muted">Any</span>}</td>
-      <td className="c-act">{c.link && <a href={c.link} target="_blank" rel="noopener noreferrer" title="Open the contest's page on the calendar, with a link to the rules">Rules</a>}</td>
+      <td className="c-act">{c.link && <a href={c.link} target="_blank" rel="noopener noreferrer" title="Open the contest's page on the calendar">Details</a>}</td>
     </tr>
   );
 
