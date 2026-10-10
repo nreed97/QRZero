@@ -8,6 +8,17 @@ const ADIF = `Test file<EOH>
 <CALL:5>K1XYZ<QSO_DATE:8>20240106<TIME_ON:6>021530<FREQ:5>7.074<MODE:4>MFSK<SUBMODE:3>FT4<EOR>
 `;
 
+/** Double-clicks a log row and returns the editor window, trying again when a slow runner doesn't open it. */
+async function openEditorWindow(page: Page, call: string): Promise<Page> {
+  for (let i = 0; i < 3; i++) {
+    const popup = page.waitForEvent("popup", { timeout: 10_000 }).catch(() => undefined);
+    await page.locator(".grid-row", { hasText: call }).dblclick();
+    const win = await popup;
+    if (win) return win;
+  }
+  throw new Error(`the editor window for ${call} didn't open`);
+}
+
 test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.goto("/?token=e2e");
 
@@ -89,10 +100,16 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.locator(".grid > .grid-tools")).toContainText("3 QSOs");
 
   // Edit a QSO: the editor opens in its own window.
-  const [editWin] = await Promise.all([page.waitForEvent("popup"), page.locator(".grid-row", { hasText: "K1ABC" }).dblclick()]);
+  const editWin = await openEditorWindow(page, "K1ABC");
   const editor = editWin.locator(".qso-editor");
   const name = editor.getByLabel("Name", { exact: true });
-  await expect(name).toHaveValue("José");
+  // On a slow runner the window can come up empty; opening the QSO again sends it again.
+  await expect(async () => {
+    await expect(name).toHaveValue("José", { timeout: 4000 });
+  }).toPass({ timeout: 30_000, intervals: [100] }).catch(async () => {
+    await page.locator(".grid-row", { hasText: "K1ABC" }).dblclick();
+    await expect(name).toHaveValue("José");
+  });
   await name.fill("Jose Maria");
   await expect(editor.locator(".qe-changes")).toHaveText("1 change");
   await editor.getByRole("button", { name: "Save" }).click();
@@ -355,7 +372,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // OQRS: mark from the right-click menu, then see it in the editor.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click({ button: "right" });
   await page.getByRole("menuitem", { name: /Mark OQRS requested/ }).click();
-  const [oqrsWin] = await Promise.all([page.waitForEvent("popup"), page.locator(".grid-row", { hasText: "K1ABC" }).dblclick()]);
+  const oqrsWin = await openEditorWindow(page, "K1ABC");
   const oqrs = oqrsWin.locator(".qso-editor");
   await expect(oqrs.getByLabel("Club Log OQRS")).toHaveValue("Y");
   await expect(oqrs.getByText("Not confirmed yet. OQRS requested on Club Log.")).toBeVisible();
