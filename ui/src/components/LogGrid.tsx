@@ -4,7 +4,6 @@ import { api } from "../api";
 import { OQRS_ACTIONS, PAPER_ACTIONS } from "../paper";
 import { BANDS, MODES } from "../modes";
 import { COLUMNS, DEFAULT_COLUMNS } from "../fields";
-import { localGet, localSet } from "../prefs";
 import type { Location, Qso, QsoFilter, QslService } from "../types";
 import { qrzPageUrl } from "./QrzPageLink";
 import SpotDialog, { type SpotRequest } from "./SpotDialog";
@@ -15,6 +14,7 @@ import "../worked.css";
 
 const PAGE = 200;
 const ROW = 26;
+const HEAD_H = 24;
 
 interface Props {
   logId: number;
@@ -28,6 +28,9 @@ interface Props {
   onExportSelected: () => void;
   columns: string[];
   onColumns: (c: string[]) => void;
+  /** Widths the user dragged columns to, in pixels (kept by the app so saved layouts can carry them). */
+  widths: Record<string, number>;
+  onWidths: (w: Record<string, number>) => void;
   locations: Location[];
   /** Filled in with a function that finds the QSO before or after one (for the editor's arrows). */
   stepper?: MutableRefObject<((id: number, dir: -1 | 1) => Qso | null) | null>;
@@ -37,16 +40,17 @@ interface Props {
 
 const QSL_NAMES: Record<QslService, string> = { qrz: "QRZ Logbook", clublog: "Club Log", eqsl: "eQSL", lotw: "LoTW (TQSL)" };
 
-export default function LogGrid({ logId, refreshKey, filter, onFilter, selection, onSelection, onEdit, onDeleted, onExportSelected, columns, onColumns, locations, stepper, editingId }: Props) {
+export default function LogGrid({ logId, refreshKey, filter, onFilter, selection, onSelection, onEdit, onDeleted, onExportSelected, columns, onColumns, widths, onWidths, locations, stepper, editingId }: Props) {
   useDisplay(); // redraw when the date or frequency format changes
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
   const [search, setSearch] = useState(filter.call ?? "");
   const [picking, setPicking] = useState(false);
   const cols = (columns.length ? columns : DEFAULT_COLUMNS).map((k) => COLUMNS.find((c) => c.key === k)).filter((c) => c !== undefined);
-  // Widths the user dragged a column to, in pixels; other columns share what's left.
-  const [widths, setWidths] = useState<Record<string, number>>(() => localGet<Record<string, number>>("qrzero.colWidths", {}));
+  // Columns without a dragged width share what's left.
   const template = `28px ${cols.map((c) => (widths[c.key] ? `${widths[c.key]}px` : c.width)).join(" ")}`;
+  // Narrowest the row can get: the heading and rows scroll sideways together beyond this.
+  const minWidth = 28 + cols.reduce((n, c) => n + (widths[c.key] ?? Number(/(\d+)px/.exec(c.width)?.[1] ?? 80)), 0);
   const head = useRef<HTMLDivElement>(null);
   const [moving, setMoving] = useState<{ key: string; to: number } | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; q: Qso } | null>(null);
@@ -123,6 +127,7 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
     getScrollElement: () => scroller.current,
     estimateSize: () => ROW,
     overscan: 20,
+    scrollPaddingStart: HEAD_H, // keep the sticky heading from covering the row scrolled to
   });
   const items = virtualizer.getVirtualItems();
   const first = items[0]?.index ?? 0;
@@ -287,13 +292,10 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
   const one = (v: string) => (v ? [v] : undefined);
 
   const setWidth = (key: string, px: number) => {
-    setWidths((w) => {
-      const next = { ...w };
-      if (px > 0) next[key] = px;
-      else delete next[key];
-      localSet("qrzero.colWidths", next);
-      return next;
-    });
+    const next = { ...widths };
+    if (px > 0) next[key] = px;
+    else delete next[key];
+    onWidths(next);
   };
 
   const resizeColumn = (e: ReactPointerEvent<HTMLSpanElement>, key: string) => {
@@ -409,8 +411,7 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
             className="tiny"
             onClick={() => {
               onColumns(DEFAULT_COLUMNS);
-              setWidths({});
-              localSet("qrzero.colWidths", {});
+              onWidths({});
             }}
           >
             Reset
@@ -418,49 +419,51 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
           <button className="tiny" onClick={() => setPicking(false)}>Done</button>
         </div>
       )}
-      <div className="grid-head" ref={head} style={{ gridTemplateColumns: template }}>
-        <span className="sel" />
-        {cols.map((c, i) => (
-          <span
-            key={c.key}
-            className={`${c.cls ?? ""} col-head ${moving?.key === c.key ? "moving" : ""} ${moving && moving.to === i && moving.key !== c.key ? "drop-before" : ""} ${moving && moving.to === cols.length && i === cols.length - 1 ? "drop-after" : ""}`}
-            title="Drag to move this column, drag its right edge to resize"
-            onPointerDown={(e) => moveColumn(e, c.key)}
-          >
-            {c.label}
-            <span className="col-resize" onPointerDown={(e) => resizeColumn(e, c.key)} onDoubleClick={() => setWidth(c.key, 0)} title="Drag to resize, double-click to reset" />
-          </span>
-        ))}
-      </div>
       <div className="grid-body" ref={scroller} tabIndex={0} onKeyDown={keys} aria-label="QSOs (arrows move, Enter edits)">
-        <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-          {items.map((v) => {
-            const q = rowAt(v.index);
-            return (
-              <div
-                key={v.key}
-                className={`grid-row ${q && selection.has(q.id) ? "selected" : ""} ${q && q.id === editingId ? "editing" : ""} ${v.index % 2 ? "odd" : ""}`}
-                style={{ transform: `translateY(${v.start}px)`, height: ROW, gridTemplateColumns: template }}
-                onClick={(e) => q && click(e, v.index, q)}
-                onDoubleClick={() => q && onEdit(q)}
-                onContextMenu={(e) => {
-                  if (!q) return;
-                  e.preventDefault();
-                  if (!selection.has(q.id)) onSelection(new Set([q.id]));
-                  setMenu({ x: e.clientX, y: e.clientY, q });
-                  api.qslTargets().then(setTargets, () => setTargets([]));
-                }}
-                title={q ? "Double-click or Enter to edit; right-click for more" : undefined}
-              >
-                <span className="sel">
-                  {q && <input type="checkbox" checked={selection.has(q.id)} onChange={() => toggle(q)} onClick={(e) => e.stopPropagation()} />}
-                </span>
-                {cols.map((c) => (
-                  <span key={c.key} className={c.cls}>{q ? c.get(q, ctx) : ""}</span>
-                ))}
-              </div>
-            );
-          })}
+        <div className="grid-inner" style={{ minWidth }}>
+        <div className="grid-head" ref={head} style={{ gridTemplateColumns: template }}>
+          <span className="sel" />
+          {cols.map((c, i) => (
+            <span
+              key={c.key}
+              className={`${c.cls ?? ""} col-head ${moving?.key === c.key ? "moving" : ""} ${moving && moving.to === i && moving.key !== c.key ? "drop-before" : ""} ${moving && moving.to === cols.length && i === cols.length - 1 ? "drop-after" : ""}`}
+              title="Drag to move this column, drag its right edge to resize"
+              onPointerDown={(e) => moveColumn(e, c.key)}
+            >
+              {c.label}
+              <span className="col-resize" onPointerDown={(e) => resizeColumn(e, c.key)} onDoubleClick={() => setWidth(c.key, 0)} title="Drag to resize, double-click to reset" />
+            </span>
+          ))}
+        </div>
+          <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+            {items.map((v) => {
+              const q = rowAt(v.index);
+              return (
+                <div
+                  key={v.key}
+                  className={`grid-row ${q && selection.has(q.id) ? "selected" : ""} ${q && q.id === editingId ? "editing" : ""} ${v.index % 2 ? "odd" : ""}`}
+                  style={{ transform: `translateY(${v.start}px)`, height: ROW, gridTemplateColumns: template }}
+                  onClick={(e) => q && click(e, v.index, q)}
+                  onDoubleClick={() => q && onEdit(q)}
+                  onContextMenu={(e) => {
+                    if (!q) return;
+                    e.preventDefault();
+                    if (!selection.has(q.id)) onSelection(new Set([q.id]));
+                    setMenu({ x: e.clientX, y: e.clientY, q });
+                    api.qslTargets().then(setTargets, () => setTargets([]));
+                  }}
+                  title={q ? "Double-click or Enter to edit; right-click for more" : undefined}
+                >
+                  <span className="sel">
+                    {q && <input type="checkbox" checked={selection.has(q.id)} onChange={() => toggle(q)} onClick={(e) => e.stopPropagation()} />}
+                  </span>
+                  {cols.map((c) => (
+                    <span key={c.key} className={c.cls}>{q ? c.get(q, ctx) : ""}</span>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
         </div>
         {menu && (() => {
           const ids = menuIds(menu.q);
