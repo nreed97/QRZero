@@ -319,10 +319,10 @@ Colours can follow Windows or be always light or dark, and text size runs from 1
 
 ## Using a browser
 
-The desktop app is a window onto a small local web server. You can run the server on its own and use any browser:
+The desktop app is a window onto a small local web server. You can run the server on its own and use any browser. It is a separate release download (`QRZero-server_<version>_windows-x86_64.exe`, or the Linux `.tar.gz`), not part of the installer, and it is not on your PATH, so give its full path. Close the desktop app first (both would use the same log and UDP ports), and point `--data-dir` at your log folder (`%APPDATA%\QRZero` for the desktop app):
 
 ```sh
-qrzero-server --data-dir "C:\path\to\data" --bind 127.0.0.1:8073
+C:\QRZero\qrzero-server.exe --data-dir "C:\path\to\data" --bind 127.0.0.1:8073
 ```
 
 It prints a link that includes a session token; open it. The token keeps other programs on the computer from reading your log. The server only listens on this computer unless you tell it otherwise, so don't bind it to your network until network sign-in exists.
