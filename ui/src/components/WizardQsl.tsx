@@ -45,13 +45,10 @@ export default function WizardQsl({ call, locationId, locationName, saveRef }: P
     const next: QslConfig = {
       ...cfg,
       clublog_enabled: use.clublog,
-      clublog_live: use.clublog,
       clublog_calls: use.clublog && call ? withCall(cfg.clublog_calls) : cfg.clublog_calls,
       qrz_enabled: use.qrz,
-      qrz_live: use.qrz,
       qrz_calls: use.qrz && call ? withCall(cfg.qrz_calls) : cfg.qrz_calls,
       eqsl_enabled: use.eqsl,
-      eqsl_live: use.eqsl,
       eqsl_calls: use.eqsl && call ? withCall(cfg.eqsl_calls) : cfg.eqsl_calls,
     };
     await api.saveQsl(next, {

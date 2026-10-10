@@ -272,11 +272,8 @@ function Online({ callsigns, locations, onClose }: Props) {
           <legend>QRZ Logbook</legend>
           <div className="row">
             <label className="check"><input type="checkbox" checked={cfg.qrz_enabled} onChange={(e) => set({ qrz_enabled: e.target.checked })} /> Upload new QSOs automatically</label>
-            <label className="f w-s"><span>Every (min)</span><input value={cfg.qrz_interval_min} disabled={!cfg.qrz_enabled} inputMode="numeric" onChange={(e) => set({ qrz_interval_min: Math.max(1, Number(e.target.value) || 15) })} /></label>
-          </div>
-          <div className="row">
-            <label className="check"><input type="checkbox" checked={cfg.qrz_live} onChange={(e) => set({ qrz_live: e.target.checked })} /> Upload shortly after a QSO is logged or edited</label>
-            <label className="f w-s"><span>Wait (min)</span><input value={cfg.qrz_live_delay_min} disabled={!cfg.qrz_live} inputMode="numeric" onChange={(e) => set({ qrz_live_delay_min: Math.min(60, Math.max(1, Number(e.target.value) || 2)) })} /></label>
+            <label className="f w-s"><span>Wait (min)</span><input value={cfg.qrz_live_delay_min} disabled={!cfg.qrz_enabled} inputMode="numeric" onChange={(e) => set({ qrz_live_delay_min: Math.min(60, Math.max(1, Number(e.target.value) || 2)) })} /></label>
+            <span className="muted small">after a QSO is logged or edited</span>
           </div>
           <p className="small muted">Each logbook on QRZ.com has its own API key (QRZ Logbook, Settings, API). QRZ needs an XML subscription for the API.</p>
           <table className="list">
@@ -320,11 +317,8 @@ function Online({ callsigns, locations, onClose }: Props) {
           <legend>Club Log</legend>
           <div className="row">
             <label className="check"><input type="checkbox" checked={cfg.clublog_enabled} onChange={(e) => set({ clublog_enabled: e.target.checked })} /> Upload new QSOs automatically</label>
-            <label className="f w-s"><span>Every (min)</span><input value={cfg.clublog_interval_min} disabled={!cfg.clublog_enabled} inputMode="numeric" onChange={(e) => set({ clublog_interval_min: Math.max(1, Number(e.target.value) || 15) })} /></label>
-          </div>
-          <div className="row">
-            <label className="check"><input type="checkbox" checked={cfg.clublog_live} onChange={(e) => set({ clublog_live: e.target.checked })} /> Upload shortly after a QSO is logged or edited</label>
-            <label className="f w-s"><span>Wait (min)</span><input value={cfg.clublog_live_delay_min} disabled={!cfg.clublog_live} inputMode="numeric" onChange={(e) => set({ clublog_live_delay_min: Math.min(60, Math.max(1, Number(e.target.value) || 2)) })} /></label>
+            <label className="f w-s"><span>Wait (min)</span><input value={cfg.clublog_live_delay_min} disabled={!cfg.clublog_enabled} inputMode="numeric" onChange={(e) => set({ clublog_live_delay_min: Math.min(60, Math.max(1, Number(e.target.value) || 2)) })} /></label>
+            <span className="muted small">after a QSO is logged or edited</span>
           </div>
           <div className="row">
             <label className="f w-l"><span>Club Log email</span><input value={cfg.clublog_email} onChange={(e) => set({ clublog_email: e.target.value })} /></label>
@@ -358,11 +352,8 @@ function Online({ callsigns, locations, onClose }: Props) {
           <legend>eQSL</legend>
           <div className="row">
             <label className="check"><input type="checkbox" checked={cfg.eqsl_enabled} onChange={(e) => set({ eqsl_enabled: e.target.checked })} /> Upload new QSOs automatically</label>
-            <label className="f w-s"><span>Every (min)</span><input value={cfg.eqsl_interval_min} disabled={!cfg.eqsl_enabled} inputMode="numeric" onChange={(e) => set({ eqsl_interval_min: Math.max(1, Number(e.target.value) || 15) })} /></label>
-          </div>
-          <div className="row">
-            <label className="check"><input type="checkbox" checked={cfg.eqsl_live} onChange={(e) => set({ eqsl_live: e.target.checked })} /> Upload shortly after a QSO is logged or edited</label>
-            <label className="f w-s"><span>Wait (min)</span><input value={cfg.eqsl_live_delay_min} disabled={!cfg.eqsl_live} inputMode="numeric" onChange={(e) => set({ eqsl_live_delay_min: Math.min(60, Math.max(1, Number(e.target.value) || 2)) })} /></label>
+            <label className="f w-s"><span>Wait (min)</span><input value={cfg.eqsl_live_delay_min} disabled={!cfg.eqsl_enabled} inputMode="numeric" onChange={(e) => set({ eqsl_live_delay_min: Math.min(60, Math.max(1, Number(e.target.value) || 2)) })} /></label>
+            <span className="muted small">after a QSO is logged or edited</span>
           </div>
           <div className="row">
             <label className="f w-m"><span>eQSL username</span><input value={cfg.eqsl_username} onChange={(e) => set({ eqsl_username: e.target.value.toUpperCase() })} /></label>
