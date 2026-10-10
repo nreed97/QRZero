@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { localGet, localSet } from "./prefs";
+import { localGet, localSet, onLocalPrefsLoaded } from "./prefs";
 
 /** Every award QRZero tracks, in the order the Awards pane lists them. */
 export const AWARD_LIST: { key: string; name: string; what: string; group: "main" | "cw" }[] = [
@@ -20,7 +20,13 @@ export const AWARD_LIST: { key: string; name: string; what: string; group: "main
 
 const KEY = "qrzero.awards_off";
 const listeners = new Set<() => void>();
-let off: string[] = localGet<{ off: string[] }>(KEY, { off: [] }).off ?? [];
+const read = () => localGet<{ off: string[] }>(KEY, { off: [] }).off ?? [];
+let off: string[] = read();
+// The saved copy from the database arrives after this module loads.
+onLocalPrefsLoaded(() => {
+  off = read();
+  listeners.forEach((l) => l());
+});
 
 /** Awards the operator has hidden. Everything is on until switched off, so awards added later show up too. */
 export function awardsOff(): readonly string[] {

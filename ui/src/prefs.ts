@@ -82,6 +82,20 @@ function saveSoon() {
  * in this browser's storage is at least as new (it is written first), so it wins and is saved up.
  */
 export async function loadLocalPrefs(): Promise<void> {
+  try {
+    await fill();
+  } finally {
+    afterLoad.forEach((f) => f());
+  }
+}
+
+/** Settings read when their module loads (before the database copy is in) must read again once it is. */
+const afterLoad: (() => void)[] = [];
+export function onLocalPrefsLoaded(f: () => void) {
+  afterLoad.push(f);
+}
+
+async function fill(): Promise<void> {
   let saved: Record<string, unknown> | null = null;
   try {
     saved = await Promise.race([

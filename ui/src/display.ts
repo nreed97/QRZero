@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { localGet, localSet } from "./prefs";
+import { localGet, localSet, onLocalPrefsLoaded } from "./prefs";
 
 /** Everyday display and behaviour options (Settings, General). Stored with the window settings, so pop-out windows follow. */
 export interface Display {
@@ -52,6 +52,7 @@ function reload() {
   subs.forEach((f) => f());
 }
 window.addEventListener("storage", (e) => e.key === KEY && reload());
+onLocalPrefsLoaded(reload);
 applyDisplay();
 
 export function useDisplay(): Display {

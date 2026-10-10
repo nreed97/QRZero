@@ -513,6 +513,13 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByRole("button", { name: "NAQCC" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "FISTS" })).toHaveCount(0);
   await page.screenshot({ path: "e2e-results/awards-no-cw.png" });
+  // The choice survives a restart: the desktop app's browser storage is new each launch, so only the database copy counts.
+  await expect.poll(async () => JSON.stringify(await (await page.request.get("/api/prefs/ui.local", { headers })).json())).toContain("qrzero.awards_off");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByRole("tab", { name: "Awards" }).click();
+  await expect(page.getByRole("button", { name: "WAZ" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "SKCC" })).toHaveCount(0);
   await fromMenu(page, "Settings…");
   await page.getByRole("button", { name: "Awards", exact: true }).click();
   await page.getByRole("button", { name: "Select all" }).click();
