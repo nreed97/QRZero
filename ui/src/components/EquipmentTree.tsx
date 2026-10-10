@@ -55,7 +55,7 @@ function RigControl({ fields, onChange }: { fields: Fields; onChange: (f: Fields
 }
 
 // Which bands an antenna covers; picks it automatically when logging on them.
-function BandPicker({ fields, onChange }: { fields: Fields; onChange: (f: Fields) => void }) {
+export function BandPicker({ fields, onChange }: { fields: Fields; onChange: (f: Fields) => void }) {
   const picked = parseBands(fields.BANDS);
   const offered = [...ANTENNA_BANDS, ...picked.filter((b) => !ANTENNA_BANDS.includes(b))];
   const flip = (b: string, on: boolean) => {

@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "../api";
+import { parseBands, shortBands } from "../antennas";
 import { PRESETS, type EntryLayout } from "../fields";
 import { gridToLatLon } from "../geo";
 import type { Equipment, Fields, ImportReport, Location, StationCallsign } from "../types";
+import { BandPicker } from "./EquipmentTree";
 import Modal from "./Modal";
+import WizardQsl from "./WizardQsl";
 
 interface Props {
   logId: number;
@@ -15,7 +18,7 @@ interface Props {
   onClose: () => void;
 }
 
-const STEPS = ["Your callsign", "Callsign lookup", "Home location", "Equipment", "Entry fields", "Import a log", "Done"];
+const STEPS = ["Your callsign", "Callsign lookup", "Home location", "Equipment", "Entry fields", "Confirmations", "Import a log", "Done"];
 
 const LOCATION_FROM_LOOKUP: [string, string][] = [
   ["GRIDSQUARE", "MY_GRIDSQUARE"], ["QTH", "MY_CITY"], ["STATE", "MY_STATE"], ["CNTY", "MY_CNTY"],
@@ -43,6 +46,8 @@ export default function SetupWizard({ logId, callsigns, locations, equipment, on
   const [gearKind, setGearKind] = useState("rig");
   const [gearName, setGearName] = useState("");
   const [gearPower, setGearPower] = useState("");
+  const [gearBands, setGearBands] = useState<Fields>({});
+  const qslSave = useRef<(() => Promise<void>) | null>(null);
 
   const [preset, setPreset] = useState(PRESETS[0].id);
   const [file, setFile] = useState<File | null>(null);
@@ -109,7 +114,10 @@ export default function SetupWizard({ logId, callsigns, locations, equipment, on
           if (p) onLayout(p.layout);
           return;
         }
-        case 5: {
+        case 5:
+          await qslSave.current?.();
+          return;
+        case 6: {
           if (!file || report) return;
           const r = await api.importAdif(logId, file, {
             ...(locId ? { location_id: String(locId) } : {}),
@@ -127,9 +135,13 @@ export default function SetupWizard({ logId, callsigns, locations, equipment, on
   const addGear = () =>
     guard(async () => {
       if (!locId || !gearName.trim()) return false;
-      await api.createEquipment(locId, gearKind, gearName, gearPower ? { POWER_W: gearPower } : {});
+      await api.createEquipment(locId, gearKind, gearName, {
+        ...(gearPower && (gearKind === "rig" || gearKind === "amplifier") ? { POWER_W: gearPower } : {}),
+        ...(gearKind === "antenna" && gearBands.BANDS ? { BANDS: gearBands.BANDS } : {}),
+      });
       setGearName("");
       setGearPower("");
+      setGearBands({});
       await onChanged();
       return false;
     });
@@ -217,11 +229,12 @@ export default function SetupWizard({ logId, callsigns, locations, equipment, on
                 )}
                 <div className="actions"><button disabled={!gearName.trim() || busy} onClick={addGear}>Add</button></div>
               </div>
+              {gearKind === "antenna" && <BandPicker fields={gearBands} onChange={setGearBands} />}
               {myGear.length > 0 && (
                 <table className="list">
                   <tbody>
                     {myGear.map((e) => (
-                      <tr key={e.id}><td>{{ rig: "Radio", antenna: "Antenna", amplifier: "Amplifier", rotator: "Rotator", other: "Other" }[e.kind]}</td><td><strong>{e.name}</strong></td><td className="muted">{e.fields.POWER_W ? `${e.fields.POWER_W} W` : ""}</td></tr>
+                      <tr key={e.id}><td>{{ rig: "Radio", antenna: "Antenna", amplifier: "Amplifier", rotator: "Rotator", other: "Other" }[e.kind]}</td><td><strong>{e.name}</strong></td><td className="muted">{e.fields.POWER_W ? `${e.fields.POWER_W} W` : e.kind === "antenna" ? shortBands(parseBands(e.fields.BANDS)) : ""}</td></tr>
                     ))}
                   </tbody>
                 </table>
@@ -231,7 +244,7 @@ export default function SetupWizard({ logId, callsigns, locations, equipment, on
           {step === 4 && (
             <>
               <h3>Entry fields</h3>
-              <p>Pick the layout closest to how you operate. You can add, remove and rearrange fields any time in Settings, Entry fields, including fields of your own.</p>
+              <p>Pick the layout closest to how you operate, for example CW clubs if you work SKCC, NAQCC, FISTS or CWops members. You can add, remove and rearrange fields any time in Settings, Entry fields, including fields of your own.</p>
               {PRESETS.map((p) => (
                 <label key={p.id} className="preset">
                   <input type="radio" name="preset" checked={preset === p.id} onChange={() => setPreset(p.id)} />
@@ -240,25 +253,29 @@ export default function SetupWizard({ logId, callsigns, locations, equipment, on
               ))}
             </>
           )}
-          {step === 5 && (
+          {step === 5 && <WizardQsl call={call.trim().toUpperCase()} locationId={locId} locationName={locName} saveRef={qslSave} />}
+          {step === 6 && (
             <>
               <h3>Import a log</h3>
               {report ? (
                 <p><strong>{report.imported.toLocaleString()}</strong> QSOs imported{report.duplicates ? `, ${report.duplicates.toLocaleString()} duplicates skipped` : ""}{report.rejected ? `, ${report.rejected} records couldn't be read` : ""}.</p>
               ) : (
                 <>
-                  <p>Coming from Log4OM or another logger? Export your log there as ADIF (.adi) and choose the file here. QSOs are linked to {locName}, and duplicates are skipped. You can also do this later from Import.</p>
+                  <p>Coming from another logger? Export your log there as ADIF (.adi) and choose the file here. QSOs are linked to {locName}, and duplicates are skipped. You can also do this later from Import.</p>
                   <input type="file" accept=".adi,.adif,.txt" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
                 </>
               )}
             </>
           )}
-          {step === 6 && (
+          {step === 7 && (
             <>
               <h3>You're ready</h3>
               <ul>
                 <li>Type a call, press <kbd>Space</kbd> or <kbd>Tab</kbd> to look it up, and <kbd>Enter</kbd> to log.</li>
                 <li><kbd>Esc</kbd> clears the form. <kbd>F1</kbd> opens the user guide.</li>
+                <li>Antennas with their bands ticked are picked for you when you log on those bands. Edit them in Settings, Equipment.</li>
+                <li>The Needed pane and cluster show what you still need; Awards tracks DXCC, WAS, WAZ and the CW clubs.</li>
+                <li>Send and receive confirmations from the QSL window in the ☰ menu: LoTW, QRZ, Club Log, eQSL and paper cards.</li>
                 <li>Double-click a QSO in the log to edit it. Use Columns to choose what the log shows.</li>
                 <li>Everything here can be changed in Settings, and this wizard can be run again from Settings, General.</li>
               </ul>
@@ -270,11 +287,11 @@ export default function SetupWizard({ logId, callsigns, locations, equipment, on
       <div className="buttons">
         <span className="muted">Step {step + 1} of {STEPS.length}</span>
         {step > 0 && step < STEPS.length - 1 && <button onClick={() => setStep(step - 1)} disabled={busy}>Back</button>}
-        {(step === 1 || step === 3 || step === 5) && !report && <button onClick={() => setStep(step + 1)} disabled={busy}>Skip</button>}
-        {step === 5 && file && !report && <button onClick={next} disabled={busy}>{busy ? "Importing…" : "Import"}</button>}
+        {(step === 1 || step === 3 || step === 5 || step === 6) && !report && <button onClick={() => setStep(step + 1)} disabled={busy}>Skip</button>}
+        {step === 6 && file && !report && <button onClick={next} disabled={busy}>{busy ? "Importing…" : "Import"}</button>}
         {step < STEPS.length - 1 ? (
-          !(step === 5 && file && !report) && (
-            <button className="primary" onClick={step === 5 ? () => setStep(6) : next} disabled={busy || (step === 0 && !call.trim())}>Next</button>
+          !(step === 6 && file && !report) && (
+            <button className="primary" onClick={step === 6 ? () => setStep(7) : next} disabled={busy || (step === 0 && !call.trim())}>Next</button>
           )
         ) : (
           <button className="primary" onClick={onClose}>Start logging</button>

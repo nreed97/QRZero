@@ -29,6 +29,8 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await wizard.getByRole("button", { name: "Next" }).click();
   await wizard.getByLabel(/Parks and summits/).check();
   await wizard.getByRole("button", { name: "Next" }).click();
+  await expect(wizard.getByRole("heading", { name: "Confirmations" })).toBeVisible();
+  await wizard.getByRole("button", { name: "Skip" }).click(); // confirmations
   await wizard.getByRole("button", { name: "Skip" }).click(); // import
   await wizard.getByRole("button", { name: "Start logging" }).click();
   await expect(page.getByText("N0CALL · Home")).toBeVisible();
