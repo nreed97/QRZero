@@ -1,6 +1,6 @@
 # QSL: LoTW, QRZ, Club Log, eQSL and paper cards
 
-Choose **QSL** from the **☰** menu at the right of the top bar. It has four tabs: **Look up** (a call's QSOs and contact details), **Cards to send** (your card queue and label printing), **To reply to**, and **Online services**.
+Choose **QSL** from the **☰** menu at the right of the top bar. It has four tabs: **QSL Detail Lookup** (a call's QSOs and contact details), **Cards to send** (your card queue and label printing), **To reply to**, and **Online services**.
 
 Each QSO keeps its upload status in the standard ADIF fields (`LOTW_QSL_SENT`, `QRZCOM_QSO_UPLOAD_STATUS`, `CLUBLOG_QSO_UPLOAD_STATUS`, `EQSL_QSL_SENT` and their dates), so exports and other loggers see what's been sent. Add the **LoTW S**, **eQSL S**, **QRZ**, **Club Log** and **QSL S** (card) columns to the log grid to see them.
 
@@ -93,13 +93,13 @@ Cards arrive in the mail and don't always get answered right away. The **To repl
 - Each row shows the call, the date the card arrived (change it if it was earlier), a note you can type in (direct, via bureau, an address), and the newest QSOs you have with that station.
 - When you've replied, click **Replied**. Pick **Sent via bureau** or **Sent direct** to also mark those QSOs as card sent with today's date, or **Just remove** to only take the call off the list. The entry is deleted; no history is kept.
 
-## Look up
+## QSL Detail Lookup
 
-For answering cards or writing them in bulk: pick **QSL lookup…** from the **☰** menu, or press **Alt+Q**. This opens the QSL window on the **Look up** tab. Type a callsign and press **Enter**.
+For answering cards or writing them in bulk: pick **QSL Detail Lookup…** from the **☰** menu, or press **Alt+Q**. This opens the QSL window on the **QSL Detail Lookup** tab. Type a callsign and press **Enter**. (This searches your own log. Looking a callsign up on QRZ.com is a different thing and happens in the QSO entry form.)
 
 The top half lists that station's QSOs, newest first: date, UTC, MHz, mode, the RST you sent and received, your own callsign, and the card status (sent and received, with the bureau or direct route and date, and OQRS if you've asked). The bottom half is the contact card: name, address, QTH, country, grid, zones, QSL via (the manager), email, how many cards you've sent and which services have confirmed. Each comes from the newest QSO that has it filled in, and empty ones are left out.
 
-Tick the QSOs for the card (QSOs whose card isn't sent yet start ticked) and use **Mark selected as** to queue a card, or record it as sent or received, by bureau or direct. **Add to reply list** puts the call on the **To reply to** tab. After each lookup the call box is empty and ready for the next call. The call is matched whole, so DL1ABC finds DL1ABC and its portable forms such as DL1ABC/P, but not DL1ABCD.
+Nothing is ticked after a lookup. Tick the QSOs for the card (the box in the header ticks them all) and use **Mark selected as** to queue a card, or record it as sent or received, by bureau or direct. **Add to reply list** puts the call on the **To reply to** tab. After each lookup the call box is empty and ready for the next call. The call is matched whole, so DL1ABC finds DL1ABC and its portable forms such as DL1ABC/P, but not DL1ABCD.
 
 ## What gets sent
 

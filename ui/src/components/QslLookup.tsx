@@ -74,8 +74,8 @@ export default function QslLookup({ logId }: { logId: number }) {
     setRows(r.rows);
     setTotal(r.total);
     setShown(c);
-    // Cards usually go out for the QSOs not yet sent.
-    setPicked((cur) => (keepPicks ? new Set(r.rows.filter((q) => cur.has(q.id)).map((q) => q.id)) : new Set(r.rows.filter((q) => qf(q, "QSL_SENT") !== "Y").map((q) => q.id))));
+    // A new call starts with nothing ticked; after marking, the ticks stay.
+    setPicked((cur) => new Set(keepPicks ? r.rows.filter((q) => cur.has(q.id)).map((q) => q.id) : []));
   };
 
   const go = async () => {
@@ -126,7 +126,7 @@ export default function QslLookup({ logId }: { logId: number }) {
           <span>Call</span>
           <input ref={box} value={call} onChange={(e) => setCall(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === "Enter" && go()} autoCapitalize="characters" spellCheck={false} />
         </label>
-        <button className="primary" onClick={go} disabled={!call.trim()}>Look up</button>
+        <button className="primary" onClick={go} disabled={!call.trim()}>Find</button>
         {rows && rows.length > 0 && (
           <>
             <label className="f w-xl">

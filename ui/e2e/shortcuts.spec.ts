@@ -22,7 +22,7 @@ test("the defaults match the keys QRZero always had", () => {
 });
 
 test("conflicts and unsafe keys are refused", () => {
-  expect(problemWith("Alt+Q", {}, "settings")).toMatch(/QSL lookup/);
+  expect(problemWith("Alt+Q", {}, "settings")).toMatch(/QSL Detail Lookup/);
   expect(problemWith("Alt+Q", {}, "qsllookup")).toBeNull();
   expect(problemWith("Alt+Q", { qsllookup: null }, "settings")).toBeNull();
   expect(problemWith("Q", {}, "settings")).toMatch(/Ctrl or Alt/);

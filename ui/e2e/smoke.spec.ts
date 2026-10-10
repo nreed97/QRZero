@@ -319,13 +319,14 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByText("Nothing waiting for a reply.")).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).click();
 
-  // QSL lookup: type a call, Enter, results with the queued card.
-  await fromMenu(page, /^QSL lookup/);
+  // QSL Detail Lookup: type a call, Enter, results with the queued card.
+  await fromMenu(page, /^QSL Detail Lookup/);
   const lookup = page.getByRole("dialog", { name: "QSL" });
   await lookup.getByLabel("Call").fill("k1abc");
   await lookup.getByLabel("Call").press("Enter");
   await expect(lookup.locator("tbody tr").first()).toContainText("queued");
   await expect(lookup.locator(".ql-card")).toContainText("K1ABC");
+  await expect(lookup.locator("tbody input[type=checkbox]:checked")).toHaveCount(0);
   await page.keyboard.press("Escape");
 
   // OQRS: mark from the right-click menu, then see it in the editor.

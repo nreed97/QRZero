@@ -111,7 +111,7 @@ The **Keyboard** tab lists the keys QRZero responds to and lets you change them.
 
 | Action | Where | Default |
 | --- | --- | --- |
-| QSL lookup | Anywhere | <kbd>Alt</kbd>+<kbd>Q</kbd> |
+| QSL Detail Lookup | Anywhere | <kbd>Alt</kbd>+<kbd>Q</kbd> |
 | User guide | Anywhere | <kbd>F1</kbd> |
 | Settings | Anywhere | none |
 | QSL: LoTW, QRZ, Club Log | Anywhere | none |

@@ -179,7 +179,7 @@ export default function PaperQsl({ logId }: { logId: number }) {
   return (
     <div className="paper">
       <p className="small muted">
-        Cards waiting: QSOs marked <b>Q</b> (queued) or <b>R</b> (requested) in QSL sent. Queue them on the <b>Look up</b> tab, or from the log with <b>Paper QSL…</b>.
+        Cards waiting: QSOs marked <b>Q</b> (queued) or <b>R</b> (requested) in QSL sent. Queue them on the <b>QSL Detail Lookup</b> tab, or from the log with <b>Paper QSL…</b>.
       </p>
       {queue.length === 0 ? (
         <p className="muted">No cards waiting.</p>
