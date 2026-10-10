@@ -1,4 +1,4 @@
-import type { ContestList, DxpedList, DxpedPlanned, PropagationReport } from "./types";
+import type { UpdateInfo, ContestList, DxpedList, DxpedPlanned, PropagationReport } from "./types";
 import type { ClubAwards, LotwWaiting, QslService, QslDownload, AwardHint, SlotGrid, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, ReplyEntry, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
@@ -77,6 +77,8 @@ export const api = {
     const q = new URLSearchParams({ calls: o.calls.join(","), region: o.region, cwt_tagged: String(o.cwtTagged) });
     return json<ClubAwards>("GET", `/logs/${logId}/club-awards?${q}`);
   },
+  /** Sets the CWT points added by hand for a year (0 removes them). */
+  putCwtExtra: (logId: number, year: number, points: number) => json<Record<string, number>>("PUT", `/logs/${logId}/cwt-extra`, { year, points }),
   awardHints: (logId: number, o: { call: string; band: string; mode: string; state: string; cqz: string; dxcc: string; grid?: string; iota?: string; cnty?: string; lotw: boolean; paper: boolean; eqsl: boolean }) => {
     const q = new URLSearchParams(Object.entries(o).map(([k, v]) => [k, String(v)]));
     return json<AwardHint[]>("GET", `/logs/${logId}/award-hints?${q}`);
@@ -155,6 +157,8 @@ export const api = {
   ctyEntities: () => json<CtyEntityInfo[]>("GET", "/cty/entities"),
   watch: () => json<WatchEntry[]>("GET", "/watch"),
   saveWatch: (entries: WatchEntry[]) => json<WatchEntry[]>("PUT", "/watch", entries),
+  updates: () => json<UpdateInfo>("GET", "/updates"),
+  setUpdates: (enabled: boolean) => json<UpdateInfo>("PUT", "/updates", { enabled }),
   contests: () => json<ContestList>("GET", "/contests"),
   refreshContests: () => json<ContestList>("POST", "/contests/refresh"),
   dxpeditions: () => json<DxpedList>("GET", "/dxpeditions"),

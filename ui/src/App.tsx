@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import MainMenu from "./components/MainMenu";
 import VfoBar from "./components/VfoBar";
+import UpdateNotice from "./components/UpdateNotice";
 import type { Equipment, Fields, Location, Log, LookupResult, Qso, QsoFilter, StationCallsign } from "./types";
 import { localClock, utcClock } from "./util";
 import { useDisplay } from "./display";
@@ -25,6 +26,7 @@ import { DEFAULT_WORKSPACE, canPopOut, findPane, removePane, sanitize, showPane,
 import { newConfirmLines } from "./newConfirms";
 import NeededAlerts from "./components/NeededAlerts";
 import SetupWizard from "./components/SetupWizard";
+import { useShortcut } from "./shortcuts";
 
 type Dialog = "import" | "export" | "settings" | "help" | "wizard" | "qsl" | "qsllookup" | null;
 
@@ -96,16 +98,11 @@ export default function App() {
   const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState("");
 
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === "q") {
-        e.preventDefault();
-        setDialog((d) => (d === null ? "qsllookup" : d));
-      }
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, []);
+  // Global shortcuts (Settings > Keyboard). They don't fire over an open window.
+  useShortcut("qsllookup", () => setDialog((d) => (d === null ? "qsllookup" : d)));
+  useShortcut("help", () => setDialog((d) => (d === null ? "help" : d)));
+  useShortcut("settings", () => setDialog((d) => (d === null ? "settings" : d)));
+  useShortcut("qsl", () => setDialog((d) => (d === null ? "qsl" : d)));
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -403,6 +400,7 @@ export default function App() {
         </label>
         <VfoBar radios={radios} radioKey={radioKey} onRadio={chooseRadio} />
         <span className="spacer" />
+        <UpdateNotice />
         {notice && <span className="notice" role="status">{notice}</span>}
         <span className="muted">{currentLog?.qso_count.toLocaleString() ?? 0} QSOs</span>
         <span className="clock" title={display.localTime ? "UTC, then your computer's time" : "UTC"}>{utcClock(now)}{display.localTime && <span className="muted"> ({localClock(now)} local)</span>}</span>
@@ -438,7 +436,6 @@ export default function App() {
                 onLogged={refreshGrid}
                 onLookup={setLookup}
                 onContext={setEntry}
-                onHelp={() => setDialog("help")}
                 radios={radios}
                 radioKey={radioKey}
                 onRadio={chooseRadio}

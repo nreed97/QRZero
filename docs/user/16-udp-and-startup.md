@@ -2,7 +2,7 @@
 
 ## UDP connections
 
-QRZero talks to WSJT-X, JTDX, N1MM Logger+ and PstRotatorAz by name (see **Settings → Radios and programs**). For everything else, such as an antenna switch, a band decoder, another rotator program or a script of your own, set up a **UDP connection** under **Settings → UDP connections**. It works much like the UDP outbound connections and the UDP relay in Log4OM.
+QRZero talks to WSJT-X, JTDX, N1MM Logger+ and PstRotatorAz by name (see **Settings → Radios and programs**). For everything else, such as an antenna switch, a band decoder, another rotator program or a script of your own, set up a **UDP connection** under **Settings → UDP connections**.
 
 Each connection has:
 

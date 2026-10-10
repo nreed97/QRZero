@@ -2,12 +2,16 @@
 
 Open **Settings…** from the **☰** menu at the right of the top bar. Its sections are listed down the left, in four groups:
 
+- **Program**: General (colours, text size, units, formats, reports, setup wizard), Backups, Keyboard
 - **Station**: Callsigns, Locations, Equipment, Logs
 - **Logging**: Entry fields, Callsign lookup, Awards
 - **Connections**: Radios and programs (WSJT-X, JTDX, N1MM, PstRotatorAz, country file), UDP connections, DX cluster, Startup programs
-- **Program**: Backups, General (colours, text size, units, formats, reports, setup wizard)
 
-Click a section to show it on the right.
+Click a section to show it on the right. Settings opens on **General**.
+
+### Searching settings
+
+Type in the **Search settings** box at the top left to find a setting by its name or a word about it, for example *rotor*, *backup*, *colours* or *QRZ*. Section names match too. The list shows each match with the section it is in. Click one (or press **Enter** for the first) and Settings jumps to that section, scrolls to the setting and outlines it for a moment. **Esc** or the **×** clears the search.
 
 ## Station callsigns
 
@@ -63,6 +67,7 @@ The options people change most. They apply at once and are kept with your other 
 - **Reports filled in for each mode**: change the report the QSO panel starts with for CW, SSB, FM, AM, RTTY, PSK31, FT8 or FT4 (for example 59 for CW). An empty box means the usual report.
 - **Ask before deleting** QSOs, notes, equipment and layouts. Turn it off if the prompts slow you down; deleting a whole log, restoring a backup and discarding edits always ask.
 - **Beep when a QSO is logged**.
+- **Tell me when a newer QRZero is released**: once a day (and shortly after start) QRZero asks GitHub for the latest release. When it is newer than yours, a link such as *Version 0.14 is available* appears in the top bar and opens the download page in your web browser. The × hides it until the next release. Nothing is downloaded or installed for you, and the check never delays starting. Turn it off here if you don't want QRZero to contact GitHub.
 - **Run the setup wizard** again (it never removes anything), and **Reset these options**.
 
 ## Logs
@@ -97,3 +102,25 @@ Restoring replaces the **whole** log file, all logs and QSOs in it, with the bac
 4. When QRZero starts, it first saves the log as it is then as a *before restore* backup, then puts the backup in its place. Backups from older versions of QRZero are brought up to date as they open.
 
 QSOs logged between choosing **Restore** and restarting are not in the restored log, but they are in the *before restore* backup. If you restored the wrong file, restore that *before restore* backup to undo it.
+
+## Keyboard shortcuts
+
+The **Keyboard** tab lists the keys QRZero responds to and lets you change them.
+
+| Action | Where | Default |
+| --- | --- | --- |
+| QSL lookup | Anywhere | <kbd>Alt</kbd>+<kbd>Q</kbd> |
+| User guide | Anywhere | <kbd>F1</kbd> |
+| Settings | Anywhere | none |
+| QSL: LoTW, QRZ, Club Log | Anywhere | none |
+| Swap between radio 1 and 2 | QSO entry | <kbd>`</kbd> |
+| Save the QSO | Edit QSO window | <kbd>Ctrl</kbd>+<kbd>S</kbd> |
+| Previous / next QSO in the log grid | Edit QSO window | <kbd>Alt</kbd>+<kbd>Up</kbd> / <kbd>Down</kbd> |
+
+- Click the key button next to an action and press the new combination. <kbd>Esc</kbd> cancels.
+- A key that is already used for another action is refused, and the message says which one. Clear that one first if you want to move the key.
+- A letter or digit on its own is refused, because it would trigger while you type a callsign. Use <kbd>Ctrl</kbd> or <kbd>Alt</kbd> with it, or an F key. A few keys belong to Windows or the program (<kbd>Ctrl</kbd>+<kbd>C</kbd>, <kbd>F5</kbd>, <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>9</kbd> for following a radio, and so on) and can't be used.
+- **Clear** leaves an action without a key, **Default** puts back its original key, and **Reset all to defaults** does that for every action.
+- **Print the list…** prints every key, yours and the fixed ones (<kbd>Enter</kbd> logs, <kbd>Esc</kbd> clears, and so on), as a one-page sheet to keep by the radio.
+
+Your choices are saved in the log database, so they survive restarts and come back with a restored backup. The ☰ menu shows the current key next to each action.
