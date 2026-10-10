@@ -344,6 +344,21 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await lookup.getByRole("button", { name: "Via bureau" }).click();
   await expect(lookup.locator("tbody tr").first()).toContainText("sent B");
   await expect(lookup.locator(".ql-after")).toHaveCount(0);
+  // Queueing with one box ticked queues just that QSO of a station that has two, and Cards to send holds only it.
+  const apiHeaders = { "x-qrzero-token": "e2e" };
+  const lid = (await (await page.request.get("/api/logs", { headers: apiHeaders })).json())[0].id;
+  for (const time of ["1000", "1100"]) {
+    await page.request.post(`/api/logs/${lid}/qsos`, { headers: apiHeaders, data: { location_id: null, fields: { CALL: "K8TWO", QSO_DATE: "20240301", TIME_ON: time, BAND: "20m", MODE: "CW" } } });
+  }
+  await lookup.getByLabel("Call").fill("k8two");
+  await lookup.getByLabel("Call").press("Enter");
+  await expect(lookup.locator("tbody tr")).toHaveCount(2);
+  await lookup.locator("tbody input[type=checkbox]").first().check();
+  await lookup.getByLabel("Mark as").selectOption({ label: "Queue a card to send" });
+  await expect(lookup.locator("tbody tr td:last-child", { hasText: "queued" })).toHaveCount(1);
+  await lookup.getByRole("button", { name: "Cards to send" }).click();
+  await expect(lookup.locator(".paper-queue tbody tr")).toHaveCount(1); // just the one K8TWO; K1ABC was marked sent above
+  await expect(lookup.locator(".paper-queue")).not.toContainText("W1AW");
   await page.keyboard.press("Escape");
 
   // OQRS: mark from the right-click menu, then see it in the editor.
