@@ -326,6 +326,13 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(queue.locator(".queue-detail")).toContainText("Date");
   await expect(queue.locator(".queue-detail")).toContainText("Contest ID");
   await expect(queue.locator(".queue-detail")).not.toContainText("QSO_DATE");
+  await queue.getByText("Choose fields").click();
+  await queue.getByLabel("Band", { exact: true }).check();
+  await expect(queue.locator(".queue-detail .ql-card:last-child dl")).toContainText("Band");
+  await queue.getByLabel("Contest ID").uncheck();
+  await expect(queue.locator(".queue-detail .ql-card:last-child dl")).not.toContainText("Contest ID");
+  await queue.getByRole("button", { name: "Reset to default" }).click();
+  await expect(queue.locator(".queue-detail .ql-card:last-child dl")).toContainText("Contest ID");
   await page.screenshot({ path: "e2e-results/queue-details.png" });
   await expect(queue.getByRole("button", { name: "Print 1 label" })).toBeVisible();
   await queue.getByLabel("Group by").selectOption("bureau");

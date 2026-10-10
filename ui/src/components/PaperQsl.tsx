@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../api";
 import { PAPER_ACTIONS, piles as makePiles, pileStations, type GroupBy, qf as f, cardDate as date, cardTime as time, cardFreq as freq, cardMode as mode } from "../paper";
-import { localGet, localSet } from "../prefs";
+import { localGet, localSet, usePref } from "../prefs";
 import { Contact } from "./ContactCard";
 import LabelBox from "./LabelBox";
 import type { Qso } from "../types";
@@ -86,20 +86,56 @@ function LabelSheet({ items, sheet, skip }: { items: Label[]; sheet: keyof typeo
   );
 }
 
-/** The QSO as it goes on the card: date, UTC, MHz, mode and RST, plus your rig, power, antenna and the contest ID. */
+/** Fields the QSO details can show: key, heading and how to read it off the QSO. */
+const DETAIL_FIELDS: { key: string; label: string; get: (q: Qso) => string }[] = [
+  { key: "date", label: "Date", get: (q) => date(f(q, "QSO_DATE")) },
+  { key: "utc", label: "UTC", get: (q) => time(f(q, "TIME_ON")) },
+  { key: "mhz", label: "MHz", get: freq },
+  { key: "mode", label: "Mode", get: mode },
+  { key: "rst", label: "RST", get: (q) => f(q, "RST_SENT") },
+  { key: "rig", label: "Rig", get: (q) => f(q, "MY_RIG") },
+  { key: "pwr", label: "Pwr", get: (q) => (f(q, "TX_PWR") ? `${f(q, "TX_PWR")} W` : "") },
+  { key: "ant", label: "Ant", get: (q) => f(q, "MY_ANTENNA") },
+  { key: "contest", label: "Contest ID", get: (q) => f(q, "CONTEST_ID") },
+  { key: "band", label: "Band", get: (q) => f(q, "BAND") },
+  { key: "rstr", label: "RST rcvd", get: (q) => f(q, "RST_RCVD") },
+  { key: "op", label: "Operator", get: (q) => f(q, "OPERATOR") },
+  { key: "mycall", label: "My call", get: (q) => f(q, "STATION_CALLSIGN") },
+  { key: "mygrid", label: "My grid", get: (q) => f(q, "MY_GRIDSQUARE") },
+  { key: "exch", label: "Exchange sent", get: (q) => f(q, "STX_STRING") },
+  { key: "comment", label: "Comment", get: (q) => f(q, "COMMENT") },
+  { key: "notes", label: "Notes", get: (q) => f(q, "NOTES") },
+  { key: "qslmsg", label: "QSL message", get: (q) => f(q, "QSLMSG") },
+];
+const DEFAULT_DETAILS = ["date", "utc", "mhz", "mode", "rst", "rig", "pwr", "ant", "contest"];
+
+/** The QSO as it goes on the card, with the fields you've chosen. */
 function QsoDetails({ q }: { q: Qso }) {
-  const lines: [string, string][] = [["Date", date(f(q, "QSO_DATE"))], ["UTC", time(f(q, "TIME_ON"))], ["MHz", freq(q)], ["Mode", mode(q)], ["RST", f(q, "RST_SENT")], ["Rig", f(q, "MY_RIG")], ["Pwr", f(q, "TX_PWR") && `${f(q, "TX_PWR")} W`], ["Ant", f(q, "MY_ANTENNA")], ["Contest ID", f(q, "CONTEST_ID")]];
+  const [shown, save] = usePref<string[]>("queue_details", DEFAULT_DETAILS);
+  const chosen = DETAIL_FIELDS.filter((x) => shown.includes(x.key));
+  const toggle = (key: string) => save(shown.includes(key) ? shown.filter((k) => k !== key) : [...shown, key]);
   return (
     <div className="ql-card">
       <h3>QSO details</h3>
       <dl>
-        {lines.map(([k, v]) => (
-          <div key={k}>
-            <dt>{k}</dt>
-            <dd>{v}</dd>
+        {chosen.map((x) => (
+          <div key={x.key}>
+            <dt>{x.label}</dt>
+            <dd>{x.get(q)}</dd>
           </div>
         ))}
       </dl>
+      <details className="more">
+        <summary>Choose fields</summary>
+        <div className="ql-fields">
+          {DETAIL_FIELDS.map((x) => (
+            <label key={x.key}>
+              <input type="checkbox" checked={shown.includes(x.key)} onChange={() => toggle(x.key)} /> {x.label}
+            </label>
+          ))}
+        </div>
+        <button className="small" onClick={() => save(DEFAULT_DETAILS)}>Reset to default</button>
+      </details>
     </div>
   );
 }
