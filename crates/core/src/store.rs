@@ -448,16 +448,16 @@ impl Store {
         let tx = self.conn.transaction()?;
         {
             let mut find = tx.prepare(&format!(
-                "SELECT id, fields FROM qsos WHERE log_id IN ({logs}) AND call = ?1 AND time_on BETWEEN ?2 - 1800 AND ?2 + 1800"
+                "SELECT id, fields, log_id FROM qsos WHERE log_id IN ({logs}) AND call = ?1 AND time_on BETWEEN ?2 - 1800 AND ?2 + 1800"
             ))?;
             let mut put = tx.prepare("UPDATE qsos SET fields = ?1, dxcc = ?2, updated_at = ?3 WHERE id = ?4")?;
             for (rec, set, fill) in items {
                 stats.received += 1;
                 let Ok(key) = Columns::from_fields(&normalize(rec)) else { continue };
                 let mut hit = false;
-                let candidates: Vec<(i64, String)> =
-                    find.query_map(params![key.call, key.time_on], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<rusqlite::Result<_>>()?;
-                for (id, raw) in candidates {
+                let candidates: Vec<(i64, String, i64)> =
+                    find.query_map(params![key.call, key.time_on], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<rusqlite::Result<_>>()?;
+                for (id, raw, log_id) in candidates {
                     let mut fields: Fields = serde_json::from_str(&raw)?;
                     if !same(&fields, rec) {
                         continue;
@@ -477,6 +477,7 @@ impl Store {
                     let c = Columns::from_fields(&fields)?;
                     put.execute(params![serde_json::to_string(&fields)?, c.dxcc, now(), id])?;
                     stats.new += 1;
+                    stats.changed.push((log_id, fields));
                 }
                 if !hit {
                     let g = |k: &str| rec.get(k).map(String::as_str).unwrap_or("");
@@ -1208,6 +1209,9 @@ pub struct ConfirmStats {
     pub already: usize,
     /// Downloaded confirmations with no matching QSO in the log.
     pub unmatched: Vec<String>,
+    /// The QSOs that changed, as (log id, fields after the change).
+    #[serde(skip)]
+    pub changed: Vec<(i64, Fields)>,
 }
 
 /// Indexed copies of a QSO's key fields.

@@ -651,7 +651,65 @@ pub struct AwardHint {
     pub cells: Vec<HintCell>,
 }
 
+/// An award cell a downloaded confirmation filled for the first time from its service.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct NewConfirm {
+    pub award: Award,
+    /// Row key (DXCC number, state code, zone, prefix).
+    pub key: String,
+    pub name: String,
+    /// "mixed", "cw", "phone", "digital" or a band like "20m".
+    pub column: String,
+    /// Which sources had already confirmed the cell, so the caller can tell whether
+    /// the cell is new under the sources it counts.
+    pub before: Counts,
+}
+
+/// The service a confirmation came from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Source {
+    Lotw,
+    Eqsl,
+}
+
 impl AwardIndex {
+    /// Notes a QSO that just gained a confirmation from `source` (its facts already show it)
+    /// and returns the cells that source had not confirmed before. The QSO is already in the
+    /// index with its older facts, so the cells before are the cells as they stood.
+    pub fn confirmed(&mut self, q: &AwardQso, source: Source) -> Vec<NewConfirm> {
+        let bit = match source {
+            Source::Lotw => BIT_LOTW,
+            Source::Eqsl => BIT_EQSL,
+        };
+        let mut cols = vec![0];
+        cols.extend(q.mode.as_deref().and_then(mode_col));
+        cols.extend(q.band.as_deref().and_then(band_col));
+        let mut out = Vec::new();
+        for award in AWARDS {
+            let Some(id) = row_id(award, q) else { continue };
+            let cells = self.get(award, &id).copied().unwrap_or([0; NCOLS]);
+            let key = match &id {
+                RowId::Num(n) => num_key(award, *n),
+                RowId::Text(s) => s.clone(),
+            };
+            for &i in &cols {
+                if cells[i] & bit != 0 {
+                    continue;
+                }
+                out.push(NewConfirm {
+                    award,
+                    name: default_name(award, &key),
+                    key: key.clone(),
+                    column: COLUMNS[i].to_string(),
+                    before: Counts { lotw: cells[i] & BIT_LOTW != 0, paper: cells[i] & BIT_PAPER != 0, eqsl: cells[i] & BIT_EQSL != 0 },
+                });
+            }
+        }
+        self.add(q);
+        self.qsos -= 1;
+        out
+    }
+
     fn slot(&mut self, award: Award, id: RowId) -> &mut Cells {
         match id {
             RowId::Text(s) => self.texts[award as usize].entry(s).or_insert([0; NCOLS]),
@@ -792,6 +850,30 @@ mod tests {
 
     fn row<'a>(t: &'a AwardTable, key: &str) -> &'a Row {
         t.rows.iter().find(|r| r.key == key).unwrap()
+    }
+
+    #[test]
+    fn confirmed_reports_cells_once() {
+        let mut idx = AwardIndex::default();
+        let mut a = q("EA1ABC", "20m", "CW");
+        a.dxcc = Some(281);
+        let mut b = q("EA1XYZ", "20m", "CW");
+        b.dxcc = Some(281);
+        idx.add(&a);
+        idx.add(&b);
+        a.lotw = true;
+        let first = idx.confirmed(&a, Source::Lotw);
+        let cols: Vec<_> = first.iter().filter(|n| n.award == Award::Dxcc).map(|n| n.column.as_str()).collect();
+        assert_eq!(cols, ["mixed", "cw", "20m"]);
+        assert!(first.iter().all(|n| !n.before.lotw && !n.before.paper));
+        // A second LoTW confirmation for the same entity adds nothing new there.
+        b.lotw = true;
+        assert!(idx.confirmed(&b, Source::Lotw).is_empty());
+        // eQSL on the same cell is new for eQSL, and says LoTW got there first.
+        b.eqsl = true;
+        let e = idx.confirmed(&b, Source::Eqsl);
+        assert!(e.iter().any(|n| n.award == Award::Dxcc && n.before.lotw));
+        assert_eq!(idx.len(), 2);
     }
 
     #[test]

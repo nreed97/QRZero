@@ -1586,7 +1586,7 @@ async fn qsl_test_qrz(State(s): State<Shared>, Json(b): Json<CallsignBody>) -> A
 }
 
 async fn qsl_download(State(s): State<Shared>, Path(service): Path<String>) -> ApiResult<qsl::Download> {
-    Ok(Json(s.qsl.download(&service).await))
+    Ok(Json(s.qsl.download(&service, false).await))
 }
 
 #[derive(Deserialize)]

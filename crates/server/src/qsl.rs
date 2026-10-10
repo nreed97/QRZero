@@ -1,20 +1,21 @@
 //! Uploads to QSL services: QRZ Logbook and Club Log on a timer, LoTW on
 //! demand through the user's TQSL.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{NaiveDate, Utc};
 use qrzero_core::adif::{self, Fields};
+use qrzero_core::awards::{Award, AwardQso, NewConfirm, Source};
 use qrzero_core::confirm::{self, Service as ConfirmService};
 use qrzero_core::qsl::{self, ClubLog, QrzLogbook, QslError, TqslJob, Upload};
 use qrzero_core::{secrets, Store};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::station::Hub;
+use crate::station::{cty_facts, Hub};
 
 const BATCH: i64 = 500;
 
@@ -145,6 +146,10 @@ pub struct Download {
     /// Downloaded confirmations with no matching QSO (first 1000).
     pub unmatched: Vec<String>,
     pub unmatched_count: usize,
+    /// Award cells this download confirmed for the first time from its service (first 5000).
+    pub new_awards: Vec<NewConfirm>,
+    /// Started by a timer, not by the user.
+    pub auto: bool,
     pub error: Option<String>,
 }
 
@@ -293,7 +298,7 @@ impl Qsl {
                     let since = *last.entry(key).or_insert(begin);
                     if on && ready && since.elapsed() >= Duration::from_secs(60 * minutes as u64) {
                         last.insert(key, std::time::Instant::now());
-                        q.download(svc).await;
+                        q.download(svc, true).await;
                     }
                 }
             }
@@ -547,15 +552,16 @@ impl Qsl {
     }
 
     /// Downloads new confirmations from LoTW or eQSL and marks the matching QSOs.
-    pub async fn download(&self, name: &str) -> Download {
+    pub async fn download(&self, name: &str, auto: bool) -> Download {
         let name: &'static str = match name {
             "lotw" => "lotw",
             "eqsl" => "eqsl",
             _ => return Download { error: Some(format!("unknown service {name}")), ..Download::default() },
         };
         let _busy = self.busy.lock().await;
-        self.set_download(name, Download { running: true, at: Utc::now().timestamp(), ..Download::default() });
-        let d = self.download_service(name).await;
+        self.set_download(name, Download { running: true, at: Utc::now().timestamp(), auto, ..Download::default() });
+        let mut d = self.download_service(name).await;
+        d.auto = auto;
         self.set_download(name, d.clone());
         d
     }
@@ -599,9 +605,35 @@ impl Qsl {
                 (r, u.set, u.fill)
             })
             .collect();
+        let cty = self.hub.cty();
+        let source = if name == "lotw" { Source::Lotw } else { Source::Eqsl };
         let stats = self.db(|st| {
             let logs: Vec<i64> = st.list_logs()?.iter().map(|l| l.id).collect();
-            st.apply_confirmations(&logs, updates, confirm::same_qso)
+            // The award cells as they stand, to tell which confirmations fill one for the first time.
+            let mut cells = HashMap::new();
+            if !updates.is_empty() {
+                for &id in &logs {
+                    cells.insert(id, st.award_index(id, |c| cty_facts(cty.as_deref(), c))?.1);
+                }
+            }
+            let mut stats = st.apply_confirmations(&logs, updates, confirm::same_qso)?;
+            let mut seen = HashSet::new();
+            for (log_id, fields) in std::mem::take(&mut stats.changed) {
+                let Some(index) = cells.get_mut(&log_id) else { continue };
+                let qso = AwardQso::from_fields(&fields, |c| cty_facts(cty.as_deref(), c));
+                for mut n in index.confirmed(&qso, source) {
+                    if n.award == Award::Dxcc {
+                        let entity = cty.as_ref().and_then(|c| c.entities().iter().find(|e| e.dxcc.is_some_and(|d| d.to_string() == n.key)));
+                        if let Some(e) = entity {
+                            n.name = e.name.clone();
+                        }
+                    }
+                    if d.new_awards.len() < 5000 && seen.insert((n.award as usize, n.key.clone(), n.column.clone())) {
+                        d.new_awards.push(n);
+                    }
+                }
+            }
+            Ok(stats)
         });
         match stats {
             Ok(s) => {

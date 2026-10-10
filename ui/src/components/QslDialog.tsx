@@ -6,12 +6,38 @@ import Modal from "./Modal";
 import PaperQsl from "./PaperQsl";
 import QslLookup from "./QslLookup";
 import ReplyList from "./ReplyList";
+import { newConfirmLines } from "../newConfirms";
 
 interface Props {
   logId: number;
   callsigns: StationCallsign[];
   locations: Location[];
   onClose: () => void;
+}
+
+/** What the last download counted toward the awards. */
+function NewAwards({ d, service }: { d: QslDownload; service: "lotw" | "eqsl" }) {
+  const lines = newConfirmLines(d, service);
+  if (!d.confirmed) return null;
+  if (!lines.length) return <p className="small muted">Nothing new toward your awards.</p>;
+  const shown = lines.slice(0, 200);
+  return (
+    <div className="new-confirms">
+      <b>New toward your awards ({lines.length})</b>
+      <table className="mono small">
+        <tbody>
+          {shown.map((l, i) => (
+            <tr key={i}>
+              <td>{l.awardName}</td>
+              <td>{l.name}</td>
+              <td>{l.what}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {lines.length > shown.length && <p className="small muted">… and {lines.length - shown.length} more.</p>}
+    </div>
+  );
 }
 
 function DownloadLine({ d }: { d?: QslDownload }) {
@@ -21,7 +47,7 @@ function DownloadLine({ d }: { d?: QslDownload }) {
   const when = new Date(d.at * 1000).toISOString().slice(11, 16);
   return (
     <span>
-      Last check {when}Z: {d.received} confirmation{d.received === 1 ? "" : "s"}, {d.confirmed} new.
+      Last check {when}Z{d.auto ? " (automatic)" : ""}: {d.received} confirmation{d.received === 1 ? "" : "s"}, {d.confirmed} new.
       {d.unmatched_count > 0 && (
         <details className="small">
           <summary>Review {d.unmatched_count} not found in the log</summary>
@@ -268,6 +294,7 @@ function Online({ callsigns, locations }: Props) {
             <button disabled={!!busy || !cfg.lotw_username} onClick={() => download("lotw")}>{busy === "lotw-rcvd" ? "Downloading…" : "Download confirmations"}</button>
             <DownloadLine d={o.downloads.lotw} />
           </div>
+          {o.downloads.lotw && !o.downloads.lotw.running && !o.downloads.lotw.error && <NewAwards d={o.downloads.lotw} service="lotw" />}
           <div className="row">
             <label className="check"><input type="checkbox" checked={cfg.lotw_download_enabled} onChange={(e) => set({ lotw_download_enabled: e.target.checked })} /> Download confirmations automatically</label>
             <label className="f w-s"><span>Every (min)</span><input value={cfg.lotw_download_interval_min} disabled={!cfg.lotw_download_enabled} inputMode="numeric" onChange={(e) => set({ lotw_download_interval_min: Math.max(1, Number(e.target.value) || 1440) })} /></label>
@@ -363,6 +390,7 @@ function Online({ callsigns, locations }: Props) {
             <button disabled={!!busy || !cfg.eqsl_username} onClick={() => download("eqsl")}>{busy === "eqsl-rcvd" ? "Downloading…" : "Download confirmations"}</button>
             <DownloadLine d={o.downloads.eqsl} />
           </div>
+          {o.downloads.eqsl && !o.downloads.eqsl.running && !o.downloads.eqsl.error && <NewAwards d={o.downloads.eqsl} service="eqsl" />}
           <div className="row">
             <label className="check"><input type="checkbox" checked={cfg.confirm_daily} onChange={(e) => set({ confirm_daily: e.target.checked })} /> Download eQSL confirmations once a day</label>
           </div>
