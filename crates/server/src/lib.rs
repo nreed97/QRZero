@@ -295,6 +295,8 @@ fn router(state: Shared) -> Router {
         .route("/propagation", get(propagation_get))
         .route("/qsl/qrz/test", post(qsl_test_qrz))
         .route("/qsl/upload/{service}", post(qsl_upload))
+        .route("/qsl/upload/{service}/qsos", post(qsl_upload_qsos))
+        .route("/qsl/targets", get(qsl_targets))
         .route("/qsl/lotw/range", get(qsl_lotw_waiting).post(qsl_lotw_range))
         .route("/qsl/download/{service}", post(qsl_download))
         .merge(backups::routes())
@@ -540,6 +542,7 @@ async fn insert_qso(State(s): State<Shared>, Path(id): Path<i64>, Json(mut b): J
     let qso = db(&s, move |st| st.insert_qso(id, b.location_id, &b.fields)).await?;
     s.hub.note_qso(id, &qso.fields);
     s.hub.send_qso(&qso.fields, qso.id);
+    s.hub.emit(json!({"type": "qso_saved", "log_id": id}));
     Ok(Json(qso))
 }
 
@@ -550,6 +553,7 @@ async fn get_qso(State(s): State<Shared>, Path(id): Path<i64>) -> ApiResult<Qso>
 async fn update_qso(State(s): State<Shared>, Path(id): Path<i64>, Json(b): Json<QsoBody>) -> ApiResult<Qso> {
     let qso = db(&s, move |st| st.update_qso(id, b.location_id, &b.fields)).await?;
     s.hub.rebuild_worked();
+    s.hub.emit(json!({"type": "qso_saved", "log_id": qso.log_id}));
     Ok(Json(qso))
 }
 
@@ -1618,6 +1622,15 @@ async fn qsl_lotw_waiting(State(s): State<Shared>, Query(q): Query<RangeBody>) -
 
 async fn qsl_lotw_range(State(s): State<Shared>, Json(b): Json<RangeBody>) -> ApiResult<qsl::Run> {
     Ok(Json(s.qsl.upload_lotw(Some((&b.from, &b.to))).await))
+}
+
+async fn qsl_targets(State(s): State<Shared>) -> Json<Vec<&'static str>> {
+    Json(s.qsl.targets())
+}
+
+/// Uploads the QSOs picked in the log to one service.
+async fn qsl_upload_qsos(State(s): State<Shared>, Path(service): Path<String>, Json(b): Json<IdsBody>) -> ApiResult<qsl::Run> {
+    Ok(Json(s.qsl.upload_ids(&service, &b.ids).await))
 }
 
 async fn qsl_upload(State(s): State<Shared>, Path(service): Path<String>) -> ApiResult<qsl::Run> {

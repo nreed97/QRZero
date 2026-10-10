@@ -297,6 +297,13 @@ async fn qrz_and_clublog_uploads() {
     assert_eq!(api.fields(log, "DL1BAD").await["CLUBLOG_QSO_UPLOAD_STATUS"], "Y");
     assert_eq!(api.get("/qsl").await["pending"]["clublog"], 0);
 
+    // The log's right-click upload: set-up services are offered, and picked QSOs go up even though they're already sent.
+    assert_eq!(api.get("/qsl/targets").await, json!(["qrz", "clublog"]));
+    let before = seen.lock().unwrap().len();
+    let run = api.post("/qsl/upload/clublog/qsos", json!({"ids": [id]})).await;
+    assert_eq!(run["uploaded"].as_u64().unwrap() + run["duplicates"].as_u64().unwrap(), 1, "{run}");
+    assert_eq!(seen.lock().unwrap().len(), before + 1);
+
     // A bad key stops the run with a clear error.
     api.put("/qsl", json!({"config": cfg, "secrets": {"qrz_keys": {"N0CALL": "BAD"}}})).await;
     api.qso(log, loc, "K5ABC").await;
@@ -306,6 +313,30 @@ async fn qrz_and_clublog_uploads() {
 }
 
 #[cfg(unix)]
+#[tokio::test]
+async fn live_upload_follows_a_new_qso() {
+    let seen = Seen::default();
+    let (qrz, clublog) = mock_services(seen.clone()).await;
+    let api = Api::new(qrz, clublog).await;
+    let (log, loc) = api.setup().await;
+    let mut cfg = api.get("/qsl").await["config"].clone();
+    cfg["qrz_calls"] = json!(["N0CALL"]);
+    cfg["qrz_since"] = json!("2025-01-01");
+    cfg["qrz_live"] = json!(true);
+    cfg["qrz_live_delay_sec"] = json!(5);
+    let o = api.put("/qsl", json!({"config": cfg, "secrets": {"qrz_keys": {"N0CALL": "GOOD-KEY"}}})).await;
+    assert_eq!(o["config"]["qrz_enabled"], false, "live upload doesn't need the timer");
+    api.qso(log, loc, "JA1XYZ").await;
+    assert!(seen.lock().unwrap().is_empty(), "not sent at once");
+    for _ in 0..40 {
+        if api.fields(log, "JA1XYZ").await.get("QRZCOM_QSO_UPLOAD_STATUS").is_some() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(300)).await;
+    }
+    assert_eq!(api.fields(log, "JA1XYZ").await["QRZCOM_QSO_UPLOAD_STATUS"], "Y");
+}
+
 #[tokio::test]
 async fn lotw_signs_with_tqsl() {
     use std::os::unix::fs::PermissionsExt;
