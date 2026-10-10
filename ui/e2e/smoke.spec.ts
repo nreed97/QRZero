@@ -299,8 +299,6 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "Cards to send" }).click();
   await expect(page.locator(".paper-queue")).toContainText("K1ABC");
   await expect(page.getByRole("button", { name: "Print 1 label" })).toBeVisible();
-  await page.getByLabel("Group by").selectOption("manager");
-  await expect(page.locator(".paper-queue .pile")).toContainText("1 card, 1 station");
   await page.getByLabel("Group by").selectOption("bureau");
   await expect(page.locator(".paper-queue .pile")).toContainText("1 card");
   await page.getByLabel("Group by").selectOption("none");

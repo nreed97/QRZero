@@ -638,12 +638,12 @@ impl Store {
         Ok((version, idx))
     }
 
-    /// QSOs waiting for a paper QSL card (QSL_SENT is R "requested" or Q "queued"),
+    /// QSOs waiting for a paper QSL card (QSL_SENT is Q "queued"),
     /// grouped by call for printing labels.
     pub fn paper_queue(&self, log_id: i64) -> Result<Vec<Qso>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, log_id, location_id, fields FROM qsos WHERE log_id = ?1
-             AND json_extract(fields, '$.QSL_SENT') IN ('R', 'Q') ORDER BY call, time_on",
+             AND json_extract(fields, '$.QSL_SENT') = 'Q' ORDER BY call, time_on",
         )?;
         let rows = stmt.query_map([log_id], row_to_qso)?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)

@@ -92,7 +92,7 @@ export default function PaperQsl({ logId }: { logId: number }) {
   const [skip, setSkip] = useState(0);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [printing, setPrinting] = useState(false);
-  const [by, setBy] = useState<GroupBy>(() => localGet<{ v: GroupBy }>("qsl.groupBy", { v: "none" }).v ?? "none");
+  const [by, setBy] = useState<GroupBy>(() => (localGet<{ v: string }>("qsl.groupBy", { v: "none" }).v === "bureau" ? "bureau" : "none"));
 
   const load = () =>
     api.paperQueue(logId).then((q) => {
@@ -149,7 +149,7 @@ export default function PaperQsl({ logId }: { logId: number }) {
   return (
     <div className="paper">
       <p className="small muted">
-        Cards waiting: QSOs marked <b>Q</b> (queued) or <b>R</b> (requested) in QSL sent. Queue them on the <b>QSL Detail Lookup</b> tab, or from the log with <b>Paper QSL…</b>.
+        Cards waiting: QSOs marked <b>Q</b> (queued) in QSL sent. Queue them on the <b>QSL Detail Lookup</b> tab, or from the log with <b>Paper QSL…</b>.
       </p>
       {queue.length === 0 ? (
         <p className="muted">No cards waiting.</p>
@@ -161,7 +161,6 @@ export default function PaperQsl({ logId }: { logId: number }) {
               <select value={by} onChange={(e) => { setBy(e.target.value as GroupBy); localSet("qsl.groupBy", { v: e.target.value }); }} title="Sort the queue into piles for a bulk mailing; labels print in this order">
                 <option value="none">None</option>
                 <option value="bureau">Bureau (country)</option>
-                <option value="manager">QSL manager</option>
               </select>
             </label>
             {by !== "none" && <span className="muted small">{grouped.length} pile{grouped.length === 1 ? "" : "s"}, {queue.length} card{queue.length === 1 ? "" : "s"}</span>}

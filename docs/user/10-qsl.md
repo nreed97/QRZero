@@ -70,14 +70,14 @@ Tick **Download eQSL confirmations once a day** on the eQSL page to have this do
 
 ## Cards to send
 
-Queue a card from the log: select the QSOs and pick **Paper QSL…, Queue a card to send**, or type Q in the **QSL sent** field when you log. QSOs where the other station asked for a card (R) show up too.
+Queue a card from the log: select the QSOs and pick **Paper QSL…, Queue a card to send**, or type Q in the **QSL sent** field when you log.
 
 The **Cards to send** tab lists everything waiting. Tick the ones to print and pick the labels:
 
 - **Brother QL-700, straight to the printer** (the default). QRZero draws the label and sends it to the printer itself, so there's no print dialog, paper size or scaling to set. See **Label printer** below.
 - **Avery 5160 / L7160** (30 small labels, two QSOs per label) and **Avery 5163 / L7163** (10 large labels, five QSOs per label) print through the normal print dialog.
 
-**Group by** sorts the queue into piles for a bulk mailing, each with its card and station count: **Bureau (country)** makes one pile per country for your outgoing bureau (cards for a QSL manager get a pile per manager), and **QSL manager** makes one pile per manager, with the cards that have no manager together. Labels print pile by pile in the order shown, and the tick box on a pile's heading picks or unpicks the whole pile. Group by is remembered.
+**Group by, Bureau (country)** sorts the queue into piles for a bulk mailing, one per country for your outgoing bureau (cards for a QSL manager get a pile per manager), each with its card and station count. Labels print pile by pile in the order shown, and the tick box on a pile's heading picks or unpicks the whole pile. Group by is remembered.
 
 Several QSOs with the same station share a label. **Skip labels** (Avery sheets) leaves the first few labels empty, for a sheet you've used part of. Click **Print**, and when the labels are on the cards click **Sent via bureau** or **Sent direct** to mark them sent with today's date.
 
