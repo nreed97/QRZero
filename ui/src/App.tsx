@@ -293,10 +293,8 @@ export default function App() {
   const onBus = useRef<(m: BusMsg) => void>(() => {});
   onBus.current = (m) => {
     if (m.t === "hello") greeted.current.add(m.pane);
-    if (m.t === "hello" && m.pane === "editor") {
-      // A window that says hello again (it reloaded, or hello was sent twice) gets the QSO being edited, so it never sits empty.
-      const q = pendingEdit.current ?? editing;
-      if (q) sendEdit(q);
+    if (m.t === "hello" && m.pane === "editor" && pendingEdit.current) {
+      sendEdit(pendingEdit.current);
       pendingEdit.current = null;
     }
     if ((m.t === "hello" || m.t === "want-ctx") && popCtx) post({ t: "ctx", ctx: popCtx });
