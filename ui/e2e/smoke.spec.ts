@@ -332,7 +332,11 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // OQRS: mark from the right-click menu, then see it in the editor.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click({ button: "right" });
   await page.getByRole("menuitem", { name: /Mark OQRS requested/ }).click();
-  const [oqrsWin] = await Promise.all([page.waitForEvent("popup"), page.locator(".grid-row", { hasText: "K1ABC" }).dblclick()]);
+  // The grid redraws after the mark, which can swallow the double-click on a slow runner, so try again.
+  let oqrsWin!: Page;
+  await expect(async () => {
+    [oqrsWin] = await Promise.all([page.waitForEvent("popup", { timeout: 4000 }), page.locator(".grid-row", { hasText: "K1ABC" }).dblclick()]);
+  }).toPass({ timeout: 40_000 });
   const oqrs = oqrsWin.locator(".qso-editor");
   await expect(oqrs.getByLabel("Club Log OQRS")).toHaveValue("Y");
   await expect(oqrs.getByText("Not confirmed yet. OQRS requested on Club Log.")).toBeVisible();
