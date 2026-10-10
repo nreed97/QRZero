@@ -176,6 +176,8 @@ export const api = {
   saveQsl: (config: QslConfig, secrets: QslSecrets) => json<QslOverview>("PUT", "/qsl", { config, secrets }),
   testQrzLogbook: (callsign: string) => json<{ callsign: string }>("POST", "/qsl/qrz/test", { callsign }),
   qslUpload: (service: QslService) => json<QslRun>("POST", `/qsl/upload/${service}`),
+  qslTargets: () => json<QslService[]>("GET", "/qsl/targets"),
+  qslUploadQsos: (service: QslService, ids: number[]) => json<QslRun>("POST", `/qsl/upload/${service}/qsos`, { ids }),
   lotwWaiting: (from: string, to: string) => json<LotwWaiting>("GET", `/qsl/lotw/range?from=${from}&to=${to}`),
   lotwUploadRange: (from: string, to: string) => json<QslRun>("POST", "/qsl/lotw/range", { from, to }),
   qslDownload: (service: "lotw" | "eqsl") => json<QslDownload>("POST", `/qsl/download/${service}`),

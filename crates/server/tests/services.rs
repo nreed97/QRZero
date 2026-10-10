@@ -1,6 +1,7 @@
 //! The DX cluster and QSL uploads, against stand-in services.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -29,7 +30,9 @@ impl Api {
     async fn new(qrz: String, clublog: String) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let mut cfg = Config::local(dir.path().to_path_buf());
-        cfg.secret_service = format!("QRZero-test-{}", std::process::id());
+        // Tests run in parallel and the Windows credential store is shared, so each server gets its own entries.
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        cfg.secret_service = format!("QRZero-test-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::SeqCst));
         cfg.update_cty = false;
         cfg.qsl_endpoints.qrz = qrz;
         cfg.qsl_endpoints.clublog = clublog;
@@ -297,12 +300,38 @@ async fn qrz_and_clublog_uploads() {
     assert_eq!(api.fields(log, "DL1BAD").await["CLUBLOG_QSO_UPLOAD_STATUS"], "Y");
     assert_eq!(api.get("/qsl").await["pending"]["clublog"], 0);
 
+    // The log's right-click upload: set-up services are offered, and picked QSOs go up even though they're already sent.
+    assert_eq!(api.get("/qsl/targets").await, json!(["qrz", "clublog"]));
+    let before = seen.lock().unwrap().len();
+    let run = api.post("/qsl/upload/clublog/qsos", json!({"ids": [id]})).await;
+    assert_eq!(run["uploaded"].as_u64().unwrap() + run["duplicates"].as_u64().unwrap(), 1, "{run}");
+    assert_eq!(seen.lock().unwrap().len(), before + 1);
+
     // A bad key stops the run with a clear error.
     api.put("/qsl", json!({"config": cfg, "secrets": {"qrz_keys": {"N0CALL": "BAD"}}})).await;
     api.qso(log, loc, "K5ABC").await;
     let run = api.post("/qsl/upload/qrz", json!(null)).await;
     assert!(run["error"].as_str().unwrap().contains("login refused"), "{run}");
     assert_eq!(api.fields(log, "K5ABC").await.get("QRZCOM_QSO_UPLOAD_STATUS"), None);
+}
+
+#[tokio::test]
+async fn live_upload_waits_before_sending() {
+    let seen = Seen::default();
+    let (qrz, clublog) = mock_services(seen.clone()).await;
+    let api = Api::new(qrz, clublog).await;
+    let (log, loc) = api.setup().await;
+    let mut cfg = api.get("/qsl").await["config"].clone();
+    cfg["qrz_calls"] = json!(["N0CALL"]);
+    cfg["qrz_since"] = json!("2025-01-01");
+    cfg["qrz_live"] = json!(true);
+    cfg["qrz_live_delay_min"] = json!(0);
+    let o = api.put("/qsl", json!({"config": cfg, "secrets": {"qrz_keys": {"N0CALL": "GOOD-KEY"}}})).await;
+    assert_eq!(o["config"]["qrz_live_delay_min"], 2, "an unset wait becomes 2 minutes");
+    assert_eq!(o["config"]["qrz_enabled"], false, "live upload doesn't need the timer");
+    api.qso(log, loc, "JA1XYZ").await;
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    assert!(seen.lock().unwrap().is_empty(), "not sent before the wait is over");
 }
 
 #[cfg(unix)]
