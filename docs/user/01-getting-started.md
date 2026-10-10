@@ -50,7 +50,7 @@ Double-click any QSO in the log to edit it. See [Logging QSOs](02-logging) and [
 
 ## 5. Connect a radio
 
-Open **Settings → Equipment**, edit your radio and pick a **Rig control** method: Hamlib `rigctld`, TCI, Kenwood/Elecraft/Flex CAT, Yaesu CAT or Icom CI-V. Pick the radio in the **Radio** box in the New QSO pane's title bar, and the frequency, band and mode follow your tuning. You can also tune the radio from the pane, from FTx decodes and from DX spots. A serial port can only be used by one program at a time, so if WSJT-X also needs the radio, run `rigctld` or the radio's TCI server and point both programs at it. See [Radios and rig control](07-radios), which also covers split, several radios and rotators.
+Open **Settings → Equipment**, edit your radio and pick a **Rig control** method: Hamlib `rigctld`, TCI, Kenwood/Elecraft/Flex CAT, Yaesu CAT or Icom CI-V. Pick the radio in the **Radio** box in the New QSO pane's title bar, and the frequency, band and mode follow your tuning. You can also tune the radio from the pane and by double-clicking DX spots. A serial port can only be used by one program at a time, so if WSJT-X also needs the radio, run `rigctld` or the radio's TCI server and point both programs at it. See [Radios and rig control](07-radios), which also covers split, several radios and rotators.
 
 ## 6. WSJT-X, JTDX and N1MM Logger+
 

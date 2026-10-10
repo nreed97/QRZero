@@ -20,6 +20,8 @@ export interface DecodePick {
   tx_freq_hz?: number;
   /** Set for FTx decodes: the picked radio is never retuned, only chosen. */
   ftx?: { rig_key: string | null };
+  /** Double-click: also tune the radio. A single click only fills in the entry form. */
+  qsy?: boolean;
 }
 
 interface Filters {

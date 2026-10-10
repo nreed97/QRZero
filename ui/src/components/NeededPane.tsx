@@ -8,7 +8,7 @@ import type { Spot } from "../types";
 import type { DecodePick } from "./FtxMonitor";
 import "../watch.css";
 
-export const spotPick = (s: Spot): DecodePick => ({ call: s.call, grid: null, band: s.band, mode: s.mode, freq_hz: s.freq_hz, tx_freq_hz: s.tx_freq_hz ?? undefined });
+export const spotPick = (s: Spot, qsy = false): DecodePick => ({ call: s.call, grid: null, band: s.band, mode: s.mode, freq_hz: s.freq_hz, tx_freq_hz: s.tx_freq_hz ?? undefined, qsy });
 
 /** Cluster spots on the air now that would be new for the log, best first. */
 export default function NeededPane({ onPick, onSettings }: { onPick: (p: DecodePick) => void; onSettings: () => void }) {
@@ -85,7 +85,8 @@ export default function NeededPane({ onPick, onSettings }: { onPick: (p: DecodeP
               className={`needed-row ${group ? `mode-${group}` : ""} ${rank === 0 ? "needed" : ""}`}
               role="row"
               onClick={() => onPick(spotPick(s))}
-              title={s.tx_freq_hz ? `Click to tune to ${s.call} and set split to ${(s.tx_freq_hz / 1000).toFixed(2)} kHz` : `Click to tune to ${s.call}`}
+              onDoubleClick={() => onPick(spotPick(s, true))}
+              title={s.tx_freq_hz ? `Click to fill in ${s.call}; double-click to tune too and set split to ${(s.tx_freq_hz / 1000).toFixed(2)} kHz` : `Click to fill in ${s.call}; double-click to tune too`}
             >
               <span><span className={`flag ${rank === 0 ? "new" : "info"}`}>{NEED_NAME[rank]}</span></span>
               <span className={`mono call ${s.watched ? "watched" : ""}`}>{s.call}</span>

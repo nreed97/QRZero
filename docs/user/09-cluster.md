@@ -19,7 +19,7 @@ QRZero connects to the first node and moves down the list if a node doesn't answ
 
 Each spot shows the time, frequency, call, country, a best guess at the mode (from the comment, or the band plan), the spotter and the comment. Spots are flagged against the open log the same way as the FTx monitor: **New DXCC**, **New band**, **New mode**, **New call**, **Worked**. A new spot of a station on the same frequency replaces the older one.
 
-- **Click a spot** to fill in the QSO panel. When the panel follows a radio QRZero controls, the radio tunes to the spot and changes mode. If the comment says where the DX listens (`UP 5`, `QSX 14.205`), the radio is also put in split with that transmit frequency; see the Radios chapter.
+- **Click a spot** to fill in the QSO panel with the call; the radio is left alone. **Double-click** a spot to fill it in and tune: when the panel follows a radio QRZero controls, the radio tunes to the spot and changes mode. If the comment says where the DX listens (`UP 5`, `QSX 14.205`), the radio is also put in split with that transmit frequency; see the Radios chapter.
 - The filters narrow the list by band, mode group (CW, phone, digital), age, **Needed only** and **Hide worked**.
 - **Origin and country…** hides spots you could never work. **Spotted from** keeps only spots whose spotter is on your continent, or within a distance of you (distance from the middle of the spotter's country to yours). **Hide same-country spots** drops a station spotted by someone in its own country, such as a Japanese station spotted from Japan. You can also hide your own country, unknown countries, and whole continents. Spots whose spotter's country can't be worked out are kept. The button shows how many of these are on; **Reset** clears them. These need your callsign set so QRZero knows where you are.
 - Each spot is coloured by its mode group: a bar down its left edge and the mode in colour, blue for CW, green for digital and orange for phone (the key is in the toolbar). These are the same colours as the band plan strip on the band map. When the mode isn't known from the spot's frequency or comment, the spot is left uncoloured.
@@ -27,13 +27,13 @@ Each spot shows the time, frequency, call, country, a best guess at the mode (fr
 
 ## Needed now
 
-The **Needed now** pane (Layout menu; it starts as a tab beside Cluster) lists only the spots on the air that would be new for your log, best first: a **new entity**, then a **new band** for an entity you have worked, then a **new mode**. Within each group the newest spot is on top. It uses the same needed flags as the Cluster pane, so a spot shows here exactly when it would be flagged **New DXCC**, **New band** or **New mode** there. Click a spot to fill in the QSO panel and tune, just like clicking it in the Cluster pane.
+The **Needed now** pane (Layout menu; it starts as a tab beside Cluster) lists only the spots on the air that would be new for your log, best first: a **new entity**, then a **new band** for an entity you have worked, then a **new mode**. Within each group the newest spot is on top. It uses the same needed flags as the Cluster pane, so a spot shows here exactly when it would be flagged **New DXCC**, **New band** or **New mode** there. Click a spot to fill in the QSO panel, or double-click it to fill in and tune, just like in the Cluster pane.
 
 A call on the same band and mode is listed once, however many people spot it. Spots drop off after the time chosen in the pane (30 minutes to start with). It works for every mode: CW, phone and digital spots are ranked together, with the mode coloured as in the Cluster pane.
 
 ### Alerts
 
-When a needed station is spotted, QRZero can play a sound and show a popup in the corner of the main window. Click the popup to tune to the station; it goes away by itself after a short while. A new entity gets a double beep, a new band or mode a single one.
+When a needed station is spotted, QRZero can play a sound and show a popup in the corner of the main window. Click the popup to fill in the station, or double-click it to fill in and tune (it then closes); it goes away by itself after a short while. A new entity gets a double beep, a new band or mode a single one.
 
 In **Settings**, **DX cluster**, under **Alerts for needed spots** (the **Alerts…** button in the pane takes you there):
 

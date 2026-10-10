@@ -50,9 +50,10 @@ export default function NeededAlerts({ onPick }: { onPick: (p: DecodePick) => vo
         <div key={id} className="needed-toast">
           <button
             className="needed-toast-body"
-            title={`Click to tune to ${s.call}`}
-            onClick={() => {
-              onPick(spotPick(s));
+            title={`Click to fill in ${s.call}; double-click to tune too`}
+            onClick={() => onPick(spotPick(s))}
+            onDoubleClick={() => {
+              onPick(spotPick(s, true));
               setToasts((t) => t.filter((x) => x.id !== id));
             }}
           >

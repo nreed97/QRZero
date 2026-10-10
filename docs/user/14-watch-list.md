@@ -34,7 +34,7 @@ When a watched station shows up, three things happen:
 
 To keep things calm, the same entry, call and band alert once every 10 minutes, however many times the station is spotted or decoded. The spots and decodes themselves are still marked **Watched** each time.
 
-**Click a hit** to fill in the QSO panel and tune your radio, just like clicking a cluster spot.
+**Click a hit** to fill in the QSO panel, or **double-click** it to fill in and tune your radio, just like a cluster spot.
 
 New hits are shown in bold and counted next to **Recent hits** (and in the window title when the pane is popped out). Clicking a hit or **Mark seen** clears the count.
 

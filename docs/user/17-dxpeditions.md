@@ -21,9 +21,9 @@ Ones that would be new are in bold, and ones that are on the air now come first.
 
 Bands and modes are judged on your active log, per entity, the way DXCC counts them: an entity worked on 20m CW still needs 17m, and still needs Phone and Digital.
 
-## Click to tune
+## Click to fill in, double-click to tune
 
-Click a row to fill in the call in the QSO panel. If the call has been spotted, you also get its frequency and mode, and your radio is tuned there, just like clicking a spot in the Cluster pane.
+Click a row to fill in the call in the QSO panel. Double-click it to also tune: if the call has been spotted, your radio goes to its frequency and mode, just like double-clicking a spot in the Cluster pane.
 
 ## Alerts
 
