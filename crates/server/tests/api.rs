@@ -163,7 +163,14 @@ async fn qrz_lookup_and_cache() {
     assert_eq!(status, 502);
     let r = api.get(&format!("/logs/{log}/lookup/W1AW")).await;
     assert!(r["error"].as_str().unwrap().contains("incorrect"));
+    assert!(r["error"].as_str().unwrap().contains("Settings > Callsign lookup"));
+    // Unchanged credentials aren't sent to QRZ again on every lookup...
+    let before = logins.load(Ordering::SeqCst);
+    api.get(&format!("/logs/{log}/lookup/K1ABC")).await;
+    api.get(&format!("/logs/{log}/lookup/K2ABC")).await;
+    assert_eq!(logins.load(Ordering::SeqCst), before);
 
+    // ...but saving a new password retries at once.
     let (_, s) = api.call(reqwest::Method::PUT, "/settings", Some(json!({"qrz_password": "good"}))).await;
     assert_eq!(s["qrz_password_set"], true);
     let r = api.get(&format!("/logs/{log}/lookup/w1aw")).await;

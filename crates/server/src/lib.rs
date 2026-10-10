@@ -1031,11 +1031,11 @@ async fn qrz_lookup(s: &Shared, call: &str) -> Result<Option<(Fields, &'static s
         return Ok(None);
     };
     let client = guard.as_mut().expect("client present");
-    let mut found = client.lookup(call).await.map_err(|e| e.to_string())?;
+    let mut found = client.lookup(call).await.map_err(|e| login_hint(e.to_string()))?;
     // Portable or prefixed calls (EA8/G4ABC, W1AW/P): fall back to the home call.
     if found.is_none() && call.contains('/') {
         if let Some(base) = call.split('/').max_by_key(|p| p.len()) {
-            found = client.lookup(base).await.map_err(|e| e.to_string())?;
+            found = client.lookup(base).await.map_err(|e| login_hint(e.to_string()))?;
         }
     }
     drop(guard);
@@ -1044,6 +1044,15 @@ async fn qrz_lookup(s: &Shared, call: &str) -> Result<Option<(Fields, &'static s
         db(s, move |st| st.cache_lookup(&c, "qrz", &f2)).await.map_err(|e| e.1)?;
     }
     Ok(found.map(|f| (f, "QRZ")))
+}
+
+/// Points the user at the settings page when QRZ refused the login.
+fn login_hint(msg: String) -> String {
+    if msg.to_lowercase().contains("password") {
+        format!("{msg}. Check your login in Settings > Callsign lookup.")
+    } else {
+        msg
+    }
 }
 
 /// Returns the QRZ client, creating it from settings, or None when lookups are disabled.
