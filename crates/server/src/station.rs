@@ -725,6 +725,15 @@ impl Hub {
         self.emit(json!({"type": "radios", "radios": radios}));
     }
 
+    fn remove_radio(&self, key: &str) {
+        let mut inner = self.lock();
+        if inner.radios.remove(key).is_some() {
+            let radios: Vec<_> = inner.radios.values().cloned().collect();
+            drop(inner);
+            self.emit(json!({"type": "radios", "radios": radios}));
+        }
+    }
+
     fn remove_radios(&self, prefix: &str) {
         let mut inner = self.lock();
         let before = inner.radios.len();
@@ -1257,20 +1266,7 @@ impl Hub {
                     }
                 }
             }
-            M::RadioInfo { station, radio_nr, freq_hz, mode, is_transmitting, .. } => {
-                let state = RigState {
-                    connected: true,
-                    freq_hz,
-                    mode: n1mm_mode(&mode).to_string(),
-                    data: n1mm_mode(&mode).is_empty(),
-                    rig_mode: mode,
-                    tx: is_transmitting,
-                    error: None,
-                    ..Default::default()
-                };
-                let name = if station.is_empty() { format!("N1MM radio {radio_nr}") } else { format!("N1MM {station} radio {radio_nr}") };
-                self.set_radio(Radio { key: format!("n1mm:{station}:{radio_nr}"), name, source: "n1mm", can_tune: false, state });
-            }
+            // N1MM's RadioInfo is ignored: the radio connection itself is the source of frequency and mode.
             _ => {}
         }
     }
@@ -1430,14 +1426,27 @@ impl Hub {
 
 // ---- background tasks -----------------------------------------------------
 
+const MAX_RIG_CHANNELS: usize = 16;
+
 async fn follow_rig(hub: std::sync::Weak<Hub>, id: i64, name: String, mut rx: tokio::sync::watch::Receiver<Vec<RigState>>) {
     loop {
         let states = rx.borrow_and_update().clone();
         let Some(hub) = hub.upgrade() else { return };
-        let many = states.len() > 1;
+        let open = states.iter().filter(|s| !s.closed).count();
+        let many = open > 1;
+        let live = states.len();
         for (ch, state) in states.into_iter().enumerate() {
+            let key = format!("rig:{id}:{ch}");
+            if state.closed && ch > 0 {
+                hub.remove_radio(&key);
+                continue;
+            }
             let name = if many { format!("{name} {}", (b'A' + ch as u8) as char) } else { name.clone() };
-            hub.set_radio(Radio { key: format!("rig:{id}:{ch}"), name, source: "rig", can_tune: true, state });
+            hub.set_radio(Radio { key, name, source: "rig", can_tune: true, state });
+        }
+        // A shorter list (trx_count shrank) drops the channels past its end.
+        for ch in live..MAX_RIG_CHANNELS {
+            hub.remove_radio(&format!("rig:{id}:{ch}"));
         }
         drop(hub);
         if rx.changed().await.is_err() {
@@ -1723,17 +1732,6 @@ fn decode_mode(m: &str) -> &str {
         "`" => "FST4",
         "&" => "MSK144",
         other => other,
-    }
-}
-
-fn n1mm_mode(m: &str) -> &'static str {
-    match m.to_ascii_uppercase().as_str() {
-        "CW" => "CW",
-        "USB" | "LSB" | "SSB" => "SSB",
-        "AM" => "AM",
-        "FM" => "FM",
-        "RTTY" => "RTTY",
-        _ => "",
     }
 }
 

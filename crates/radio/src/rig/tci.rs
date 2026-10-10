@@ -118,6 +118,11 @@ fn apply(chans: &mut Vec<RigState>, msg: &TciMsg) {
                 decode_mode(m).apply(chan(chans, t));
             }
         }
+        "rx_enable" => {
+            if let (Some(t), Some(on)) = (trx(), arg(1)) {
+                chan(chans, t).closed = !on.eq_ignore_ascii_case("true");
+            }
+        }
         "trx" => {
             if let (Some(t), Some(on)) = (trx(), arg(1)) {
                 chan(chans, t).tx = on.eq_ignore_ascii_case("true");
@@ -212,6 +217,11 @@ mod tests {
         // Unannounced trx grows the list; garbage indexes are ignored.
         apply(&mut chans, &parse("vfo:2,0,3500000;vfo:99,0,1;vfo:x,0,1;")[0]);
         assert_eq!(chans.len(), 3);
+        // Closing and reopening a receiver.
+        apply(&mut chans, &parse("rx_enable:1,false;")[0]);
+        assert!(chans[1].closed && !chans[0].closed);
+        apply(&mut chans, &parse("rx_enable:1,true;")[0]);
+        assert!(!chans[1].closed);
     }
 
     #[test]
@@ -250,6 +260,10 @@ mod tests {
                     log2.lock().unwrap().push(t.to_string());
                     // ExpertSDR echoes accepted settings back to all clients.
                     ws.send(Message::text(t.to_string())).await.unwrap();
+                    // The operator closes slice B right after this retune.
+                    if t.starts_with("vfo:1,0,7075000") {
+                        ws.send(Message::text("rx_enable:1,false;")).await.unwrap();
+                    }
                 }
             }
         });
@@ -280,5 +294,11 @@ mod tests {
         handle.send(0, RigCommand::SetSplit(None));
         let st = wait(|s| !s[0].split).await;
         assert_eq!(st[0].tx_freq_hz, 14_079_000);
+
+        // Closing a receiver on the radio marks its channel closed.
+        handle.send(1, RigCommand::SetFreq(7_075_000));
+        let st = wait(|s| s[1].closed).await;
+        assert_eq!(st[1].freq_hz, 7_075_000);
+        assert!(!st[0].closed);
     }
 }

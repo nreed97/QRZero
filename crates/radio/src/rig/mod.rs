@@ -52,6 +52,8 @@ pub struct RigState {
     pub tx_freq_hz: u64,
     /// Last connection error, shown to the user. None when fine.
     pub error: Option<String>,
+    /// The receiver / slice behind this channel was closed on the radio; it is no longer listed.
+    pub closed: bool,
 }
 
 /// A request to change the rig.

@@ -143,7 +143,7 @@ The DXCC flags need the country file (see below) and compare with QSOs in the op
 
 ## N1MM Logger+
 
-In N1MM open **Config → Configure Ports, Mode Control, Winkey, etc → Broadcast Data**, tick **Contacts** and **Radio**, and set the address to `127.0.0.1:12060`. QSOs logged in N1MM are copied into the open log; when you edit or delete one in N1MM, QRZero follows. N1MM's radios can be followed by the QSO panel.
+In N1MM open **Config → Configure Ports, Mode Control, Winkey, etc → Broadcast Data**, tick **Contacts** and **Radio**, and set the address to `127.0.0.1:12060`. QSOs logged in N1MM are copied into the open log; when you edit or delete one in N1MM, QRZero follows.  N1MM's own radio info is ignored; QRZero follows the radio connection itself.
 
 ## Country file
 

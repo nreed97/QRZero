@@ -5,7 +5,7 @@ QRZero can read the frequency and mode from your radios and tune them. Each radi
 | Rig control | For | Settings |
 | --- | --- | --- |
 | Hamlib rigctld | Almost any radio Hamlib supports. Start `rigctld` first (for example `rigctld -m 2028 -r COM3 -s 38400`). | Host and port (default 127.0.0.1:4532) |
-| TCI | ExpertSDR (SunSDR, ANAN with Thetis TCI), and Flex radios through a TCI bridge. Every receiver or **slice** shows up as its own radio. | Host and port (default 127.0.0.1:40001) |
+| TCI | ExpertSDR (SunSDR, ANAN with Thetis TCI), and Flex radios through a TCI bridge. Every receiver or **slice** shows up as its own radio, and a slice you close on the radio disappears from the list. | Host and port (default 127.0.0.1:40001) |
 | Kenwood / Elecraft / Flex CAT | Kenwood, Elecraft K3/K4/KX, and the SmartSDR CAT ports of a Flex. | Serial port (COM3 on Windows, `/dev/cu.usbserial-…` on a Mac, `/dev/ttyUSB0` on Linux) and baud |
 | Yaesu CAT | FT-991A, FTDX10, FTDX101, FT-710 and other recent Yaesu radios. | Serial port and baud |
 | Icom CI-V | Icom radios over USB or a CI-V interface. | Serial port, baud and the CI-V address (IC-7300 is 94, IC-7610 is 98, IC-705 is A4) |
@@ -33,7 +33,7 @@ Split works over every rig control method, with these limits:
 - **TCI** and **Hamlib (rigctld)**: split is read and set. Hamlib needs a radio whose driver supports split (`rigctl` commands `s`, `S` and `I`).
 - **Kenwood, Elecraft and Flex CAT**, and **Yaesu CAT**: split is read and set. Setting it receives on VFO A and transmits on VFO B.
 - **Icom CI-V**: split is read and set on radios that can read the other VFO's frequency (IC-7300, IC-7610, IC-705, IC-9700 and similar). Older Icoms show the single frequency, and QRZero turns split off but can't set the transmit frequency.
-- **WSJT-X and N1MM** radios show the single frequency they report.
+- **WSJT-X** radios show the single frequency they report.
 
 Radios that don't report split show and log one frequency, as before.
 
@@ -47,7 +47,7 @@ When you double-click a cluster or band map spot whose comment says where the DX
 
 Anything more than 100 kHz from the spot is ignored. Spots that set split show it in the row's tooltip. Double-clicking a spot that doesn't say turns split off, so the radio never keeps the last station's transmit frequency.
 
-WSJT-X and N1MM radios are listed too (when those programs are connected), so the panel can follow them, but they can't be tuned from QRZero.
+WSJT-X radios are listed too (when it is connected), so the panel can follow them, but they can't be tuned from QRZero.
 
 ## VFO readout
 
