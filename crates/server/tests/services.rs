@@ -349,7 +349,7 @@ async fn lotw_signs_with_tqsl() {
     // A stand-in tqsl that records its arguments and the file it was given.
     let tqsl = api.dir.path().join("tqsl");
     let record = api.dir.path().join("tqsl-args");
-    std::fs::write(&tqsl, format!("#!/bin/sh\nprintf '%s\\n' \"$@\" > {0}\ncat \"$9\" >> {0}\nexit 0\n", record.display())).unwrap();
+    std::fs::write(&tqsl, format!("#!/bin/sh\nprintf '%s\\n' \"$@\" > {0}\nfor a; do f=$a; done\ncat \"$f\" >> {0}\nexit 0\n", record.display())).unwrap();
     std::fs::set_permissions(&tqsl, std::fs::Permissions::from_mode(0o755)).unwrap();
 
     let mut cfg = api.get("/qsl").await["config"].clone();
@@ -362,7 +362,7 @@ async fn lotw_signs_with_tqsl() {
     let run = api.post("/qsl/upload/lotw", json!(null)).await;
     assert_eq!(run["uploaded"], 2, "{run}");
     let args = std::fs::read_to_string(&record).unwrap();
-    assert!(args.starts_with("-d\n-q\n-x\n-a\ncompliant\n-l\nHome QTH\n-u\n"), "{args}");
+    assert!(args.starts_with("-d\n-q\n-x\n-a\ncompliant\n-l\nHome QTH\n-f\nupdate\n-u\n"), "{args}");
     assert!(args.contains("<CALL:6>JA1XYZ") && args.contains("<CALL:4>W1AW"), "{args}");
     assert_eq!(api.fields(log, "W1AW").await["LOTW_QSL_SENT"], "Y");
     assert_eq!(api.get("/qsl").await["pending"]["lotw"][0]["pending"], 0);
@@ -392,7 +392,7 @@ async fn lotw_upload_needed_by_date_range() {
     }
     let tqsl = api.dir.path().join("tqsl");
     let record = api.dir.path().join("tqsl-args");
-    std::fs::write(&tqsl, format!("#!/bin/sh\nprintf '%s\\n' \"$@\" > {0}\ncat \"$9\" >> {0}\nexit 0\n", record.display())).unwrap();
+    std::fs::write(&tqsl, format!("#!/bin/sh\nprintf '%s\\n' \"$@\" > {0}\nfor a; do f=\"$a\"; done\ncat \"$f\" >> {0}\nexit 0\n", record.display())).unwrap();
     std::fs::set_permissions(&tqsl, std::fs::Permissions::from_mode(0o755)).unwrap();
     let mut cfg = api.get("/qsl").await["config"].clone();
     cfg["tqsl_path"] = json!(tqsl);
@@ -405,6 +405,7 @@ async fn lotw_upload_needed_by_date_range() {
     let run = api.post("/qsl/lotw/range", json!({"from": "2025-06-01", "to": "2025-06-03"})).await;
     assert_eq!(run["uploaded"], 2, "{run}");
     let args = std::fs::read_to_string(&record).unwrap();
+    assert!(args.contains("Home QTH\n-f\nupdate\n-u"), "{args}");
     assert!(args.contains("<CALL:4>A1AA") && args.contains("<CALL:4>C3CC"), "{args}");
     assert!(!args.contains("B2BB") && !args.contains("D4DD"), "{args}");
     let a = api.fields(log, "A1AA").await;
