@@ -5,8 +5,6 @@ import type { Location, QslConfig, QslDownload, QslOverview, QslRun, QslService,
 import SaveBar from "./SaveBar";
 import Modal from "./Modal";
 import PaperQsl from "./PaperQsl";
-import QslLookup from "./QslLookup";
-import ReplyList from "./ReplyList";
 import { newConfirmLines } from "../newConfirms";
 
 interface Props {
@@ -76,17 +74,17 @@ function RunLine({ run }: { run?: QslRun }) {
   );
 }
 
-type Tab = "lookup" | "cards" | "reply" | "online";
+type Tab = "queue" | "online";
 
 export default function QslDialog(props: Props & { tab?: Tab }) {
-  const [tab, setTab] = useState<Tab>(props.tab ?? "lookup");
-  const tabs: [Tab, string][] = [["lookup", "QSL Detail Lookup"], ["cards", "Cards to send"], ["reply", "To reply to"], ["online", "Online services"]];
+  const [tab, setTab] = useState<Tab>(props.tab ?? "queue");
+  const tabs: [Tab, string][] = [["queue", "Queue"], ["online", "Online services"]];
   return (
     <Modal title="QSL" onClose={props.onClose} wide>
       <nav className="tabs">
         {tabs.map(([k, label]) => <button key={k} className={tab === k ? "active" : ""} onClick={() => setTab(k)}>{label}</button>)}
       </nav>
-      {tab === "lookup" ? <QslLookup logId={props.logId} /> : tab === "cards" ? <PaperQsl logId={props.logId} /> : tab === "reply" ? <ReplyList logId={props.logId} /> : <Online {...props} />}
+      {tab === "queue" ? <PaperQsl logId={props.logId} /> : <Online {...props} />}
     </Modal>
   );
 }

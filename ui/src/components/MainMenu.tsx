@@ -2,13 +2,13 @@ import { Fragment } from "react";
 import { usePopup } from "./usePopup";
 import { show, useOverrides, SHORTCUTS, bindingFor } from "../shortcuts";
 
-export type MenuAction = "import" | "export" | "qsl" | "qsllookup" | "settings" | "help" | "about";
+export type MenuAction = "import" | "export" | "qsl" | "qslqueue" | "settings" | "help" | "about";
 
 const ITEMS: { id: MenuAction; label: string }[] = [
   { id: "import", label: "Import ADIF…" },
   { id: "export", label: "Export ADIF…" },
   { id: "qsl", label: "QSL: LoTW, QRZ, Club Log…" },
-  { id: "qsllookup", label: "QSL Detail Lookup…" },
+  { id: "qslqueue", label: "QSL Queue…" },
   { id: "settings", label: "Settings…" },
   { id: "help", label: "Help" },
   { id: "about", label: "About QRZero" },

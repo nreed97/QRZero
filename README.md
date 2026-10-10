@@ -105,7 +105,7 @@ The log grid stays fast at any size. Search by call (with `*` wildcards), narrow
 
 ![Log grid right-click menu](docs/screenshots/log-menu.png)
 
-The right-click menu acts on the selected rows: edit, fill from QRZ, view on QRZ.com, spot to the cluster, send through your UDP connections, mark OQRS and card status, add to the reply list, export and delete. Double-click a QSO to edit it in its own window, grouped as Contact, Their location, My station, QSL (a table for LoTW, card, eQSL, QRZ and Club Log) and Other fields. **All ADIF fields** at the bottom edits everything stored with the QSO.
+The right-click menu acts on the selected rows: edit, fill from QRZ, view on QRZ.com, spot to the cluster, send through your UDP connections, mark OQRS and card status, queue a card or answer one that arrived, export and delete. Double-click a QSO to edit it in its own window, grouped as Contact, Their location, My station, QSL (a table for LoTW, card, eQSL, QRZ and Club Log) and Other fields. **All ADIF fields** at the bottom edits everything stored with the QSO.
 
 ![QSO editor](docs/screenshots/qso-editor.png)
 
@@ -234,7 +234,7 @@ The **SKCC**, **CWops**, **NAQCC** and **FISTS** buttons count from the club num
 
 ## QSL and online services
 
-Choose **QSL: LoTW, QRZ, Club Log…** or **QSL Detail Lookup…** (<kbd>Alt</kbd>+<kbd>Q</kbd>) from the ☰ menu. One QSL window has four tabs: **QSL Detail Lookup**, **Cards to send**, **To reply to** and **Online services**. Each QSO keeps its status in the standard ADIF fields (sent, date, confirmed), so other loggers see what has been sent, and each service has a **QSOs from** date so an imported log is not uploaded twice.
+Choose **QSL: LoTW, QRZ, Club Log…** or **QSL Queue…** (<kbd>Alt</kbd>+<kbd>Q</kbd>) from the ☰ menu. One QSL window has two tabs: **Queue** and **Online services**. Each QSO keeps its status in the standard ADIF fields (sent, date, confirmed), so other loggers see what has been sent, and each service has a **QSOs from** date so an imported log is not uploaded twice.
 
 ### Online services
 
@@ -254,17 +254,11 @@ Moving from another logger? Download confirmations first: everything the service
 
 The QSO editor shows LoTW, card, eQSL, QRZ and Club Log together with a one-line summary, and the log has **LoTW R**, **QSL R**, **QRZ R**, **OQRS** and **Confirmed** columns (and sent-status columns for each service). Your Club Log OQRS requests are tracked as a reminder.
 
-### QSL Detail Lookup, Cards to send and To reply to
+### The card queue
 
-- **QSL Detail Lookup** is for answering cards in bulk: type a call, press Enter, and see that station's QSOs newest first with the card status, plus a contact card (name, address, QSL manager, email, grid, zones and how many cards you have sent). Nothing is ticked after a lookup; tick the QSOs for the card and mark them queued, sent or received, by bureau or direct. The call is matched whole, so DL1ABC finds DL1ABC/P but not DL1ABCD.
-- **Cards to send** lists everything queued. Print Avery 5160/L7160 or 5163/L7163 address labels (several QSOs with one station share a label) or Brother QL-700 labels for the confirmation block on the back of a card. The default is a 50 mm by 4 inch DK-22223 label that reads "CONFIRMING QSO WITH", the call in large type, then date, UTC, MHz, mode and RST for up to four QSOs, newest first, with an optional bottom line for your power or rig; DK-1201, DK-1209 and DK-1202 rolls are there too. **Group by** sorts the queue into piles for a bulk mailing, one per country for your outgoing bureau (cards for a QSL manager get a pile per manager) or one per manager, each with its card and station count. Labels print pile by pile.
-- **To reply to** is the list of cards that arrived and still need an answer. Add a call from the log's right-click menu or the QSL Detail Lookup tab, keep a note (direct, via bureau, an address), and click **Replied**, which can also mark the QSOs as card sent by bureau or direct.
+Paper cards go through one **Queue**. In the Log tab, select QSOs and use **Paper QSL…** (or right-click) to **queue a card to send**, or to mark a **card received, queue a reply** (their card arrived, so a card back goes in the queue). Only QSOs marked queued are in the queue.
 
-| | |
-| --- | --- |
-| ![QSL Detail Lookup](docs/screenshots/qsl-lookup.png) | ![To reply to](docs/screenshots/qsl-reply.png) |
-
-![Cards to send, grouped by bureau](docs/screenshots/qsl-paper.png)
+The **Queue** tab shows each queued card with the station's contact information (name, address, QSL manager, email, grid, zones, cards sent so far) and every field of that QSO. Tick the ones to print and pick the labels: Avery 5160/L7160 or 5163/L7163, or Brother QL-700 labels sent straight to the printer with no print dialog (or saved as PNG images) for the confirmation block on the back of a card. The default is a 50 mm by 4 inch DK-22223 label that reads "CONFIRMING QSO WITH", the call in large type, then date, UTC, MHz, mode and RST for up to four QSOs, newest first, with an optional bottom line for your power or rig. **Group by Bureau** sorts the queue into one pile per country for your outgoing bureau. Then mark the cards **Sent via bureau** or **Sent direct** and they leave the queue.
 
 ## ADIF import and export
 

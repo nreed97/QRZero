@@ -264,24 +264,25 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
     if (!action || !ids.length) return;
     try {
       await api.markQsos(ids, action.fields());
-      onDeleted();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
-
-  const addToReplyList = async (ids: number[]) => {
-    const want = new Set(ids);
-    const calls = [...new Set([...pages.current.values()].flat().filter((q) => want.has(q.id)).map((q) => q.fields.CALL).filter((c): c is string => !!c))];
-    try {
-      for (const c of calls) await api.addReply(logId, c);
+      let note = "";
+      if (key.startsWith("rcvd")) {
+        // A card that came in is answered: queue a card back, unless one has already gone out for that QSO.
+        const sent = new Set([...pages.current.values()].flat().filter((q) => q.fields.QSL_SENT === "Y").map((q) => q.id));
+        const unsent = ids.filter((id) => !sent.has(id));
+        if (unsent.length) await api.markQsos(unsent, { QSL_SENT: "Q" });
+        note = unsent.length ? `Card received. ${unsent.length} QSO${unsent.length === 1 ? "" : "s"} queued to send (QSL, Queue).` : "Card received. Your card was already sent.";
+      } else if (key === "queue") {
+        note = `${ids.length} QSO${ids.length === 1 ? "" : "s"} queued to send (QSL, Queue).`;
+      }
       setError("");
-      setNotice(`Added ${calls.join(", ")} to the reply list (QSL, To reply to).`);
+      setNotice(note);
+      onDeleted();
     } catch (e) {
       setNotice("");
       setError((e as Error).message);
     }
   };
+
 
   const one = (v: string) => (v ? [v] : undefined);
 
@@ -490,10 +491,10 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
               ))}
               <hr />
               <button role="menuitem" onClick={act(() => void markPaper("oqrs", ids))}>Mark OQRS requested ({what})</button>
+              <button role="menuitem" onClick={act(() => void markPaper("queue", ids))}>Queue a card to send ({what})</button>
               <button role="menuitem" onClick={act(() => void markPaper("sent-b", ids))}>Card sent via bureau ({what})</button>
               <button role="menuitem" onClick={act(() => void markPaper("sent-d", ids))}>Card sent direct ({what})</button>
-              <button role="menuitem" onClick={act(() => void markPaper("rcvd-b", ids))}>Card received ({what})</button>
-              <button role="menuitem" onClick={act(() => void addToReplyList(ids))}>Add {what} to reply list</button>
+              <button role="menuitem" onClick={act(() => void markPaper("rcvd-b", ids))}>Card received, queue a reply ({what})</button>
               <hr />
               <button role="menuitem" onClick={act(onExportSelected)}>Export {what}…</button>
               <button role="menuitem" onClick={act(() => void deleteSelected())}>Delete {what}…</button>

@@ -29,7 +29,7 @@ import NeededAlerts from "./components/NeededAlerts";
 import SetupWizard from "./components/SetupWizard";
 import { useShortcut } from "./shortcuts";
 
-type Dialog = "import" | "export" | "settings" | "help" | "wizard" | "qsl" | "qsllookup" | "about" | null;
+type Dialog = "import" | "export" | "settings" | "help" | "wizard" | "qsl" | "qslqueue" | "about" | null;
 
 /** Where a pane goes back to when its window closes. */
 const HOME: Partial<Record<PaneId, [PaneId, Zone]>> = {
@@ -100,7 +100,7 @@ export default function App() {
   const [notice, setNotice] = useState("");
 
   // Global shortcuts (Settings > Keyboard). They don't fire over an open window.
-  useShortcut("qsllookup", () => setDialog((d) => (d === null ? "qsllookup" : d)));
+  useShortcut("qslqueue", () => setDialog((d) => (d === null ? "qslqueue" : d)));
   useShortcut("help", () => setDialog((d) => (d === null ? "help" : d)));
   useShortcut("settings", () => setDialog((d) => (d === null ? "settings" : d)));
   useShortcut("qsl", () => setDialog((d) => (d === null ? "qsl" : d)));
@@ -530,7 +530,7 @@ export default function App() {
           }}
         />
       )}
-      {(dialog === "qsl" || dialog === "qsllookup") && logId !== null && <QslDialog tab={dialog === "qsl" ? "online" : "lookup"} logId={logId} callsigns={callsigns} locations={locations} onClose={() => setDialog(null)} />}
+      {(dialog === "qsl" || dialog === "qslqueue") && logId !== null && <QslDialog tab={dialog === "qsl" ? "online" : "queue"} logId={logId} callsigns={callsigns} locations={locations} onClose={() => setDialog(null)} />}
       {dialog === "help" && <HelpView onClose={() => setDialog(null)} />}
       {dialog === "about" && <AboutDialog onClose={() => setDialog(null)} />}
     </div>

@@ -1,6 +1,6 @@
 # QSL: LoTW, QRZ, Club Log, eQSL and paper cards
 
-Choose **QSL** from the **☰** menu at the right of the top bar. It has four tabs: **QSL Detail Lookup** (a call's QSOs and contact details), **Cards to send** (your card queue and label printing), **To reply to**, and **Online services**.
+Choose **QSL** from the **☰** menu at the right of the top bar. It has two tabs: **Queue** (the cards you mean to send, with label printing) and **Online services**.
 
 Each QSO keeps its upload status in the standard ADIF fields (`LOTW_QSL_SENT`, `QRZCOM_QSO_UPLOAD_STATUS`, `CLUBLOG_QSO_UPLOAD_STATUS`, `EQSL_QSL_SENT` and their dates), so exports and other loggers see what's been sent. Add the **LoTW S**, **eQSL S**, **QRZ**, **Club Log** and **QSL S** (card) columns to the log grid to see them.
 
@@ -68,38 +68,30 @@ Enter your eQSL username and password, plus the **QTH nickname** if your eQSL ac
 
 Tick **Download eQSL confirmations once a day** on the eQSL page to have this done for you.
 
-## Cards to send
+## The card queue
 
-Queue a card from the log: select the QSOs and pick **Paper QSL…, Queue a card to send**, or type Q in the **QSL sent** field when you log. QSOs where the other station asked for a card (R) show up too.
+Paper cards go through one **Queue**. A QSO gets into it two ways, both from the **Log** tab (select QSOs, then use **Paper QSL…** above the log, or right-click):
 
-The **Cards to send** tab lists everything waiting. Tick the ones to print and pick your label sheet:
+- **Queue a card to send**: you want to send a card to get theirs back. You can also type Q in the **QSL sent** field when you log.
+- **Card received, queue a reply**: their card arrived (with a PSE QSL). The QSO is marked received with today's date and goes into the queue so you answer it. If a card has already been sent for that QSO, it only records the receipt. The **Paper QSL…** menu has both a bureau and a direct version.
 
-- **Avery 5160 / L7160**: 30 small labels, two QSOs per label.
-- **Avery 5163 / L7163**: 10 large labels, five QSOs per label.
-- **Brother QL-700, DK-22223 50 mm tape, 4 in long** (the default): one label for the fill-in block on the back of a card. It reads "CONFIRMING QSO WITH", the call in large type, then Date, UTC, MHz, Mode and RST for up to four QSOs, newest first; more QSOs with the same station go on another label. **Bottom line** adds an optional line under a rule, such as your power or rig.
-- Other **Brother QL-700** rolls: **DK-1201** (29 x 90 mm) and **DK-1209** (29 x 62 mm) with two QSOs per label, or **DK-1202** (62 x 100 mm) with five. Each label is its own page. For any QL-700 size, choose your QL-700 in the print dialog, set the paper to the matching size (for DK-22223, a custom 50 mm x 101.6 mm), and leave scaling at 100%.
+Use the Log tab's search to find the QSOs. Only QSOs marked Q (queued) are in the queue; nothing else is.
 
-**Group by** sorts the queue into piles for a bulk mailing, each with its card and station count: **Bureau (country)** makes one pile per country for your outgoing bureau (cards for a QSL manager get a pile per manager), and **QSL manager** makes one pile per manager, with the cards that have no manager together. Labels print pile by pile in the order shown, and the tick box on a pile's heading picks or unpicks the whole pile. Group by is remembered.
+Choose **QSL Queue…** from the **☰** menu, or press **Alt+Q**, to open the **Queue** tab:
 
-Several QSOs with the same station share a label. **Skip labels** leaves the first few labels empty, for a sheet you've used part of. Click **Print**, and when the labels are on the cards click **Sent via bureau** or **Sent direct** to mark them sent with today's date.
+1. **Review.** Click a row to see the contact information for that station (name, address, QTH, country, grid, zones, QSL via, email, cards sent so far, confirmations) and every filled-in field of that QSO. Nothing is ticked at first. Tick the cards you want to print or mark; with nothing ticked, the buttons act on the one you're looking at. **Group by, Bureau (country)** sorts the queue into piles for a bulk mailing, one per country for your outgoing bureau (cards for a QSL manager get a pile per manager); the tick box on a pile's heading picks the whole pile.
+2. **Print the label.** Pick the labels: **Brother QL-700, straight to the printer** (the default; no print dialog, paper size or scaling to set; see **Label printer** below), or **Avery 5160 / L7160** (30 small labels, two QSOs each) or **Avery 5163 / L7163** (10 large labels, five QSOs each), which print through the normal print dialog. Several QSOs with one station share a label; **Skip labels** (Avery) leaves the first few empty on a part-used sheet.
+3. **Mark it sent.** Click **Sent via bureau** or **Sent direct** (today's date is filled in) and the QSOs leave the queue. After a successful QL-700 print a line asks whether to mark those QSOs sent, so it's one click; a failed print marks nothing. **Remove from queue** takes QSOs out without sending a card.
 
-When a card arrives, select its QSOs in the log and pick **Paper QSL…, Card received via bureau** (or direct).
+### Label
 
-## Cards to reply to
+The label is shown as it will print: "CONFIRMING QSO WITH", the call in large type, then Date, UTC, MHz, Mode and RST for up to four QSOs, newest first, and an optional line at the bottom. **Save label image** saves each label as a PNG file, the way it reads on the card, for printing some other way.
 
-Cards arrive in the mail and don't always get answered right away. The **To reply to** tab is a list of the calls you still owe a reply.
+### Label printer
 
-- Right-click QSOs in the log and pick **Add to reply list**, or type a call in **Add a call** and press Enter. A call is listed once, however often you add it.
-- Each row shows the call, the date the card arrived (change it if it was earlier), a note you can type in (direct, via bureau, an address), and the newest QSOs you have with that station.
-- When you've replied, click **Replied**. Pick **Sent via bureau** or **Sent direct** to also mark those QSOs as card sent with today's date, or **Just remove** to only take the call off the list. The entry is deleted; no history is kept.
+Open **Label printer** under the preview and pick your printer (QRZero picks a Brother QL printer on its own the first time), the **tape** and the label **length**. DK-22223, 50 mm continuous tape cut at 101.6 mm is the fill-in block on the back of a card. Other continuous DK rolls (29, 38, 54 and 62 mm) work too; narrower tape fits fewer QSOs per label. **Bottom line** is printed under a rule at the foot of every label, for example `RIG K3S · ANT hex beam · PWR 100W`. These settings are kept in your log.
 
-## QSL Detail Lookup
-
-For answering cards or writing them in bulk: pick **QSL Detail Lookup…** from the **☰** menu, or press **Alt+Q**. This opens the QSL window on the **QSL Detail Lookup** tab. Type a callsign and press **Enter**. (This searches your own log. Looking a callsign up on QRZ.com is a different thing and happens in the QSO entry form.)
-
-The top half lists that station's QSOs, newest first: date, UTC, MHz, mode, the RST you sent and received, your own callsign, and the card status (sent and received, with the bureau or direct route and date, and OQRS if you've asked). The bottom half is the contact card: name, address, QTH, country, grid, zones, QSL via (the manager), email, how many cards you've sent and which services have confirmed. Each comes from the newest QSO that has it filled in, and empty ones are left out.
-
-Nothing is ticked after a lookup. Tick the QSOs for the card (the box in the header ticks them all) and use **Mark selected as** to queue a card, or record it as sent or received, by bureau or direct. **Add to reply list** puts the call on the **To reply to** tab. After each lookup the call box is empty and ready for the next call. The call is matched whole, so DL1ABC finds DL1ABC and its portable forms such as DL1ABC/P, but not DL1ABCD.
+The Brother driver must be installed so Windows knows the printer, and its tape must match the **Tape** setting. Printing straight to the printer is Windows only; elsewhere use **Save label image**.
 
 ## What gets sent
 
