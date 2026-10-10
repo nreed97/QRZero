@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { api } from "../api";
 import { PAPER_ACTIONS, piles as makePiles, pileStations, type GroupBy, qf as f, cardDate as date, cardTime as time, cardFreq as freq, cardMode as mode } from "../paper";
 import { localGet, localSet } from "../prefs";
+import { Contact } from "./ContactCard";
 import LabelBox from "./LabelBox";
 import type { Qso } from "../types";
 
@@ -85,19 +86,42 @@ function LabelSheet({ items, sheet, skip }: { items: Label[]; sheet: keyof typeo
   );
 }
 
+/** Every filled-in field of one QSO, as label / value lines. */
+function QsoDetails({ q }: { q: Qso }) {
+  const lines = Object.entries(q.fields).filter(([, v]) => v !== "").sort(([a], [b]) => a.localeCompare(b));
+  return (
+    <div className="ql-card">
+      <h3>QSO details</h3>
+      <dl>
+        {lines.map(([k, v]) => (
+          <div key={k}>
+            <dt className="mono">{k}</dt>
+            <dd>{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+/** The queue: QSOs marked to send a card for. Review one, print its label, mark it sent. */
 export default function PaperQsl({ logId }: { logId: number }) {
   const [queue, setQueue] = useState<Qso[] | null>(null);
   const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [cur, setCur] = useState<number | null>(null);
+  const [all, setAll] = useState<Qso[]>([]);
   const [sheet, setSheet] = useState<Sheet>("ql");
   const [skip, setSkip] = useState(0);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  /** QSOs just printed on the QL label, waiting to be marked sent. */
+  const [printed, setPrinted] = useState<Qso[] | null>(null);
   const [printing, setPrinting] = useState(false);
   const [by, setBy] = useState<GroupBy>(() => (localGet<{ v: string }>("qsl.groupBy", { v: "none" }).v === "bureau" ? "bureau" : "none"));
 
   const load = () =>
     api.paperQueue(logId).then((q) => {
       setQueue(q);
-      setPicked(new Set(q.map((x) => x.id)));
+      setPicked((now) => new Set(q.filter((x) => now.has(x.id)).map((x) => x.id)));
     });
 
   useEffect(() => {
@@ -116,17 +140,35 @@ export default function PaperQsl({ logId }: { logId: number }) {
   }, [printing]);
 
   const grouped = useMemo(() => makePiles(queue ?? [], by), [queue, by]);
-  // Labels print in the order shown, so a pile comes off the printer together.
-  const chosen = useMemo(() => grouped.flatMap((p) => p.qsos).filter((q) => picked.has(q.id)), [grouped, picked]);
+  const ordered = useMemo(() => grouped.flatMap((p) => p.qsos), [grouped]);
+  const current = ordered.find((q) => q.id === cur) ?? ordered[0];
+  const currentCall = current ? f(current, "CALL") : "";
+
+  // The contact details come from every QSO with that station, not only the queued ones.
+  useEffect(() => {
+    if (!currentCall) return setAll([]);
+    let live = true;
+    api.search(logId, { exact_call: currentCall }, 0, 200, "newest").then((r) => live && setAll(r.rows), () => {});
+    return () => {
+      live = false;
+    };
+  }, [logId, currentCall]);
+
+  // The label and the Sent buttons act on the ticked QSOs, or on the one being looked at when nothing is ticked.
+  const chosen = useMemo(() => {
+    const ticked = ordered.filter((q) => picked.has(q.id));
+    return ticked.length ? ticked : current ? [current] : [];
+  }, [ordered, picked, current]);
   const items = useMemo(() => (sheet === "ql" ? [] : labels(chosen, SHEETS[sheet].lines)), [chosen, sheet]);
 
   if (!queue) return <p className="muted">Loading…</p>;
 
-  const mark = async (key: string) => {
+  const mark = async (key: string, qsos: Qso[] = chosen) => {
     const a = PAPER_ACTIONS.find((x) => x.key === key)!;
     try {
-      await api.markQsos(chosen.map((q) => q.id), a.fields());
-      setMsg({ text: `Marked ${chosen.length} QSO${chosen.length === 1 ? "" : "s"}: ${a.label.toLowerCase()}.`, ok: true });
+      await api.markQsos(qsos.map((q) => q.id), a.fields());
+      setMsg({ text: `${qsos.length} QSO${qsos.length === 1 ? "" : "s"}: ${a.label.toLowerCase()}.`, ok: true });
+      setPrinted(null);
       await load();
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
@@ -146,13 +188,16 @@ export default function PaperQsl({ logId }: { logId: number }) {
     setPicked(next);
   };
 
+  const n = chosen.length;
+  const what = `${n} QSO${n === 1 ? "" : "s"}`;
+
   return (
     <div className="paper">
       <p className="small muted">
-        Cards waiting: QSOs marked <b>Q</b> (queued) in QSL sent. Queue them on the <b>QSL Detail Lookup</b> tab, or from the log with <b>Paper QSL…</b>.
+        The queue holds the cards you mean to send: QSOs you queued, and QSOs whose card arrived (their reply is queued for you). Queue them in the <b>Log</b> tab: select QSOs and use <b>Paper QSL…</b> or right-click.
       </p>
       {queue.length === 0 ? (
-        <p className="muted">No cards waiting.</p>
+        <p className="muted">Nothing in the queue.</p>
       ) : (
         <>
           <div className="row">
@@ -163,41 +208,64 @@ export default function PaperQsl({ logId }: { logId: number }) {
                 <option value="bureau">Bureau (country)</option>
               </select>
             </label>
-            {by !== "none" && <span className="muted small">{grouped.length} pile{grouped.length === 1 ? "" : "s"}, {queue.length} card{queue.length === 1 ? "" : "s"}</span>}
+            <span className="muted small">{queue.length} card{queue.length === 1 ? "" : "s"} queued{by !== "none" ? `, ${grouped.length} pile${grouped.length === 1 ? "" : "s"}` : ""}. Click a row to review it; tick the ones to print or mark.</span>
           </div>
-          <table className="list paper-queue">
-            <thead>
-              <tr>
-                <th><input type="checkbox" aria-label="All" checked={picked.size === queue.length} onChange={(e) => setPicked(new Set(e.target.checked ? queue.map((q) => q.id) : []))} /></th>
-                <th>Call</th><th>Via</th><th>Date</th><th>UTC</th><th>MHz</th><th>Mode</th><th>Sent</th><th>Their card</th>
-              </tr>
-            </thead>
-            <tbody>
-              {grouped.map((p) => (
-                <Fragment key={p.key}>
-                  {by !== "none" && (
-                    <tr className="pile">
-                      <td><input type="checkbox" aria-label={`Pick ${p.title}`} checked={p.qsos.every((q) => picked.has(q.id))} onChange={(e) => togglePile(p, e.target.checked)} /></td>
-                      <td colSpan={8}><b>{p.title}</b> — {p.qsos.length} card{p.qsos.length === 1 ? "" : "s"}, {pileStations(p)} station{pileStations(p) === 1 ? "" : "s"}</td>
-                    </tr>
-                  )}
-                  {p.qsos.map((q) => (
-                    <tr key={q.id}>
-                      <td><input type="checkbox" checked={picked.has(q.id)} onChange={(e) => toggle(q.id, e.target.checked)} aria-label={`Pick ${f(q, "CALL")}`} /></td>
-                      <td className="call">{f(q, "CALL")}</td>
-                      <td className="mono">{f(q, "QSL_VIA")}</td>
-                      <td className="mono">{date(f(q, "QSO_DATE"))}</td>
-                      <td className="mono">{time(f(q, "TIME_ON"))}</td>
-                      <td className="mono">{freq(q)}</td>
-                      <td className="mono">{mode(q)}</td>
-                      <td className="mono">{f(q, "RST_SENT")}</td>
-                      <td>{f(q, "QSL_RCVD") === "Y" ? "received" : ""}</td>
-                    </tr>
-                  ))}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
+          <div className="ql-list">
+            <table className="list paper-queue">
+              <thead>
+                <tr>
+                  <th><input type="checkbox" aria-label="All" checked={picked.size === queue.length} onChange={(e) => setPicked(new Set(e.target.checked ? queue.map((q) => q.id) : []))} /></th>
+                  <th>Call</th><th>Via</th><th>Date</th><th>UTC</th><th>MHz</th><th>Mode</th><th>Sent</th><th>Their card</th>
+                </tr>
+              </thead>
+              <tbody>
+                {grouped.map((p) => (
+                  <Fragment key={p.key}>
+                    {by !== "none" && (
+                      <tr className="pile">
+                        <td><input type="checkbox" aria-label={`Pick ${p.title}`} checked={p.qsos.every((q) => picked.has(q.id))} onChange={(e) => togglePile(p, e.target.checked)} /></td>
+                        <td colSpan={8}><b>{p.title}</b> — {p.qsos.length} card{p.qsos.length === 1 ? "" : "s"}, {pileStations(p)} station{pileStations(p) === 1 ? "" : "s"}</td>
+                      </tr>
+                    )}
+                    {p.qsos.map((q) => (
+                      <tr key={q.id} className={q.id === current?.id ? "sel" : ""} onClick={() => setCur(q.id)}>
+                        <td onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={picked.has(q.id)} onChange={(e) => toggle(q.id, e.target.checked)} aria-label={`Pick ${f(q, "CALL")} ${date(f(q, "QSO_DATE"))}`} /></td>
+                        <td className="call">{f(q, "CALL")}</td>
+                        <td className="mono">{f(q, "QSL_VIA")}</td>
+                        <td className="mono">{date(f(q, "QSO_DATE"))}</td>
+                        <td className="mono">{time(f(q, "TIME_ON"))}</td>
+                        <td className="mono">{freq(q)}</td>
+                        <td className="mono">{mode(q)}</td>
+                        <td className="mono">{f(q, "RST_SENT")}</td>
+                        <td>{f(q, "QSL_RCVD") === "Y" ? `received ${f(q, "QSL_RCVD_VIA")}`.trim() : ""}</td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {current && (
+            <div className="queue-detail">
+              <Contact rows={all.length ? all : [current]} call={currentCall} />
+              <QsoDetails q={current} />
+            </div>
+          )}
+          <div className="row">
+            <span className="small">{what}:</span>
+            <button className="primary" disabled={!n} onClick={() => mark("sent-b")}>Sent via bureau</button>
+            <button disabled={!n} onClick={() => mark("sent-d")}>Sent direct</button>
+            <button disabled={!n} onClick={() => mark("none")} title="Take it out of the queue without sending a card">Remove from queue</button>
+            <span className="muted small">{picked.size ? "the ticked ones" : "the one you're looking at"}</span>
+          </div>
+          {printed && (
+            <p className="ql-after">
+              Printed. Mark {printed.length} QSO{printed.length === 1 ? "" : "s"} sent?{" "}
+              <button onClick={() => mark("sent-b", printed)}>Via bureau</button>{" "}
+              <button onClick={() => mark("sent-d", printed)}>Direct</button>{" "}
+              <button onClick={() => setPrinted(null)}>Not now</button>
+            </p>
+          )}
           <div className="row">
             <label className="f w-xl">
               <span>Labels</span>
@@ -214,22 +282,10 @@ export default function PaperQsl({ logId }: { logId: number }) {
               Print {items.length} label{items.length === 1 ? "" : "s"}
             </button>}
           </div>
-          {sheet === "ql" && (
-            <LabelBox
-              qsos={chosen}
-              onMessage={(text, ok) => setMsg({ text, ok })}
-              onPrinted={() => setMsg({ text: "Printed. Mark the cards below once they're in the mail.", ok: true })}
-            />
-          )}
-          <div className="row">
-            <span className="muted small">After printing:</span>
-            <button disabled={!chosen.length} onClick={() => mark("sent-b")}>Sent via bureau</button>
-            <button disabled={!chosen.length} onClick={() => mark("sent-d")}>Sent direct</button>
-            <button disabled={!chosen.length} onClick={() => mark("none")}>Not sending</button>
-          </div>
+          {sheet === "ql" && <LabelBox qsos={chosen} onMessage={(text, ok) => setMsg({ text, ok })} onPrinted={setPrinted} />}
         </>
       )}
-      {msg && <p className={msg.ok ? "ok" : "err"}>{msg.text}</p>}
+      <p className={`ql-msg ${msg ? (msg.ok ? "ok" : "err") : ""}`}>{msg?.text}</p>
       {printing && sheet !== "ql" && createPortal(<LabelSheet items={items} sheet={sheet} skip={SHEETS[sheet].cols * SHEETS[sheet].rows > 1 ? skip : 0} />, document.body)}
     </div>
   );

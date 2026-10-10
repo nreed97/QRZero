@@ -292,74 +292,65 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "Save and close" }).click();
   await expect(page.getByRole("button", { name: "Save and close" })).toHaveCount(0);
 
-  // Paper cards: queue one from the log, then find it in QSL, Cards to send.
+  // Queue: queue a card from the log, review it in QSL, Queue (details and contact info), print its label, mark it sent.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click();
   await page.getByLabel("Paper QSL").selectOption("queue");
-  await fromMenu(page, /^QSL:/);
-  await page.getByRole("button", { name: "Cards to send" }).click();
-  await expect(page.locator(".paper-queue")).toContainText("K1ABC");
-  await expect(page.getByRole("button", { name: "Print 1 label" })).toBeVisible();
-  await page.getByLabel("Group by").selectOption("bureau");
-  await expect(page.locator(".paper-queue .pile")).toContainText("1 card");
-  await page.getByLabel("Group by").selectOption("none");
-  await page.getByRole("button", { name: "Close", exact: true }).click();
-
-  // Reply list: add from the log's right-click menu, jot a note, mark it replied.
-  await page.locator(".grid-row", { hasText: "K1ABC" }).click({ button: "right" });
-  await page.getByRole("menuitem", { name: /to reply list/ }).click();
-  await fromMenu(page, /^QSL:/);
-  await page.getByRole("button", { name: "To reply to" }).click();
-  await expect(page.locator(".reply-table")).toContainText("K1ABC");
-  await page.getByLabel("Note for K1ABC").fill("send direct");
-  await page.getByLabel("Note for K1ABC").blur();
-  await page.getByRole("button", { name: "Replied" }).click();
-  await page.getByRole("button", { name: "Just remove" }).click();
-  await expect(page.getByText("Nothing waiting for a reply.")).toBeVisible();
-  await page.getByRole("button", { name: "Close", exact: true }).click();
-
-  // QSL Detail Lookup: type a call, Enter, results with the queued card.
-  await fromMenu(page, /^QSL Detail Lookup/);
-  const lookup = page.getByRole("dialog", { name: "QSL" });
-  await lookup.getByLabel("Call").fill("k1abc");
-  await lookup.getByLabel("Call").press("Enter");
-  await expect(lookup.locator("tbody tr").first()).toContainText("queued");
-  await expect(lookup.locator(".ql-card")).toContainText("K1ABC");
-  await expect(lookup.locator("tbody input[type=checkbox]:checked")).toHaveCount(0);
-  // F2 ticks the highlighted QSO; the label shows it and can be saved as an image.
-  await lookup.getByLabel("Call").press("F2");
-  await expect(lookup.locator("tbody input[type=checkbox]:checked")).toHaveCount(1);
-  await expect(lookup.getByLabel("Label preview")).toBeVisible();
-  const [png] = await Promise.all([page.waitForEvent("download"), lookup.getByRole("button", { name: "Save label image" }).click()]);
+  await expect(page.getByText("1 QSO queued to send")).toBeVisible();
+  await fromMenu(page, /^QSL Queue/);
+  const queue = page.getByRole("dialog", { name: "QSL" });
+  await expect(queue.locator(".paper-queue")).toContainText("K1ABC");
+  await expect(queue.locator(".queue-detail")).toContainText("K1ABC");
+  await expect(queue.locator(".queue-detail")).toContainText("QSO_DATE");
+  await expect(queue.getByRole("button", { name: "Print 1 label" })).toBeVisible();
+  await queue.getByLabel("Group by").selectOption("bureau");
+  await expect(queue.locator(".paper-queue .pile")).toContainText("1 card");
+  await queue.getByLabel("Group by").selectOption("none");
+  await expect(queue.locator("tbody input[type=checkbox]:checked")).toHaveCount(0);
+  // The label can be saved as an image.
+  const [png] = await Promise.all([page.waitForEvent("download"), queue.getByRole("button", { name: "Save label image" }).click()]);
   expect(png.suggestedFilename()).toBe("K1ABC.png");
   // Printing needs a printer: with an unknown one the error says so and nothing is offered as sent.
-  await lookup.getByText("Label printer").click();
-  await lookup.getByLabel("Printer").fill("No such printer");
-  await lookup.getByRole("button", { name: "Print 1 label" }).click();
-  await expect(lookup.locator(".ql-msg.err")).toContainText(/only set up for Windows|Can't open the printer/);
-  await expect(lookup.locator(".ql-after")).toHaveCount(0);
-  // When the printer takes it, ask whether to mark the QSOs sent; the answer is recorded.
+  await queue.getByText("Label printer").click();
+  await queue.getByRole("textbox", { name: "Printer" }).fill("No such printer");
+  await queue.getByRole("button", { name: "Print 1 label" }).click();
+  await expect(queue.locator(".ql-msg.err")).toContainText(/only set up for Windows|Can't open the printer/);
+  await expect(queue.locator(".ql-after")).toHaveCount(0);
+  // When the printer takes it, ask whether to mark the QSO sent; the answer takes it out of the queue.
   await page.route("**/api/label/print?*", (r) => r.fulfill({ json: 1 }));
-  await lookup.getByRole("button", { name: "Print 1 label" }).click();
-  await expect(lookup.locator(".ql-after")).toContainText("Mark 1 QSO sent?");
-  await lookup.getByRole("button", { name: "Via bureau" }).click();
-  await expect(lookup.locator("tbody tr").first()).toContainText("sent B");
-  await expect(lookup.locator(".ql-after")).toHaveCount(0);
-  // Queueing with one box ticked queues just that QSO of a station that has two, and Cards to send holds only it.
+  await queue.getByRole("button", { name: "Print 1 label" }).click();
+  await expect(queue.locator(".ql-after")).toContainText("Mark 1 QSO sent?");
+  await queue.getByRole("button", { name: "Via bureau", exact: true }).click();
+  await expect(queue.getByText("Nothing in the queue.")).toBeVisible();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+
+  // Queueing with one QSO selected queues just that QSO of a station that has two.
   const apiHeaders = { "x-qrzero-token": "e2e" };
   const lid = (await (await page.request.get("/api/logs", { headers: apiHeaders })).json())[0].id;
   for (const time of ["1000", "1100"]) {
     await page.request.post(`/api/logs/${lid}/qsos`, { headers: apiHeaders, data: { location_id: null, fields: { CALL: "K8TWO", QSO_DATE: "20240301", TIME_ON: time, BAND: "20m", MODE: "CW" } } });
   }
-  await lookup.getByLabel("Call").fill("k8two");
-  await lookup.getByLabel("Call").press("Enter");
-  await expect(lookup.locator("tbody tr")).toHaveCount(2);
-  await lookup.locator("tbody input[type=checkbox]").first().check();
-  await lookup.getByLabel("Mark as").selectOption({ label: "Queue a card to send" });
-  await expect(lookup.locator("tbody tr td:last-child", { hasText: "queued" })).toHaveCount(1);
-  await lookup.getByRole("button", { name: "Cards to send" }).click();
-  await expect(lookup.locator(".paper-queue tbody tr")).toHaveCount(1); // just the one K8TWO; K1ABC was marked sent above
-  await expect(lookup.locator(".paper-queue")).not.toContainText("W1AW");
+  await page.getByPlaceholder(/Search call/).fill("K8TWO");
+  await expect(page.locator(".grid-row", { hasText: "K8TWO" })).toHaveCount(2);
+  await page.locator(".grid-row", { hasText: "K8TWO" }).first().click();
+  await page.getByLabel("Paper QSL").selectOption("queue");
+  await expect(page.getByText("1 QSO queued to send")).toBeVisible();
+  // A card that arrives puts a card back in the queue for you to send.
+  await page.getByPlaceholder(/Search call/).fill("W1AW");
+  await page.locator(".grid-row", { hasText: "W1AW" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: /Card received, queue a reply/ }).click();
+  await expect(page.getByText("1 QSO queued to send")).toBeVisible();
+  await fromMenu(page, /^QSL Queue/);
+  await expect(queue.locator(".paper-queue tbody tr")).toHaveCount(2); // one K8TWO and W1AW, nothing else
+  await expect(queue.locator(".paper-queue")).toContainText("W1AW");
+  await expect(queue.locator(".paper-queue")).toContainText("K8TWO");
+  await expect(queue.locator(".paper-queue")).not.toContainText("K1ABC");
+  await queue.locator(".paper-queue tbody tr", { hasText: "W1AW" }).getByText("received").waitFor();
+  // Mark the one being looked at sent: the other stays.
+  await queue.locator(".paper-queue tbody tr", { hasText: "W1AW" }).click();
+  await queue.getByRole("button", { name: "Sent direct" }).click();
+  await expect(queue.locator(".paper-queue tbody tr")).toHaveCount(1);
   await page.keyboard.press("Escape");
+  await page.getByPlaceholder(/Search call/).fill("");
 
   // OQRS: mark from the right-click menu, then see it in the editor.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click({ button: "right" });
