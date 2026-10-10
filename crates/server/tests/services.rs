@@ -315,7 +315,6 @@ async fn qrz_and_clublog_uploads() {
     assert_eq!(api.fields(log, "K5ABC").await.get("QRZCOM_QSO_UPLOAD_STATUS"), None);
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn live_upload_waits_before_sending() {
     let seen = Seen::default();
@@ -335,6 +334,7 @@ async fn live_upload_waits_before_sending() {
     assert!(seen.lock().unwrap().is_empty(), "not sent before the wait is over");
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn lotw_signs_with_tqsl() {
     use std::os::unix::fs::PermissionsExt;
