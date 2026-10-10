@@ -2,7 +2,7 @@ import { Fragment } from "react";
 import { usePopup } from "./usePopup";
 import { show, useOverrides, SHORTCUTS, bindingFor } from "../shortcuts";
 
-export type MenuAction = "import" | "export" | "qsl" | "qsllookup" | "settings" | "help";
+export type MenuAction = "import" | "export" | "qsl" | "qsllookup" | "settings" | "help" | "about";
 
 const ITEMS: { id: MenuAction; label: string }[] = [
   { id: "import", label: "Import ADIF…" },
@@ -11,6 +11,7 @@ const ITEMS: { id: MenuAction; label: string }[] = [
   { id: "qsllookup", label: "QSL lookup…" },
   { id: "settings", label: "Settings…" },
   { id: "help", label: "Help" },
+  { id: "about", label: "About QRZero" },
 ];
 
 /** The ☰ menu at the right of the top bar. */

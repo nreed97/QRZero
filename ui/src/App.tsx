@@ -18,6 +18,7 @@ import ImportDialog from "./components/ImportDialog";
 import ExportDialog from "./components/ExportDialog";
 import SettingsDialog, { type GeneralPrefs } from "./components/SettingsDialog";
 import HelpView from "./components/HelpView";
+import AboutDialog from "./components/AboutDialog";
 import SharedPane, { type PaneActions } from "./components/SharedPanes";
 import Workspace from "./components/Workspace";
 import LayoutMenu from "./components/LayoutMenu";
@@ -28,7 +29,7 @@ import NeededAlerts from "./components/NeededAlerts";
 import SetupWizard from "./components/SetupWizard";
 import { useShortcut } from "./shortcuts";
 
-type Dialog = "import" | "export" | "settings" | "help" | "wizard" | "qsl" | "qsllookup" | null;
+type Dialog = "import" | "export" | "settings" | "help" | "wizard" | "qsl" | "qsllookup" | "about" | null;
 
 /** Where a pane goes back to when its window closes. */
 const HOME: Partial<Record<PaneId, [PaneId, Zone]>> = {
@@ -531,6 +532,7 @@ export default function App() {
       )}
       {(dialog === "qsl" || dialog === "qsllookup") && logId !== null && <QslDialog tab={dialog === "qsl" ? "online" : "lookup"} logId={logId} callsigns={callsigns} locations={locations} onClose={() => setDialog(null)} />}
       {dialog === "help" && <HelpView onClose={() => setDialog(null)} />}
+      {dialog === "about" && <AboutDialog onClose={() => setDialog(null)} />}
     </div>
   );
 }
