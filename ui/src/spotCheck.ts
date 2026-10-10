@@ -20,7 +20,6 @@ export function spotBlocked(status: SpotStatus, call: string, qsoUtc: number | n
   if (call.trim().length < 3) return "Enter a callsign first";
   if (!status.connected) return "Not connected to a DX cluster";
   if (qsoUtc === null) return "The QSO has no valid date and time";
-  const age = Math.max(0, Math.round((now - qsoUtc) / 60));
-  if (age > status.maxMinutes) return `Too old to spot (${age} min ago, the limit is ${status.maxMinutes})`;
+  if ((now - qsoUtc) / 60 > status.maxMinutes) return `Too old to spot (past the ${status.maxMinutes}-minute limit)`;
   return null;
 }
