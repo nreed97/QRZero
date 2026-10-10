@@ -78,7 +78,7 @@ GS-232 replies don't need a line break at the end, which is how the WRC answers.
 
 ### Turning the antenna from N1MM
 
-Tick **Let N1MM (or another program) turn the rotator through QRZero** under the rotator settings. QRZero then listens for PstRotatorAz-style UDP commands (default `127.0.0.1:12040`) and passes every bearing, and stop, to whichever rotator connection you set up above, and answers when the program asks for the heading. In N1MM, under **Config → Configure Ports**, set the rotor to the PstRotator-style UDP option with the same address. Use this when N1MM is the program you want to drive the antenna and QRZero holds the connection to the controller. Don't point it at the same port PstRotatorAz itself uses.
+Tick **Let N1MM (or another program) turn the rotator through QRZero** under the rotator settings. QRZero then listens for PstRotatorAz-style UDP commands (default `127.0.0.1:12040`) and passes every bearing, and stop, to whichever rotator connection you set up above, and answers when the program asks for the heading. N1MM's own rotor messages (what **Alt+J** sends) work as well as PstRotatorAz-style ones. In N1MM, under **Config → Configure Ports**, set the rotor's UDP address to the one above. Use this when N1MM is the program you want to drive the antenna and QRZero holds the connection to the controller. Don't point it at the same port PstRotatorAz itself uses.
 
 With a rotator set up, the map shows the rotator's heading and **Turn SP** / **LP** buttons that turn the antenna to the short or long path of the station you're working.
 

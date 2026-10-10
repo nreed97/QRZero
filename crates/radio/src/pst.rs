@@ -45,9 +45,12 @@ pub fn reply(az: f64) -> String {
 pub fn parse_request(s: &str) -> Option<Request> {
     let t = s.trim();
     let number = |v: &str| v.trim().parse::<f64>().ok().filter(|a| a.is_finite()).map(|a| Request::Turn(a.rem_euclid(360.0)));
-    if let Some(i) = t.find("<AZIMUTH>") {
-        let rest = &t[i + 9..];
-        return number(&rest[..rest.find('<')?]);
+    // N1MM's own rotor message: <N1MMRotor><rotor>name</rotor><goazi>145.0</goazi>...
+    for tag in ["<AZIMUTH>", "<goazi>"] {
+        if let Some(i) = t.find(tag) {
+            let rest = &t[i + tag.len()..];
+            return number(&rest[..rest.find('<')?]);
+        }
     }
     if t.contains("<STOP>") {
         return Some(Request::Stop);
@@ -85,6 +88,8 @@ mod tests {
         assert_eq!(parse_request("<PST><AZIMUTH>370</AZIMUTH></PST>"), Some(Request::Turn(10.0)));
         assert_eq!(parse_request("<PST><STOP>1</STOP></PST>"), Some(Request::Stop));
         assert_eq!(parse_request("<PST>AZ?</PST>"), Some(Request::Query));
+        let n1mm = "<N1MMRotor><rotor>Hexbeam</rotor><goazi>145.0</goazi><offset>0.0</offset><bidirectional>0</bidirectional><freqband>14.0</freqband></N1MMRotor>";
+        assert_eq!(parse_request(n1mm), Some(Request::Turn(145.0)));
         assert_eq!(parse_request("45\r\n"), Some(Request::Turn(45.0)));
         assert_eq!(parse_request("M090\r"), Some(Request::Turn(90.0)));
         assert_eq!(parse_request("AZ:200"), Some(Request::Turn(200.0)));
