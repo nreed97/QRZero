@@ -5,7 +5,7 @@ QRZero can read the frequency and mode from your radios and tune them. Each radi
 | Rig control | For | Settings |
 | --- | --- | --- |
 | Hamlib rigctld | Almost any radio Hamlib supports. Start `rigctld` first (for example `rigctld -m 2028 -r COM3 -s 38400`). | Host and port (default 127.0.0.1:4532) |
-| TCI | ExpertSDR (SunSDR, ANAN with Thetis TCI), and Flex radios through a TCI bridge. Every receiver or **slice** shows up as its own radio. | Host and port (default 127.0.0.1:40001) |
+| TCI | ExpertSDR (SunSDR, ANAN with Thetis TCI), and Flex radios through a TCI bridge. Every receiver or **slice** shows up as its own radio, and a slice you close on the radio disappears from the list. | Host and port (default 127.0.0.1:40001) |
 | Kenwood / Elecraft / Flex CAT | Kenwood, Elecraft K3/K4/KX, and the SmartSDR CAT ports of a Flex. | Serial port (COM3 on Windows, `/dev/cu.usbserial-…` on a Mac, `/dev/ttyUSB0` on Linux) and baud |
 | Yaesu CAT | FT-991A, FTDX10, FTDX101, FT-710 and other recent Yaesu radios. | Serial port and baud |
 | Icom CI-V | Icom radios over USB or a CI-V interface. | Serial port, baud and the CI-V address (IC-7300 is 94, IC-7610 is 98, IC-705 is A4) |
