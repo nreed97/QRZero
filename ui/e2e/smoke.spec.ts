@@ -220,6 +220,13 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
     radio.close();
   }
   await page.getByRole("tab", { name: "Log", exact: true }).click();
+  // About names the installed version and links to the project.
+  await fromMenu(page, "About QRZero");
+  const about = page.getByRole("dialog", { name: "About QRZero" });
+  await expect(about).toContainText(/Version \d+\.\d+\.\d+/);
+  await expect(about.getByRole("link", { name: "Releases and downloads" })).toHaveAttribute("href", "https://github.com/nreed97/QRZero/releases");
+  await expect(about.getByRole("link", { name: "Report a problem or suggest a change" })).toHaveAttribute("href", "https://github.com/nreed97/QRZero/issues");
+  await about.getByRole("button", { name: "Close" }).click();
   await fromMenu(page, "Settings…");
   // General is the first section and opens by default; the search box jumps to a setting.
   await expect(page.getByRole("heading", { name: "General" })).toBeVisible();

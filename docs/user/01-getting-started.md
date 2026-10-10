@@ -75,6 +75,7 @@ Choose **QSL** from the **☰** menu, then the **Online services** tab. Enter yo
 | Look up a QSL card or send confirmations | **QSL** in the ☰ menu |
 | Back up or restore my log | **Settings → Backups** |
 | Search this guide | The search box at the top of the Help window |
+| See which version I have, or find the project page, releases and issue tracker | **About QRZero** in the ☰ menu |
 
 The log is stored in one file, `qrzero.db`, in `%APPDATA%\QRZero` on Windows, `~/Library/Application Support/QRZero` on a Mac, or `~/.local/share/QRZero` on Linux. QRZero backs it up once a day when it starts, into the `backups` folder next to it; **Settings → Backups** lists those copies, makes one on demand and restores from one. Copy the backups folder to another drive or a USB stick now and then, so a dead disk doesn't take your log with it.
 
