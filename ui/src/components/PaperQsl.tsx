@@ -86,16 +86,16 @@ function LabelSheet({ items, sheet, skip }: { items: Label[]; sheet: keyof typeo
   );
 }
 
-/** Every filled-in field of one QSO, as label / value lines. */
+/** The QSO as it goes on the card: date, UTC, MHz, mode and RST. */
 function QsoDetails({ q }: { q: Qso }) {
-  const lines = Object.entries(q.fields).filter(([, v]) => v !== "").sort(([a], [b]) => a.localeCompare(b));
+  const lines: [string, string][] = [["Date", date(f(q, "QSO_DATE"))], ["UTC", time(f(q, "TIME_ON"))], ["MHz", freq(q)], ["Mode", mode(q)], ["RST", f(q, "RST_SENT")]];
   return (
     <div className="ql-card">
       <h3>QSO details</h3>
       <dl>
         {lines.map(([k, v]) => (
           <div key={k}>
-            <dt className="mono">{k}</dt>
+            <dt>{k}</dt>
             <dd>{v}</dd>
           </div>
         ))}

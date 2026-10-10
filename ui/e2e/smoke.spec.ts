@@ -323,7 +323,9 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   const queue = page.getByRole("dialog", { name: "QSL" });
   await expect(queue.locator(".paper-queue")).toContainText("K1ABC");
   await expect(queue.locator(".queue-detail")).toContainText("K1ABC");
-  await expect(queue.locator(".queue-detail")).toContainText("QSO_DATE");
+  await expect(queue.locator(".queue-detail")).toContainText("Date");
+  await expect(queue.locator(".queue-detail")).not.toContainText("QSO_DATE");
+  await page.screenshot({ path: "e2e-results/queue-details.png" });
   await expect(queue.getByRole("button", { name: "Print 1 label" })).toBeVisible();
   await queue.getByLabel("Group by").selectOption("bureau");
   await expect(queue.locator(".paper-queue .pile")).toContainText("1 card");
