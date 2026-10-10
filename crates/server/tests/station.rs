@@ -523,4 +523,8 @@ async fn n1mm_turns_the_rotator_through_qrzero() {
     let n1mm = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     n1mm.send_to(b"<PST><AZIMUTH>135</AZIMUTH></PST>", listen).await.unwrap();
     assert_eq!(turns.recv().await.unwrap(), "P 135 0");
+    // N1MM's own rotor message (Alt+J).
+    let msg = "<N1MMRotor><rotor>Hexbeam</rotor><goazi>145.0</goazi><offset>0.0</offset><bidirectional>0</bidirectional><freqband>14.0</freqband></N1MMRotor>";
+    n1mm.send_to(msg.as_bytes(), listen).await.unwrap();
+    assert_eq!(turns.recv().await.unwrap(), "P 145 0");
 }
