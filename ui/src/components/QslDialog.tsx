@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { onLive } from "../live";
 import type { Location, QslConfig, QslDownload, QslOverview, QslRun, QslService, StationCallsign } from "../types";
+import SaveBar from "./SaveBar";
 import Modal from "./Modal";
 import PaperQsl from "./PaperQsl";
 import QslLookup from "./QslLookup";
@@ -90,7 +91,7 @@ export default function QslDialog(props: Props & { tab?: Tab }) {
   );
 }
 
-function Online({ callsigns, locations }: Props) {
+function Online({ callsigns, locations, onClose }: Props) {
   const [o, setO] = useState<QslOverview | null>(null);
   const [cfg, setCfg] = useState<QslConfig | null>(null);
   const [qrzKeys, setQrzKeys] = useState<Record<string, string>>({});
@@ -157,8 +158,10 @@ function Online({ callsigns, locations }: Props) {
       setLotwPassword("");
       setEqslPassword("");
       setMsg({ text: "Saved.", ok: true });
+      return true;
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
+      return false;
     }
   };
 
@@ -409,11 +412,7 @@ function Online({ callsigns, locations }: Props) {
         </fieldset>
         )}
 
-        <div className="row">
-          <span className="spacer" />
-          {msg && <span className={msg.ok ? "ok" : "err"}>{msg.text}</span>}
-          <button className="primary" onClick={save}>Save</button>
-        </div>
+        <SaveBar msg={msg} onSave={save} onClose={onClose} />
       </div>
   );
 }

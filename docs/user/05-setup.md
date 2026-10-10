@@ -78,6 +78,8 @@ Logs are completely separate, for example one per operator sharing the computer.
 
 On the **Callsign lookup** tab, turn on QRZ.com lookups and enter your QRZ username and password. Lookups need a QRZ XML subscription. **Save and test login** checks the details straight away.
 
+Settings pages with a **Save** button (and the QSL window's **Online services** page) also have **Save and close**, which saves and then closes the window. The *Saved.* note fades out after a couple of seconds, so if you save again it shows again.
+
 - On Windows the password is stored in Windows Credential Manager, never in the log file. On a Mac it goes to the Keychain. On Linux it goes to the desktop keyring (GNOME Keyring or KWallet); only when no keyring is running, as on a headless server, is it kept in the log file's settings.
 - Results are cached for 30 days, so working the same station again is instant and doesn't use your QRZ allowance.
 - Portable calls such as `W1AW/P` or `EA8/G4ABC` fall back to the home call if QRZ doesn't know the full call.
