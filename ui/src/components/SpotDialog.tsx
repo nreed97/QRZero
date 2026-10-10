@@ -26,7 +26,7 @@ export default function SpotDialog({ req, onClose }: { req: SpotRequest; onClose
       <p>Send a spot of <b>{req.call}</b> to everyone on the cluster?</p>
       <div className="row">
         <label className="f w-m"><span>Freq kHz</span><input value={freq} onChange={(e) => setFreq(e.target.value)} inputMode="decimal" disabled={busy || msg?.ok} /></label>
-        <label className="f grow"><span>Comment</span><input value={comment} maxLength={60} onChange={(e) => setComment(e.target.value)} disabled={busy || msg?.ok} autoFocus /></label>
+        <label className="f grow"><span>Comment</span><input value={comment} maxLength={30} onChange={(e) => setComment(e.target.value)} disabled={busy || msg?.ok} autoFocus /></label>
       </div>
       <p className="muted small">The cluster will get: <code>DX {Number.isFinite(khz) ? khz.toFixed(1) : "?"} {req.call} {comment.trim()}</code></p>
       {msg && <p className={msg.ok ? "ok" : "err"}>{msg.text}</p>}

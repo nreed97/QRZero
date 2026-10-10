@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
+import { expandSpotComment, SPOT_COMMENT_MAX, SPOT_PLACEHOLDERS } from "../spotCheck";
 import type { ClusterConfig, ClusterNode, CtyStatus, Equipment, Fields, IntegrationStatus, Integrations, Location, Log, Settings, StationCallsign } from "../types";
 import type { EntryLayout, ModeLayouts } from "../fields";
 import Modal from "./Modal";
@@ -543,6 +544,8 @@ function NeededAlertsSettings() {
   );
 }
 
+const EXAMPLE_QSO: Fields = { CALL: "JA1XYZ", MODE: "CW", BAND: "20m", FREQ: "14.0254", RST_SENT: "599", RST_RCVD: "579", NAME: "Taro", MY_GRIDSQUARE: "EN34" };
+
 function ClusterTab({ onClose }: { onClose: () => void }) {
   const [cfg, setCfg] = useState<ClusterConfig | null>(null);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -611,6 +614,14 @@ function ClusterTab({ onClose }: { onClose: () => void }) {
         <input className="w-port" value={cfg.spot_max_minutes} inputMode="numeric" aria-label="Minutes" onChange={(e) => setCfg({ ...cfg, spot_max_minutes: Math.max(1, Math.min(120, Number(e.target.value.replace(/\D/g, "")) || 1)) })} />
         <span>minutes</span>
       </div>
+      <label className="f">
+        <span>Comment for spots sent from the log's right-click menu</span>
+        <input value={cfg.spot_comment} maxLength={80} onChange={(e) => setCfg({ ...cfg, spot_comment: e.target.value })} />
+      </label>
+      <p className="muted small">
+        Plain text, plus these filled in from the QSO: {SPOT_PLACEHOLDERS.map(([p, d], i) => <span key={p}><code>{p}</code> {d}{i < SPOT_PLACEHOLDERS.length - 1 ? ", " : ". "}</span>)}
+        Clusters keep only the first {SPOT_COMMENT_MAX} characters. You can still change the comment before sending. Example: <code>{expandSpotComment(cfg.spot_comment, EXAMPLE_QSO)}</code>
+      </p>
       <label className="check"><input type="checkbox" checked={cfg.auto_connect} onChange={(e) => setCfg({ ...cfg, auto_connect: e.target.checked })} /> Connect when QRZero starts</label>
       <SaveBar msg={msg} onSave={save} onClose={onClose} />
     </div>

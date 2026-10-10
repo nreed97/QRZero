@@ -227,6 +227,7 @@ async fn cluster_spots_are_flagged() {
     api.post("/cluster/send", json!({"line": "sh/dx 5"})).await;
     api.wait_for("/cluster", |v| v["lines"].as_array().unwrap().iter().any(|l| l == "echo: sh/dx 5")).await;
 
+    assert_eq!(c["config"]["spot_comment"], "spotted with QRZero", "the default spot comment");
     // Spotting: a fresh QSO goes out as a "DX" line, an old one is refused.
     let now = chrono::Utc::now().timestamp();
     api.post("/cluster/spot", json!({"call": "ja1xyz", "freq_khz": 14025.04, "comment": "CW  599\r\nsh/dx", "qso_utc": now - 60})).await;
