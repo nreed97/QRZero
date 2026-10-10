@@ -8,7 +8,7 @@ const ITEMS: { id: MenuAction; label: string }[] = [
   { id: "import", label: "Import ADIF…" },
   { id: "export", label: "Export ADIF…" },
   { id: "qsl", label: "QSL: LoTW, QRZ, Club Log…" },
-  { id: "qsllookup", label: "QSL lookup…" },
+  { id: "qsllookup", label: "Card lookup…" },
   { id: "settings", label: "Settings…" },
   { id: "help", label: "Help" },
 ];
