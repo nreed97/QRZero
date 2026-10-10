@@ -9,7 +9,7 @@ import type { Location, Qso, QsoFilter, QslService } from "../types";
 import { qrzPageUrl } from "./QrzPageLink";
 import SpotDialog, { type SpotRequest } from "./SpotDialog";
 import { useSpotStatus } from "../spot";
-import { qsoEnd, spotBlocked } from "../spotCheck";
+import { expandSpotComment, qsoEnd, spotBlocked } from "../spotCheck";
 import { confirmDelete, useDisplay } from "../display";
 import "../worked.css";
 
@@ -479,7 +479,7 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
                 const khz = Number(f.FREQ_RX || f.FREQ) * 1000;
                 return (
                   <button role="menuitem" disabled={!!why || !(khz > 0)} title={why ?? (khz > 0 ? undefined : "The QSO has no frequency")}
-                    onClick={act(() => setSpot({ call: f.CALL, freqKhz: khz, comment: f.MODE ?? "", qsoUtc: qsoEnd(f) ?? 0 }))}>
+                    onClick={act(() => setSpot({ call: f.CALL, freqKhz: khz, comment: expandSpotComment(spotStatus.comment, f), qsoUtc: qsoEnd(f) ?? 0 }))}>
                     Spot {f.CALL} to the cluster…{why ? ` (${why})` : ""}
                   </button>
                 );

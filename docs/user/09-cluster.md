@@ -45,9 +45,9 @@ The popups and the sound come from the main window only, so pop-out windows don'
 
 ## Spotting a station you worked
 
-To tell the cluster you worked someone, click **Spot…** in the QSO panel, or right-click the QSO in the log and choose **Spot … to the cluster…**. A box shows the frequency and a comment (the mode to start with) that you can change, and the exact line that will be sent. Nothing goes out until you click **Send spot**.
+To tell the cluster you worked someone, click **Spot…** in the QSO panel, or right-click the QSO in the log and choose **Spot … to the cluster…**. A box shows the frequency and a comment that you can change, and the exact line that will be sent. Nothing goes out until you click **Send spot**.
 
-Spotting is switched off, with the reason shown, when the cluster isn't connected or the QSO is too old. To keep an old contact from being spotted by mistake, only QSOs from the last 10 minutes can be spotted; change the limit in **Settings**, **DX cluster**, **Only spot a QSO made within the last … minutes**. For a QSO logged in split, the spot is at the frequency you listened on, where the DX transmits.
+Spotting is switched off, with the reason shown, when the cluster isn't connected or the QSO is too old. To keep an old contact from being spotted by mistake, only QSOs from the last 10 minutes can be spotted; change the limit in **Settings**, **DX cluster**, **Only spot a QSO made within the last … minutes**. The comment from the right-click menu starts as the one set in **Settings**, **DX cluster**, **Comment for spots sent from the log's right-click menu** (**spotted with QRZero** to start with). Besides plain text it can hold `{call}`, `{mode}`, `{band}`, `{freq}`, `{rst_sent}`, `{rst_rcvd}`, `{name}` and `{my_grid}`, which are filled in from the QSO, so `{mode} {rst_rcvd} via QRZero` becomes `CW 579 via QRZero`. Clusters keep only the first 30 characters, so longer comments are cut. The QSO panel's **Spot…** starts with the mode. For a QSO logged in split, the spot is at the frequency you listened on, where the DX transmits.
 
 ## Console
 

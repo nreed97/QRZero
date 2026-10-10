@@ -25,11 +25,13 @@ pub struct ClusterConfig {
     pub auto_connect: bool,
     /// A QSO older than this many minutes can't be spotted.
     pub spot_max_minutes: u32,
+    /// Comment prefilled for a spot from the log's right-click menu; may hold {placeholders} for QSO data.
+    pub spot_comment: String,
 }
 
 impl Default for ClusterConfig {
     fn default() -> Self {
-        ClusterConfig { nodes: Vec::new(), auto_connect: false, spot_max_minutes: 10 }
+        ClusterConfig { nodes: Vec::new(), auto_connect: false, spot_max_minutes: 10, spot_comment: "spotted with QRZero".into() }
     }
 }
 
@@ -178,7 +180,7 @@ impl Cluster {
         if age > max * 60 {
             return Err(format!("that QSO is older than {max} minutes, so it can't be spotted"));
         }
-        let comment: String = comment.chars().filter(|c| !c.is_control()).take(60).collect();
+        let comment: String = comment.chars().filter(|c| !c.is_control()).take(30).collect();
         let line = format!("DX {freq_khz:.1} {call} {}", comment.trim()).trim_end().to_string();
         let handle = inner.handle.as_ref().ok_or("not connected to a cluster")?;
         handle.send(&line);

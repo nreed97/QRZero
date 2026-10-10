@@ -1,6 +1,6 @@
 import type { Fields } from "./types";
 
-export interface SpotStatus { connected: boolean; maxMinutes: number }
+export interface SpotStatus { connected: boolean; maxMinutes: number; comment: string }
 
 /** Unix seconds for an ADIF date ("20261009") and time ("2312" or "231245"), UTC. */
 export function adifToUnix(date?: string, time?: string): number | null {
@@ -23,4 +23,19 @@ export function spotBlocked(status: SpotStatus, call: string, qsoUtc: number | n
   const age = Math.max(0, Math.round((now - qsoUtc) / 60));
   if (age > status.maxMinutes) return `Too old to spot (${age} min ago, the limit is ${status.maxMinutes})`;
   return null;
+}
+
+export const SPOT_COMMENT_MAX = 30;
+export const SPOT_PLACEHOLDERS: [string, string][] = [
+  ["{call}", "callsign"], ["{mode}", "mode"], ["{band}", "band"], ["{freq}", "frequency in MHz"],
+  ["{rst_sent}", "RST sent"], ["{rst_rcvd}", "RST received"], ["{name}", "operator name"], ["{my_grid}", "your grid"],
+];
+export const DEFAULT_SPOT_COMMENT = "spotted with QRZero";
+
+/** Fills the {placeholders} of a spot comment from a QSO; unknown or empty ones vanish. Cut to what a cluster accepts. */
+export function expandSpotComment(template: string, f: Fields): string {
+  const v: Record<string, string | undefined> = {
+    call: f.CALL, mode: f.MODE, band: f.BAND, freq: f.FREQ, rst_sent: f.RST_SENT, rst_rcvd: f.RST_RCVD, name: f.NAME, my_grid: f.MY_GRIDSQUARE,
+  };
+  return template.replace(/\{(\w+)\}/g, (_, k: string) => v[k.toLowerCase()] ?? "").replace(/\s+/g, " ").trim().slice(0, SPOT_COMMENT_MAX);
 }

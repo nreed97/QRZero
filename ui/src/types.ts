@@ -199,7 +199,7 @@ export interface Spot {
 }
 
 export interface ClusterNode { name: string; host: string; port: number; login: string; password: string; commands: string[] }
-export interface ClusterConfig { nodes: ClusterNode[]; auto_connect: boolean; spot_max_minutes: number }
+export interface ClusterConfig { nodes: ClusterNode[]; auto_connect: boolean; spot_max_minutes: number; spot_comment: string }
 export interface ClusterSnapshot { home?: Entity | null; config: ClusterConfig; state: string; connected: boolean; spots: Spot[]; lines: string[] }
 
 export interface LotwWaiting { locations: { mapping: LotwMapping; waiting: number }[] }
