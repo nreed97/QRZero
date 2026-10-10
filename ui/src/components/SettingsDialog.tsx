@@ -602,6 +602,11 @@ function ClusterTab() {
         ))}
       </div>
       <NeededAlertsSettings />
+      <div className="row">
+        <span>Only spot a QSO made within the last</span>
+        <input className="w-port" value={cfg.spot_max_minutes} inputMode="numeric" aria-label="Minutes" onChange={(e) => setCfg({ ...cfg, spot_max_minutes: Math.max(1, Math.min(120, Number(e.target.value.replace(/\D/g, "")) || 1)) })} />
+        <span>minutes</span>
+      </div>
       <label className="check"><input type="checkbox" checked={cfg.auto_connect} onChange={(e) => setCfg({ ...cfg, auto_connect: e.target.checked })} /> Connect when QRZero starts</label>
       {msg && <p className={msg.ok ? "ok" : "err"}>{msg.text}</p>}
       <div className="buttons"><button className="primary" onClick={save}>Save</button></div>

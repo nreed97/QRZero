@@ -43,6 +43,12 @@ In **Settings**, **DX cluster**, under **Alerts for needed spots** (the **Alerts
 
 The popups and the sound come from the main window only, so pop-out windows don't repeat them.
 
+## Spotting a station you worked
+
+To tell the cluster you worked someone, click **Spot…** in the QSO panel, or right-click the QSO in the log and choose **Spot … to the cluster…**. A box shows the frequency and a comment (the mode to start with) that you can change, and the exact line that will be sent. Nothing goes out until you click **Send spot**.
+
+Spotting is switched off, with the reason shown, when the cluster isn't connected or the QSO is too old. To keep an old contact from being spotted by mistake, only QSOs from the last 10 minutes can be spotted; change the limit in **Settings**, **DX cluster**, **Only spot a QSO made within the last … minutes**. For a QSO logged in split, the spot is at the frequency you listened on, where the DX transmits.
+
 ## Console
 
 **Console** shows what the node sends and lets you type commands, for example `sh/dx 20` for the last 20 spots or `dx 14025 K1ABC tnx qso` to spot a station.

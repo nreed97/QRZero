@@ -60,6 +60,12 @@ impl Api {
         self.send(reqwest::Method::POST, path, Some(body), None).await
     }
 
+    /// POST that returns the HTTP status instead of insisting on 200.
+    async fn post_status(&self, path: &str, body: Value) -> u16 {
+        let resp = self.http.post(format!("{}{}", self.base, path)).header("x-qrzero-token", &self.token).json(&body).send().await.unwrap();
+        resp.status().as_u16()
+    }
+
     async fn put(&self, path: &str, body: Value) -> Value {
         self.send(reqwest::Method::PUT, path, Some(body), None).await
     }
@@ -218,8 +224,17 @@ async fn cluster_spots_are_flagged() {
     api.post("/cluster/send", json!({"line": "sh/dx 5"})).await;
     api.wait_for("/cluster", |v| v["lines"].as_array().unwrap().iter().any(|l| l == "echo: sh/dx 5")).await;
 
+    // Spotting: a fresh QSO goes out as a "DX" line, an old one is refused.
+    let now = chrono::Utc::now().timestamp();
+    api.post("/cluster/spot", json!({"call": "ja1xyz", "freq_khz": 14025.04, "comment": "CW  599\r\nsh/dx", "qso_utc": now - 60})).await;
+    api.wait_for("/cluster", |v| v["lines"].as_array().unwrap().iter().any(|l| l == "echo: DX 14025.0 JA1XYZ CW  599sh/dx")).await;
+    let old = api.post_status("/cluster/spot", json!({"call": "JA1XYZ", "freq_khz": 14025.0, "comment": "", "qso_utc": now - 3600})).await;
+    assert_eq!(old, 400, "an hour-old QSO is too old to spot");
+
     api.post("/cluster/connect", json!({"connect": false})).await;
     api.wait_for("/cluster", |v| v["connected"] == false).await;
+    let off = api.post_status("/cluster/spot", json!({"call": "JA1XYZ", "freq_khz": 14025.0, "comment": "", "qso_utc": now})).await;
+    assert_eq!(off, 400, "no spot without a cluster connection");
 }
 
 #[tokio::test]

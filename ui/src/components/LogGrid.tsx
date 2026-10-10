@@ -7,6 +7,9 @@ import { COLUMNS, DEFAULT_COLUMNS } from "../fields";
 import { localGet, localSet } from "../prefs";
 import type { Location, Qso, QsoFilter } from "../types";
 import { qrzPageUrl } from "./QrzPageLink";
+import SpotDialog, { type SpotRequest } from "./SpotDialog";
+import { useSpotStatus } from "../spot";
+import { qsoEnd, spotBlocked } from "../spotCheck";
 import { confirmDelete, useDisplay } from "../display";
 import "../worked.css";
 
@@ -46,6 +49,8 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
   const [moving, setMoving] = useState<{ key: string; to: number } | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; q: Qso } | null>(null);
   const [notice, setNotice] = useState("");
+  const [spot, setSpot] = useState<SpotRequest | null>(null);
+  const spotStatus = useSpotStatus(!!menu);
 
   useEffect(() => {
     if (!menu) return;
@@ -438,10 +443,21 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
             f();
           };
           return (
-            <div className="wb-menu" role="menu" style={{ left: menu.x, top: menu.y }} onPointerDown={(e) => e.stopPropagation()}>
+            <div className="wb-menu" role="menu" style={{ left: menu.x, top: Math.min(menu.y, Math.max(4, window.innerHeight - 380)), maxHeight: window.innerHeight - 8, overflowY: "auto" }} onPointerDown={(e) => e.stopPropagation()}>
               <button role="menuitem" onClick={act(() => onEdit(menu.q))}>Edit {menu.q.fields.CALL ?? "QSO"}</button>
               <button role="menuitem" onClick={act(() => void lookupQsos(ids))}>Fill {what} from QRZ</button>
               {ids.length === 1 && menu.q.fields.CALL && <a role="menuitem" className="menu-link" href={qrzPageUrl(menu.q.fields.CALL)} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(null)}>View {menu.q.fields.CALL} on QRZ.com</a>}
+              {ids.length === 1 && menu.q.fields.CALL && (() => {
+                const f = menu.q.fields;
+                const why = spotBlocked(spotStatus, f.CALL, qsoEnd(f));
+                const khz = Number(f.FREQ_RX || f.FREQ) * 1000;
+                return (
+                  <button role="menuitem" disabled={!!why || !(khz > 0)} title={why ?? (khz > 0 ? undefined : "The QSO has no frequency")}
+                    onClick={act(() => setSpot({ call: f.CALL, freqKhz: khz, comment: f.MODE ?? "", qsoUtc: qsoEnd(f) ?? 0 }))}>
+                    Spot {f.CALL} to the cluster…{why ? ` (${why})` : ""}
+                  </button>
+                );
+              })()}
               <button role="menuitem" onClick={act(() => void sendQsos(ids))}>Send {what} through UDP connections</button>
               <hr />
               <button role="menuitem" onClick={act(() => void markPaper("oqrs", ids))}>Mark OQRS requested ({what})</button>
@@ -457,6 +473,7 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
         })()}
         {total === 0 && <div className="grid-empty muted">No QSOs{filter.call || filter.bands || filter.modes || filter.dxcc !== undefined || filter.fields ? " match the search" : " yet"}.</div>}
       </div>
+      {spot && <SpotDialog req={spot} onClose={() => setSpot(null)} />}
     </section>
   );
 }

@@ -17,12 +17,20 @@ use crate::station::Hub;
 const MAX_SPOTS: usize = 500;
 const MAX_LINES: usize = 300;
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ClusterConfig {
     pub nodes: Vec<ClusterNode>,
     /// Connect when QRZero starts.
     pub auto_connect: bool,
+    /// A QSO older than this many minutes can't be spotted.
+    pub spot_max_minutes: u32,
+}
+
+impl Default for ClusterConfig {
+    fn default() -> Self {
+        ClusterConfig { nodes: Vec::new(), auto_connect: false, spot_max_minutes: 10 }
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -153,6 +161,28 @@ impl Cluster {
         let handle = inner.handle.as_ref().ok_or("not connected to a cluster")?;
         handle.send(line);
         Ok(())
+    }
+
+    /// Sends a DX spot for a QSO made at `qso_utc` (Unix seconds). Refused when the QSO is older than the configured limit.
+    pub fn spot(&self, call: &str, freq_khz: f64, comment: &str, qso_utc: i64) -> Result<String, String> {
+        let call = call.trim().to_uppercase();
+        if !(3..=15).contains(&call.len()) || !call.chars().all(|c| c.is_ascii_alphanumeric() || c == '/') {
+            return Err("that doesn't look like a callsign".into());
+        }
+        if !(1.0..=300_000_000.0).contains(&freq_khz) {
+            return Err("enter the frequency in kHz".into());
+        }
+        let inner = self.lock();
+        let max = i64::from(inner.config.spot_max_minutes);
+        let age = chrono::Utc::now().timestamp() - qso_utc;
+        if age > max * 60 {
+            return Err(format!("that QSO is older than {max} minutes, so it can't be spotted"));
+        }
+        let comment: String = comment.chars().filter(|c| !c.is_control()).take(60).collect();
+        let line = format!("DX {freq_khz:.1} {call} {}", comment.trim()).trim_end().to_string();
+        let handle = inner.handle.as_ref().ok_or("not connected to a cluster")?;
+        handle.send(&line);
+        Ok(line)
     }
 
     fn emit_state(&self) {

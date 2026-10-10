@@ -290,6 +290,7 @@ fn router(state: Shared) -> Router {
         .route("/cluster", get(cluster_get).put(cluster_put))
         .route("/cluster/connect", post(cluster_connect))
         .route("/cluster/send", post(cluster_send))
+        .route("/cluster/spot", post(cluster_spot))
         .route("/qsl", get(qsl_get).put(qsl_put))
         .route("/propagation", get(propagation_get))
         .route("/qsl/qrz/test", post(qsl_test_qrz))
@@ -1546,6 +1547,21 @@ struct LineBody {
 async fn cluster_send(State(s): State<Shared>, Json(b): Json<LineBody>) -> ApiResult<()> {
     s.cluster.send(&b.line).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
     Ok(Json(()))
+}
+
+#[derive(Deserialize)]
+struct SpotBody {
+    call: String,
+    freq_khz: f64,
+    #[serde(default)]
+    comment: String,
+    /// When the QSO was made, Unix seconds.
+    qso_utc: i64,
+}
+
+async fn cluster_spot(State(s): State<Shared>, Json(b): Json<SpotBody>) -> ApiResult<serde_json::Value> {
+    let line = s.cluster.spot(&b.call, b.freq_khz, &b.comment, b.qso_utc).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(serde_json::json!({ "line": line })))
 }
 
 // ---- QSL services ----------------------------------------------------------

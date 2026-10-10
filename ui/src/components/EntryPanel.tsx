@@ -6,6 +6,9 @@ import { antennaForBand, hasBands } from "../antennas";
 import { fieldDef, freshValues, type EntryLayout, type ModeLayouts } from "../fields";
 import { localGet, localSet } from "../prefs";
 import QrzPageLink from "./QrzPageLink";
+import SpotDialog, { type SpotRequest } from "./SpotDialog";
+import { useSpotStatus } from "../spot";
+import { adifToUnix, spotBlocked } from "../spotCheck";
 import type { Equipment, Fields, Location, LookupResult, Radio } from "../types";
 import { adifDateTime } from "../util";
 import { isShortcut } from "../shortcuts";
@@ -85,6 +88,8 @@ export default function EntryPanel({ logId, stationCall, location, layout: baseL
   const [rstSent, setRstSent] = useState(choiceFor(prefs.mode).rst);
   const [rstRcvd, setRstRcvd] = useState(choiceFor(prefs.mode).rst);
   const [call, setCall] = useState("");
+  const [spotReq, setSpotReq] = useState<SpotRequest | null>(null);
+  const spotStatus = useSpotStatus();
   const [form, setForm] = useState<Fields>(() => freshValues(layout, prefs.last));
   const [lookupFill, setLookupFill] = useState<Fields>({});
   const [touched, setTouched] = useState<Set<string>>(new Set());
@@ -513,7 +518,21 @@ export default function EntryPanel({ logId, stationCall, location, layout: baseL
               title="Look the call up on QRZ and fill in the boxes that are still blank"
             >Fill from QRZ</button>
             <QrzPageLink call={call} />
+            {(() => {
+              // The DX transmits where we listen: the receive box in split, else the frequency box.
+              const khz = Number(freqRx || freq) * 1000;
+              const when = manualTime ? adifToUnix(manualDate.replaceAll("-", ""), manualClock.replace(":", "")) : Math.floor(Date.now() / 1000);
+              const why = spotBlocked(spotStatus, call, when) ?? (khz > 0 ? null : "Enter the frequency first");
+              return (
+                <button
+                  disabled={!!why}
+                  onClick={() => setSpotReq({ call: call.trim().toUpperCase(), freqKhz: khz, comment: choiceFor(mode).mode, qsoUtc: when ?? 0 })}
+                  title={why ?? "Tell the DX cluster you've worked this station on this frequency"}
+                >Spot…</button>
+              );
+            })()}
           </div>
+          {spotReq && <SpotDialog req={spotReq} onClose={() => setSpotReq(null)} />}
         </div>
       </div>
     </section>
