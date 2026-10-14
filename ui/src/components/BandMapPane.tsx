@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import type { PopContext } from "../bus";
-import { onLive, useInstances, useRadios } from "../live";
+import { followedRadio, onLive, useInstances, useRadios } from "../live";
 import { BANDS, MODE_GROUP_NAME, bandForFreq, modeGroup } from "../modes";
 import { localGet, localSet } from "../prefs";
 import type { FtxDecode, Spot } from "../types";
@@ -158,7 +158,8 @@ export default function BandMapPane({ ctx, act }: { ctx: PopContext; act: PaneAc
   }, []);
 
   // Which radio, band and centre.
-  const radio = radios.find((r) => r.key === ctx.radioKey && r.connected && r.freq_hz > 0) ?? null;
+  const followed = followedRadio(radios, ctx.radioKey);
+  const radio = followed && followed.connected && followed.freq_hz > 0 ? followed : null;
   const radioKhz = radio ? radio.freq_hz / 1000 : null;
   const radioBand = radio ? bandForFreq(radio.freq_hz / 1e6) ?? null : null;
   const following = !!radioBand && prefs.follow;
@@ -333,7 +334,7 @@ export default function BandMapPane({ ctx, act }: { ctx: PopContext; act: PaneAc
         ? `${radio.name} ${(radio.freq_hz / 1000).toFixed(2)} kHz`
         : `${radio.name} on ${radioBand}`
       : `${radio.name} is outside the ham bands`
-    : ctx.radioKey
+    : followed
       ? "Radio not connected"
       : "No radio selected";
 

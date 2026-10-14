@@ -1,5 +1,6 @@
 import { bandForFreq } from "../modes";
 import type { Radio } from "../types";
+import { followedRadio } from "../live";
 import { usePopup } from "./usePopup";
 
 /** 14074000 Hz as 14.074.000, the way a radio's display reads. */
@@ -45,7 +46,7 @@ const cls = (r: Radio) => `vfo${r.tx && r.connected ? " tx" : ""}${r.connected ?
 export default function VfoBar({ radios, radioKey, onRadio }: { radios: Radio[]; radioKey: string; onRadio: (key: string) => void }) {
   const { open, setOpen, box } = usePopup<HTMLDivElement>();
   if (!radios.length) return null;
-  const shown = radios.find((r) => r.key === radioKey) ?? radios.find((r) => r.connected) ?? radios[0];
+  const shown = followedRadio(radios, radioKey)!;
   const others = radios.filter((r) => r !== shown);
   const otherTx = others.some((r) => r.connected && r.tx);
   return (

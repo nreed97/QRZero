@@ -104,3 +104,12 @@ export function useIntegrations(): Integrations | null {
   useEffect(() => onLive((e) => e.type === "integrations" && setC(e.config)), []);
   return c;
 }
+
+/**
+ * The radio the QSO panel, the band map and the top bar follow: the one picked, else the first
+ * that is connected, else the first listed. Radio keys change when a rig is reconnected or a
+ * slice closes, and a stale pick must not leave the panel with no radio to tune.
+ */
+export function followedRadio(radios: Radio[], key: string): Radio | null {
+  return radios.find((r) => r.key === key) ?? radios.find((r) => r.connected) ?? radios[0] ?? null;
+}

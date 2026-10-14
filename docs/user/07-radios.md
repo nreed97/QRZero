@@ -16,7 +16,7 @@ A serial port can only be used by one program at a time. If WSJT-X or another pr
 
 ## Following a radio
 
-When radios are connected, the **Radio** box appears in the QSO panel's title bar. Pick a radio and the panel follows it: the frequency, band and mode change as you tune. While it follows a radio you control:
+When radios are connected, the **Radio** box appears in the QSO panel's title bar. Until you pick one, the panel follows the first connected radio (the one the top bar shows), and it goes back to that if the radio you picked is no longer listed. Pick a radio and the panel follows it: the frequency, band and mode change as you tune. While it follows a radio you control:
 
 - Typing a frequency and leaving the box tunes the radio.
 - Changing the mode sets the radio's mode (FT8, FT4 and other digital modes use the radio's USB data mode).

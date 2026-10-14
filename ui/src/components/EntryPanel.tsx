@@ -8,6 +8,7 @@ import { localGet, localSet } from "../prefs";
 import QrzPageLink from "./QrzPageLink";
 import SpotDialog, { type SpotRequest } from "./SpotDialog";
 import { useSpotStatus } from "../spot";
+import { followedRadio } from "../live";
 import { useLookupSettings } from "../lookupSettings";
 import { adifToUnix, spotBlocked } from "../spotCheck";
 import type { Equipment, Fields, Location, LookupResult, Radio } from "../types";
@@ -134,7 +135,7 @@ export default function EntryPanel({ logId, stationCall, location, layout: baseL
 
   const visibleKeys = useMemo(() => new Set(layout.rows.flat().map((i) => i.key)), [layout]);
   const byKind = (kind: string) => equipment.filter((e) => e.kind === kind);
-  const radio = radios.find((r) => r.key === radioKey) ?? null;
+  const radio = followedRadio(radios, radioKey);
   const antennas = byKind("antenna");
   // Auto is offered once an antenna has bands, and is then the default.
   const canAutoAnt = antennas.some((a) => hasBands(a.fields));
