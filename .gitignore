@@ -1,8 +1,0 @@
-/target
-node_modules/
-/ui/dist/
-*.db
-*.db-wal
-*.db-shm
-.DS_Store
-/src-tauri/gen/
