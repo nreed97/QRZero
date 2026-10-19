@@ -26,6 +26,24 @@ function markRoot(f: FrameInfo) {
 }
 markRoot(info());
 
+/** Input types that hold text, where the webview's own menu (cut, copy, paste) is useful. */
+const NO_TEXT = ["checkbox", "radio", "button", "submit", "reset", "range", "color", "file", "image"];
+
+/**
+ * In the desktop app, right-clicking where QRZero has no menu of its own would open the webview's
+ * browser menu (Back, Reload...). Hide it there, but keep it in text fields and over selected text.
+ * In a browser nothing changes.
+ */
+export function hideBrowserMenu() {
+  if (!info().supported) return;
+  window.addEventListener("contextmenu", (e) => {
+    const t = e.target;
+    const text = t instanceof HTMLTextAreaElement || (t instanceof HTMLInputElement && !NO_TEXT.includes(t.type)) || (t instanceof HTMLElement && t.isContentEditable);
+    if (text || window.getSelection()?.toString()) return;
+    e.preventDefault();
+  });
+}
+
 /** The address parameters that give a new window this window's frame. */
 export function frameParams(): [string, string][] {
   const f = info();

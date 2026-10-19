@@ -26,6 +26,8 @@ Close the window, or click **Dock back** (the arrow-into-a-box icon in its title
 
 In the desktop app, the **Always on top** button (the pin icon) in a pop-out's title bar keeps that window above your other windows (handy for a logging form over a full-screen radio program). The pin is highlighted while it is on. It affects only that window, and QRZero remembers the setting for each pane. A browser tab can't do this, so the button is not shown there.
 
+In the desktop app, right-clicking where QRZero has no menu of its own does nothing, rather than showing a web browser's Back and Reload menu. Text boxes keep their Cut, Copy and Paste menu, and so does selected text. In a browser you get the browser's usual menu.
+
 In a web browser, allow pop-ups for QRZero's page, or the window can't open.
 
 ## Frameless windows
