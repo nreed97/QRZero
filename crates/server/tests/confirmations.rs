@@ -206,7 +206,9 @@ async fn confirmations_awards_and_paper_cards() {
     assert!(has_cell(&verified, "291", "mixed", "confirmed"), "{verified}");
     assert!(has_cell(&verified, "339", "20m", "confirmed"), "{verified}");
     let was = api.get(&format!("/logs/{log}/awards/was?lotw=true&unworked=true&verified=true")).await;
-    assert!(has_cell(&was, "CT", "mixed", "confirmed"), "{was}");
+    // WAS credit (Mixed) is verified too; the band cell stays a plain confirmation.
+    assert!(has_cell(&was, "CT", "mixed", "verified"), "{was}");
+    assert!(has_cell(&was, "CT", "20m", "confirmed"), "{was}");
     // The credit sync asks LoTW for everything again; nothing changes here.
     let c = api.post("/qsl/download/lotw-credit", json!(null)).await;
     assert_eq!((c["received"].as_u64(), c["confirmed"].as_u64(), c["error"].as_str()), (Some(1), Some(0), None), "{c}");

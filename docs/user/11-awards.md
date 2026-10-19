@@ -14,7 +14,15 @@ The **Awards** pane, a tab next to the log to start with, shows how far you are 
 
 - **SKCC** and **CWops**: the CW club awards, described under **CW club awards** below. They have their own buttons next to the others.
 
-On the **DXCC** tab a short line under the toolbar shows the **Challenge** (confirmed/worked entity-band slots on 160 to 6 m, not counting 60 m; 1000 are needed) and **5BDXCC** (the entities confirmed on each of 80, 40, 20, 15 and 10 m; the award needs 100 on every one of the five). Hover the line for the full wording.
+Some tabs have a short line under the toolbar for the awards built on the table. Hover the line for the full wording.
+
+- **DXCC**: the **Challenge** (confirmed/worked entity-band slots on 160 to 6 m, not counting 60 m; 1000 are needed), **5BDXCC** (the entities confirmed on each of 80, 40, 20, 15 and 10 m; the award needs 100 on every one of the five) and the **Honor Roll** (current entities confirmed for Mixed, CW, Phone and Digital, with the number the Honor Roll needs, all but 9 of the current entities, in brackets; #1 needs every one). With **Show V** on, the verified count is shown beside each, since ARRL counts the credit it has granted.
+- **WAS**: **5BWAS** (states confirmed on each of the five bands, 50 on each) and **Triple Play** (states confirmed on CW, Phone and Digital, and on all three). Triple Play only takes LoTW confirmations of QSOs from 1 January 2009, so it counts those whatever is ticked under **Confirmed by**.
+- **WAZ**: **5BWAZ** (zone-band slots confirmed on the five bands, 150 for the award and 200 for all 40 zones on each band), then the count for each band.
+
+## Deleted entities
+
+QSOs with a deleted DXCC entity in their DXCC field (for example 229, the German Democratic Republic) appear on the DXCC tab marked *(deleted)*. They count toward the DXCC totals, as they do on ARRL's standings, and the top right says how many there are. The Honor Roll counts current entities only, and the **of 340** is the number of current entities. The country file never gives a QSO a deleted entity, so these only come from logs imported with their DXCC field.
 
 Each row is an entity, state, zone, prefix and so on. The columns are **Mixed**, then **CW**, **Phone** and **Digital**, then each band from 160 m to 6 m (60 m included), plus 2 m and 70 cm. A green **V** on a shaded cell means verified, a green **C** means confirmed and an amber **W** means worked but not yet confirmed. Use **Columns** in the toolbar to hide the modes and bands you don't chase (for example 2 m and 70 cm for DXCC); the choice is kept separately for each award, and only changes what is shown, not any total. The second header row shows confirmed and worked totals for each column, and the top right shows the overall total.
 
@@ -34,14 +42,14 @@ Tick the sources that count under **Confirmed by**:
 
 ## Verified
 
-**V** is a step above **C** and applies to **DXCC** only: LoTW has granted DXCC credit for that QSO. It is optional. Turn it on under **Settings…**, **Awards**, **Show V (verified)**; until then every LoTW confirmation shows as C.
+**V** is a step above **C** and applies to **DXCC** and **WAS**: LoTW has granted that award's credit for the QSO. It is optional. Turn it on under **Settings…**, **Awards**, **Show V (verified)**; until then every LoTW confirmation shows as C.
 
 Credit comes from the QSO's **CREDIT_GRANTED** field (and LoTW's `APP_LoTW_CREDIT_GRANTED`). Two ways to fill it:
 
 - With the option on, **QSL**, **LoTW** gets a **Download verified credit** button. It downloads all your LoTW confirmations again and stores the credit LoTW lists on them. Run it once, then normal confirmation downloads keep the credit up to date for new confirmations. It needs your LoTW website login.
 - Import an ADIF file that already has CREDIT_GRANTED (for example from another logger). QSOs already in your log are skipped by an import, so use this for new QSOs.
 
-Each cell is V when a credited QSO falls in that cell; a cell with only plain confirmations stays C. LoTW says whether the credit was for Mixed, a mode or a band, and only those cells turn V. Verified cells count as confirmed, and the top right adds a verified total. Credit is shown whichever sources are ticked under **Confirmed by**.
+Each cell is V when a credited QSO falls in that cell; a cell with only plain confirmations stays C. LoTW says whether the credit was for Mixed, a mode or a band, and only those cells turn V. Credit from eQSL's eWAS doesn't count. Verified cells count as confirmed, and the top right adds a verified total. Credit is shown whichever sources are ticked under **Confirmed by**.
 
 ## Finding what you need
 

@@ -3,9 +3,9 @@ import { localGet, localSet, onLocalPrefsLoaded } from "./prefs";
 
 /** Every award QRZero tracks, in the order the Awards pane lists them. */
 export const AWARD_LIST: { key: string; name: string; what: string; group: "main" | "cw" }[] = [
-  { key: "dxcc", name: "DXCC", what: "Entities, plus the Challenge and 5BDXCC", group: "main" },
-  { key: "was", name: "WAS", what: "The 50 US states", group: "main" },
-  { key: "waz", name: "WAZ", what: "The 40 CQ zones", group: "main" },
+  { key: "dxcc", name: "DXCC", what: "Entities, plus the Challenge, 5BDXCC and Honor Roll", group: "main" },
+  { key: "was", name: "WAS", what: "The 50 US states, plus 5BWAS and Triple Play", group: "main" },
+  { key: "waz", name: "WAZ", what: "The 40 CQ zones, plus 5BWAZ", group: "main" },
   { key: "wpx", name: "WPX", what: "Callsign prefixes", group: "main" },
   { key: "wac", name: "WAC", what: "The six continents", group: "main" },
   { key: "itu", name: "ITU", what: "The 90 ITU zones", group: "main" },

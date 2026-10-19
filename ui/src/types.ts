@@ -272,9 +272,12 @@ export interface QslSecrets { qrz_keys?: Record<string, string>; clublog_passwor
 export type AwardKind = "dxcc" | "was" | "waz" | "wpx" | "wac" | "itu" | "vucc" | "iota" | "counties";
 export type AwardStatus = "worked" | "confirmed" | "verified";
 export type HintStatus = "new" | "worked" | "confirmed";
-export interface AwardRow { key: string; name: string; cells: Record<string, AwardStatus> }
+/** `deleted`: a deleted DXCC entity, which counts toward DXCC totals but not the Honor Roll. */
+export interface AwardRow { key: string; name: string; cells: Record<string, AwardStatus>; deleted?: boolean }
 export interface AwardColumn { key: string; worked: number; confirmed: number; verified: number }
-export interface AwardTable { award: AwardKind; columns: AwardColumn[]; rows: AwardRow[]; total: number }
+/** WAS Triple Play: states confirmed through LoTW on each mode group since 2009, and on all three. */
+export interface TriplePlay { cw: number; phone: number; digital: number; all: number }
+export interface AwardTable { award: AwardKind; columns: AwardColumn[]; rows: AwardRow[]; total: number; triple_play?: TriplePlay }
 /** One CWT hour: QSOs logged, different call-and-band contacts (what counts), QSOs just outside the hour. */
 export interface CwtSession { date: string; hour: number; qsos: number; contacts: number; near: number; point: boolean }
 export interface CwtYear { year: number; sessions: number; points: number; extra: number; medal: string; next: number; detail: CwtSession[] }

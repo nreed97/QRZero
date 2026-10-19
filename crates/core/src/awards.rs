@@ -79,6 +79,10 @@ pub struct AwardQso {
     /// For DXCC credit, the columns the credit was granted for (bit per [`COLUMNS`] entry), when
     /// LoTW said (Mixed, a mode group or a band). `None`: every column the QSO fills.
     pub credit_cols: Option<u32>,
+    /// The same for WAS credit.
+    pub was_credit_cols: Option<u32>,
+    /// QSO start, Unix seconds (0 when unknown).
+    pub time_on: i64,
     /// QSO row id, so the UI can list QSOs for a cell.
     pub id: i64,
 }
@@ -87,6 +91,26 @@ pub struct AwardQso {
 /// `DXCC_MODE`) and LoTW's APP_LOTW_CREDIT_GRANTED (`DXCC-20`, `DXCC-CW`, `DXCC-M-HR`...), given the
 /// QSO's own mode and band. `None` when neither names DXCC credit.
 pub fn dxcc_credit_cols(
+    credit: &str,
+    app_credit: &str,
+    mode: Option<&str>,
+    band: Option<&str>,
+) -> Option<u32> {
+    credit_cols("DXCC", credit, app_credit, mode, band)
+}
+
+/// Like [`dxcc_credit_cols`], for WAS (`WAS`, `WAS_BAND`, `WAS_MODE`, `WAS-20`...).
+pub fn was_credit_cols(
+    credit: &str,
+    app_credit: &str,
+    mode: Option<&str>,
+    band: Option<&str>,
+) -> Option<u32> {
+    credit_cols("WAS", credit, app_credit, mode, band)
+}
+
+fn credit_cols(
+    award: &str,
     credit: &str,
     app_credit: &str,
     mode: Option<&str>,
@@ -108,16 +132,16 @@ pub fn dxcc_credit_cols(
             .to_ascii_uppercase()
             .as_str()
         {
-            "DXCC" => add(Some(0)),
-            "DXCC_BAND" => add(band.and_then(band_col)),
-            "DXCC_MODE" => add(mode.and_then(mode_col)),
-            n if n.starts_with("DXCC") => add(None),
+            n if n == award => add(Some(0)),
+            n if n.strip_prefix(award) == Some("_BAND") => add(band.and_then(band_col)),
+            n if n.strip_prefix(award) == Some("_MODE") => add(mode.and_then(mode_col)),
+            n if n.starts_with(award) => add(None),
             _ => {}
         }
     }
     for part in app_credit.split(',') {
         let name = part.trim().to_ascii_uppercase();
-        let Some(rest) = name.strip_prefix("DXCC-") else {
+        let Some(rest) = name.strip_prefix(award).and_then(|r| r.strip_prefix('-')) else {
             continue;
         };
         let rest = rest.strip_suffix("-HR").unwrap_or(rest);
@@ -141,7 +165,9 @@ pub fn credit_mask(credit: &str) -> u16 {
     let mut mask = 0;
     for part in credit.split(',') {
         let name = part.split(':').next().unwrap_or("").trim().to_ascii_uppercase();
-        let award = if name.contains("DXCC") {
+        let award = if name.starts_with("EWAS") {
+            continue;
+        } else if name.contains("DXCC") {
             Award::Dxcc
         } else if name.contains("WAS") {
             Award::Was
@@ -188,6 +214,8 @@ impl AwardQso {
         let mode = get("SUBMODE").or(get("MODE")).map(str::to_ascii_uppercase);
         AwardQso {
             credit_cols: dxcc_credit_cols(credit, app_credit, mode.as_deref(), band.as_deref()),
+            was_credit_cols: was_credit_cols(credit, app_credit, mode.as_deref(), band.as_deref()),
+            time_on: get("QSO_DATE").and_then(|d| crate::store::parse_time(d, get("TIME_ON").unwrap_or("0000"))).unwrap_or(0),
             band,
             mode,
             dxcc: dxcc.or(facts.dxcc),
@@ -223,6 +251,9 @@ pub struct Row {
     pub key: String,
     pub name: String,
     pub cells: BTreeMap<String, Status>,
+    /// A deleted DXCC entity: it counts toward the DXCC total but not the Honor Roll.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub deleted: bool,
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
@@ -241,6 +272,95 @@ pub struct AwardTable {
     pub rows: Vec<Row>,
     /// How many exist to work (340 DXCC, 50 WAS, 40 WAZ, 90 ITU, 6 WAC, 3077 counties); 0 where open-ended.
     pub total: usize,
+    /// WAS only: the WAS Triple Play count.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub triple_play: Option<TriplePlay>,
+}
+
+/// WAS Triple Play: states confirmed through LoTW on CW, Phone and Digital, from QSOs on
+/// or after 2009-01-01, whatever sources the rest of the table counts.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub struct TriplePlay {
+    pub cw: usize,
+    pub phone: usize,
+    pub digital: usize,
+    /// States confirmed on all three.
+    pub all: usize,
+}
+
+/// 2009-01-01 00:00 UTC, the first day that counts for WAS Triple Play.
+const TRIPLE_PLAY_FROM: i64 = 1_230_768_000;
+
+/// Deleted DXCC entities (ADIF entity code, name). They count toward DXCC totals but not
+/// the Honor Roll, and the country file doesn't list them.
+pub const DELETED_DXCC: [(u32, &str); 62] = [
+    (2, "Abu Ail Is."),
+    (8, "Aldabra"),
+    (19, "Bajo Nuevo"),
+    (23, "Blenheim Reef"),
+    (25, "British North Borneo"),
+    (26, "British Somaliland"),
+    (28, "Canal Zone"),
+    (30, "Celebe & Molucca Is."),
+    (39, "Comoros"),
+    (42, "Damao, Diu"),
+    (44, "Desroches"),
+    (55, "Farquhar"),
+    (57, "French Equatorial Africa"),
+    (58, "French Indo-China"),
+    (59, "French West Africa"),
+    (67, "French India"),
+    (68, "Kuwait/Saudi Arabia Neutral Zone"),
+    (81, "Germany"),
+    (85, "Bonaire, Curacao"),
+    (93, "Geyser Reef"),
+    (101, "Goa"),
+    (102, "Gold Coast, Togoland"),
+    (113, "Ifni"),
+    (115, "Italian Somaliland"),
+    (119, "Java"),
+    (127, "Kamaran Is."),
+    (128, "Karelo-Finnish Republic"),
+    (134, "Kingman Reef"),
+    (139, "Kuria Muria I."),
+    (151, "Malyj Vysotskij I."),
+    (154, "Yemen Arab Republic"),
+    (155, "Malaya"),
+    (164, "Manchuria"),
+    (178, "Minerva Reef"),
+    (183, "Netherlands Borneo"),
+    (184, "Netherlands New Guinea"),
+    (186, "Newfoundland, Labrador"),
+    (193, "Okinawa (Ryukyu Is.)"),
+    (194, "Okino Tori-shima"),
+    (196, "Palestine"),
+    (198, "Papua Territory"),
+    (200, "Portuguese Timor"),
+    (208, "Ruanda-Urundi"),
+    (210, "Saar"),
+    (218, "Czechoslovakia"),
+    (220, "Sarawak"),
+    (226, "Saudi Arabia/Iraq Neutral Zone"),
+    (228, "Serrana Bank & Roncador Cay"),
+    (229, "German Democratic Republic"),
+    (231, "Sikkim"),
+    (243, "People's Democratic Rep. of Yemen"),
+    (244, "Southern Sudan"),
+    (255, "St. Maarten, Saba, St. Eustatius"),
+    (258, "Sumatra"),
+    (261, "Swan Is."),
+    (264, "Tangier"),
+    (267, "Territory of New Guinea"),
+    (268, "Tibet"),
+    (271, "Trieste"),
+    (307, "Zanzibar"),
+    (488, "Walvis Bay"),
+    (493, "Penguin Is."),
+];
+
+/// The name of a deleted DXCC entity, or `None` for a current (or unknown) one.
+pub fn deleted_dxcc(dxcc: u32) -> Option<&'static str> {
+    DELETED_DXCC.iter().find(|(d, _)| *d == dxcc).map(|(_, n)| *n)
 }
 
 /// Bands that get their own column, in display order.
@@ -551,6 +671,8 @@ pub struct Tally {
     names: BTreeMap<String, String>,
     nums: HashMap<u32, Cells>,
     texts: HashMap<String, Cells>,
+    /// WAS only: per state, LoTW confirmations since 2009 as bits for CW, Phone and Digital.
+    triple: HashMap<u32, u8>,
 }
 
 impl Tally {
@@ -566,6 +688,7 @@ impl Tally {
             names,
             nums: HashMap::new(),
             texts: HashMap::new(),
+            triple: HashMap::new(),
         }
     }
 
@@ -583,13 +706,18 @@ impl Tally {
         } else {
             1
         };
-        // Only DXCC has verified credit; it says which columns the credit was granted for.
-        let credited = self.verified && self.award == Award::Dxcc && q.credit & (1 << self.award as usize) != 0;
-        let cols = if self.award == Award::Dxcc {
-            q.credit_cols
-        } else {
-            None
+        // DXCC and WAS have verified credit; it says which columns the credit was granted for.
+        let cols = match self.award {
+            Award::Dxcc => q.credit_cols,
+            Award::Was => q.was_credit_cols,
+            _ => None,
         };
+        let credited = self.verified && matches!(self.award, Award::Dxcc | Award::Was) && q.credit & (1 << self.award as usize) != 0;
+        if let (Award::Was, RowId::Num(n), true) = (self.award, &id, q.lotw && q.time_on >= TRIPLE_PLAY_FROM) {
+            if let Some(i) = q.mode.as_deref().and_then(mode_col) {
+                *self.triple.entry(*n).or_default() |= 1 << (i - COL_CW);
+            }
+        }
         let value = |i: usize| {
             if credited && cols.is_none_or(|m| m >> i & 1 == 1) {
                 3
@@ -613,6 +741,10 @@ impl Tally {
 
     pub fn finish(self, include_unworked: bool) -> AwardTable {
         let award = self.award;
+        let triple_play = (award == Award::Was).then(|| {
+            let has = |bit: u8| self.triple.values().filter(|b| *b & bit != 0).count();
+            TriplePlay { cw: has(1), phone: has(2), digital: has(4), all: self.triple.values().filter(|b| **b == 7).count() }
+        });
         let names = self.names;
         let mut entries: Vec<(String, Cells)> = self
             .nums
@@ -647,7 +779,11 @@ impl Tally {
         let mut rows: Vec<Row> = entries
             .into_iter()
             .map(|(key, cells)| {
-                let name = names.get(&key).cloned().unwrap_or_else(|| default_name(award, &key));
+                let gone = match award {
+                    Award::Dxcc if !names.contains_key(&key) => key.parse().ok().and_then(deleted_dxcc),
+                    _ => None,
+                };
+                let name = names.get(&key).cloned().or(gone.map(str::to_string)).unwrap_or_else(|| default_name(award, &key));
                 let mut map = BTreeMap::new();
                 for (i, &v) in cells.iter().enumerate() {
                     if v == 0 {
@@ -667,7 +803,7 @@ impl Tally {
                     };
                     map.insert(COLUMNS[i].to_string(), status);
                 }
-                Row { key, name, cells: map }
+                Row { key, name, cells: map, deleted: gone.is_some() }
             })
             .collect();
 
@@ -696,6 +832,7 @@ impl Tally {
             columns,
             rows,
             total,
+            triple_play,
         }
     }
 }
@@ -987,6 +1124,45 @@ mod tests {
         assert_eq!((col("20m").confirmed, col("20m").verified), (1, 0));
         assert_eq!(tab.rows[0].cells.get("40m"), Some(&Status::Verified));
         assert_eq!(tab.rows[0].cells.get("20m"), Some(&Status::Confirmed));
+    }
+
+    #[test]
+    fn was_credit_and_triple_play() {
+        assert_eq!(credit_mask("EWAS"), 0, "eWAS is eQSL's award, not ARRL's");
+        let bit = |c: &str| 1u32 << COLUMNS.iter().position(|x| *x == c).unwrap();
+        assert_eq!(was_credit_cols("WAS_BAND,DXCC", "", Some("CW"), Some("20m")), Some(bit("20m")));
+        assert_eq!(was_credit_cols("DXCC", "", Some("CW"), Some("20m")), None);
+        let mut t = Tally::new(Award::Was, Counts { paper: true, ..Counts::default() }, BTreeMap::new()).with_verified(true);
+        let jan_2009 = TRIPLE_PLAY_FROM;
+        let was = |state: &str, band: &str, mode: &str| AwardQso { state: Some(state.into()), dxcc: Some(291), ..q("K1ABC", band, mode) };
+        // CT on all three modes through LoTW since 2009; the CW one is also WAS-credited on 20 m.
+        t.add(&AwardQso { lotw: true, time_on: jan_2009, credit: credit_mask("WAS_BAND"), was_credit_cols: Some(bit("20m")), ..was("CT", "20m", "CW") });
+        t.add(&AwardQso { lotw: true, time_on: jan_2009 + 60, ..was("CT", "40m", "SSB") });
+        t.add(&AwardQso { lotw: true, time_on: jan_2009, ..was("CT", "40m", "FT8") });
+        // OH: CW before 2009, and a card on phone, so neither counts for Triple Play.
+        t.add(&AwardQso { lotw: true, time_on: jan_2009 - 1, ..was("OH", "20m", "CW") });
+        t.add(&AwardQso { paper: true, time_on: jan_2009, ..was("OH", "20m", "SSB") });
+        let tab = t.finish(false);
+        assert_eq!(tab.triple_play, Some(TriplePlay { cw: 1, phone: 1, digital: 1, all: 1 }));
+        let ct = tab.rows.iter().find(|r| r.key == "CT").unwrap();
+        assert_eq!((ct.cells["20m"], ct.cells["cw"]), (Status::Verified, Status::Worked), "only the credited column is verified");
+        let oh = tab.rows.iter().find(|r| r.key == "OH").unwrap();
+        assert_eq!(oh.cells["phone"], Status::Confirmed);
+        assert_eq!(Tally::new(Award::Waz, Counts::default(), BTreeMap::new()).finish(false).triple_play, None);
+    }
+
+    #[test]
+    fn deleted_entities_are_named_and_flagged() {
+        assert_eq!(DELETED_DXCC.len(), 62);
+        let names = BTreeMap::from([("291".to_string(), "United States".to_string())]);
+        let mut t = Tally::new(Award::Dxcc, Counts::default(), names);
+        t.add(&AwardQso { dxcc: Some(229), ..q("DM2ABC", "20m", "CW") });
+        t.add(&AwardQso { dxcc: Some(291), ..q("K1ABC", "20m", "CW") });
+        let tab = t.finish(true);
+        let gdr = tab.rows.iter().find(|r| r.key == "229").unwrap();
+        assert_eq!((gdr.name.as_str(), gdr.deleted), ("German Democratic Republic", true));
+        assert!(!tab.rows.iter().find(|r| r.key == "291").unwrap().deleted);
+        assert_eq!(tab.total, 1, "deleted entities don't add to the number there is to work");
     }
 
     #[test]

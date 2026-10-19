@@ -602,7 +602,7 @@ impl Store {
         let marks = vec!["?"; callsigns.len()].join(", ");
         let calls = if callsigns.is_empty() { String::new() } else { format!(" AND station_callsign IN ({marks})") };
         let mut stmt = self.conn.prepare(&format!(
-            "SELECT id, call, band, IFNULL(submode, mode), dxcc, fields FROM qsos WHERE log_id = ?{calls}"
+            "SELECT id, call, band, IFNULL(submode, mode), dxcc, fields, time_on FROM qsos WHERE log_id = ?{calls}"
         ))?;
         let mut args: Vec<Value> = vec![log_id.into()];
         args.extend(callsigns.iter().map(|c| Value::from(c.to_ascii_uppercase())));
@@ -675,6 +675,8 @@ impl Store {
                 q.mode.as_deref(),
                 q.band.as_deref(),
             );
+            q.was_credit_cols = crate::awards::was_credit_cols(credit, app_credit, q.mode.as_deref(), q.band.as_deref());
+            q.time_on = r.get(6)?;
             f(&q);
         }
         Ok(())

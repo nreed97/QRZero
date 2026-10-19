@@ -771,7 +771,9 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // A QSO LoTW granted DXCC credit for shows V instead of C.
   await page.request.post(`/api/logs/${logId}/import`, {
     headers,
-    data: Buffer.from(["<EOH>", cwQso("VK9XX", "20240210", "090000", { DXCC: "35", LOTW_QSL_RCVD: "Y", CREDIT_GRANTED: "DXCC,DXCC_BAND" }), cwQso("ZL1ABC", "20240210", "091000", { DXCC: "170", LOTW_QSL_RCVD: "Y" })].join("\n")),
+    data: Buffer.from(["<EOH>", cwQso("VK9XX", "20240210", "090000", { DXCC: "35", LOTW_QSL_RCVD: "Y", CREDIT_GRANTED: "DXCC,DXCC_BAND" }), cwQso("ZL1ABC", "20240210", "091000", { DXCC: "170", LOTW_QSL_RCVD: "Y" }),
+      // A deleted entity, and a state and zone confirmed through LoTW for the WAS and WAZ summaries.
+      cwQso("DM2AAA", "19850101", "120000", { DXCC: "229" }), cwQso("W1AW", "20240210", "092000", { DXCC: "291", STATE: "CT", CQZ: "5", LOTW_QSL_RCVD: "Y" })].join("\n")),
   });
   await page.getByRole("button", { name: "DXCC", exact: true }).click();
   // Verified is optional: off, the credited QSO is just confirmed.
@@ -792,7 +794,21 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.locator(".award-table td.confirmed").first()).toHaveText("C");
   // 5BDXCC counts entities per band, as the award needs 100 on each.
   await expect(page.locator(".ftx-msg", { hasText: "5BDXCC" })).toContainText(/80m \d+ · 40m \d+ · 20m \d+ · 15m \d+ · 10m \d+/);
+  // Deleted entities count toward the total but are marked, and the Honor Roll counts only current ones.
+  await expect(page.locator(".award-table tr", { hasText: "German Democratic Republic" })).toContainText("(deleted)");
+  await expect(page.locator(".award-score")).toContainText("1 deleted");
+  await expect(page.locator(".ftx-msg", { hasText: "Honor Roll" })).toContainText(/Mixed \d+ \(\d+ V\) · CW \d+/);
   await page.screenshot({ path: "e2e-results/awards-verified.png" });
+  await page.getByRole("button", { name: "WAS", exact: true }).click();
+  await expect(page.locator(".ftx-msg", { hasText: "Triple Play" })).toContainText("CW 1 · Phone 0 · Digital 0 (all three 0)");
+  await expect(page.locator(".ftx-msg", { hasText: "5BWAS" })).toContainText(/20m [1-9]/);
+  await page.screenshot({ path: "e2e-results/awards-was.png" });
+  await page.getByRole("button", { name: "WAZ", exact: true }).click();
+  await expect(page.locator(".ftx-msg", { hasText: "5BWAZ" })).toContainText(/5BWAZ [1-9]\d* \(150\) · 80m \d+ · 40m \d+ · 20m [1-9]/);
+  await page.screenshot({ path: "e2e-results/awards-waz.png" });
+  await page.getByRole("button", { name: "DXCC", exact: true }).click();
+  await expect(page.locator(".ftx-msg", { hasText: "Honor Roll" })).toBeVisible();
+  await page.screenshot({ path: "e2e-results/awards-dxcc.png" });
   await page.getByRole("button", { name: "SKCC" }).click();
   const centurion = page.locator(".club-table tbody tr", { hasText: "Centurion" }).first();
   await expect(centurion).toContainText("100");
