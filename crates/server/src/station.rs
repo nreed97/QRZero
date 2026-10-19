@@ -426,6 +426,8 @@ pub struct Hub {
     pub(crate) updates: crate::updates::Updates,
     /// The user's own UDP connections and relays.
     pub(crate) udp: Arc<crate::udp_out::Outputs>,
+    /// Push alerts through ntfy.
+    pub(crate) notify: Arc<crate::notify::Notify>,
     /// Where auto-logged QSOs go to be looked up: (log id, QSO id, call).
     auto_lookup: Mutex<Option<tokio::sync::mpsc::UnboundedSender<(i64, i64, String)>>>,
 }
@@ -454,7 +456,16 @@ impl Hub {
         let dxped = crate::dxped::saved(|k| store.lock().unwrap_or_else(|p| p.into_inner()).get_setting(k).ok().flatten());
         let mostwanted = crate::mostwanted::saved(|k| store.lock().unwrap_or_else(|p| p.into_inner()).get_setting(k).ok().flatten());
         let contests = crate::contests::saved(|k| store.lock().unwrap_or_else(|p| p.into_inner()).get_setting(k).ok().flatten());
-        let hub = Arc::new(Hub { store, data_dir, events, inner: Mutex::default(), cty: RwLock::default(), watch, dxped, mostwanted, contests, updates: crate::updates::Updates::new(), udp, auto_lookup: Mutex::default() });
+        let ntfy = store
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .get_setting(crate::notify::SETTING_KEY)
+            .ok()
+            .flatten()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default();
+        let notify = Arc::new(crate::notify::Notify::new(ntfy));
+        let hub = Arc::new(Hub { store, data_dir, events, inner: Mutex::default(), cty: RwLock::default(), watch, dxped, mostwanted, contests, updates: crate::updates::Updates::new(), udp, notify, auto_lookup: Mutex::default() });
         if let Err(e) = hub.load_cty_file() {
             tracing::info!("no country file yet: {e}");
         }
@@ -1461,8 +1472,14 @@ impl Hub {
     /// Alerts for a watched station (at most once per ten minutes per call and band).
     pub(crate) fn watch_hit(&self, entry_id: u64, s: &crate::watch::Sighting) {
         if let Some(hit) = self.watch.record(entry_id, s, chrono::Utc::now().timestamp()) {
-            self.emit(json!({"type": "watch_hit", "hit": hit}));
+            self.alert_watch(&hit);
         }
+    }
+
+    /// Shows a watch list or DXpedition alert, and pushes it through ntfy when that is on.
+    pub(crate) fn alert_watch(&self, hit: &crate::watch::WatchHit) {
+        self.emit(json!({"type": "watch_hit", "hit": hit}));
+        self.notify.watch(hit);
     }
 
     /// Notes a cluster spot of a listed DXpedition, and alerts when it would be new for the log.
@@ -1470,7 +1487,7 @@ impl Hub {
         let now = chrono::Utc::now().timestamp();
         if let Some((label, note)) = self.dxped.on_spot(self, s, dxcc, now) {
             if let Some(hit) = self.watch.record_other(label, note, s, now) {
-                self.emit(json!({"type": "watch_hit", "hit": hit}));
+                self.alert_watch(&hit);
             }
         }
     }

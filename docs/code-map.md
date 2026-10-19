@@ -40,6 +40,7 @@ Search tip: each Rust module starts with a `//!` doc comment saying what it is, 
 - The live station (rig connections, WSJT-X/N1MM/Pst over UDP, event stream): `station.rs`.
 - Cluster connection and spot flagging: `cluster.rs`. Watch list: `watch.rs`.
 - Online uploads and QSL queues: `qsl.rs`. Label printing: `label.rs`.
+- Push alerts through ntfy (needed spots, watch list, DXpeditions): `notify.rs`.
 - Custom UDP connections and relay: `udp_out.rs`. Programs started with QRZero: `startup.rs`.
 - Backups API: `backups.rs`. Update check: `updates.rs`.
 - Feeds: `propagation.rs`, `contests.rs`, `dxped.rs`, `mostwanted.rs` (Club Log Most Wanted ranks).

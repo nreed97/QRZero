@@ -294,8 +294,9 @@ impl Cluster {
                     spot
                 };
                 hub.emit(json!({"type": "spot", "spot": spot}));
+                hub.notify.spot(&spot, spot.received);
                 if let Some(hit) = hit {
-                    hub.emit(json!({"type": "watch_hit", "hit": hit}));
+                    hub.alert_watch(&hit);
                 }
             }
         }

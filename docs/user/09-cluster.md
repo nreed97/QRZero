@@ -46,6 +46,8 @@ In **Settings**, **DX cluster**, under **Alerts for needed spots** (the **Alerts
 
 The popups and the sound come from the main window only, so pop-out windows don't repeat them.
 
+To get alerts on your phone as well, see [Push alerts (ntfy)](20-alerts.md).
+
 ## Spotting a station you worked
 
 To tell the cluster you worked someone, click **Spot…** in the QSO panel, or right-click the QSO in the log and choose **Spot … to the cluster…**. A box shows the frequency and a comment that you can change, and the exact line that will be sent. Nothing goes out until you click **Send spot**, and the box closes once the spot is sent. If the cluster refuses it, the box stays open with the reason so you can try again.

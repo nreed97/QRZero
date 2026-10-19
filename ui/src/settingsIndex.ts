@@ -45,6 +45,7 @@ export const SETTING_ENTRIES: SettingEntry[] = [
   E("cluster", "Show a popup", "alert needed spot tune"),
   E("cluster", "Commands after login", "cluster node telnet password"),
   E("awards", "CW club awards", "skcc cwops naqcc fists"),
+  E("alerts", "Send alerts through ntfy", "ntfy push phone notification alert topic"),
   E("awards", "Spot flags", "needed spots cluster band map goals chase new band mode unconfirmed waz wpx iota zone prefix"),
   E("awards", "DX Marathon alerts", "marathon cq country zone this year spot flag alert"),
   ...AWARD_LIST.map((a) => E("awards", a.name, `award hide show ${a.what}`)),

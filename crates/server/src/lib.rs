@@ -28,6 +28,7 @@ use serde_json::json;
 mod backups;
 mod label;
 mod cluster;
+mod notify;
 mod propagation;
 mod qsl;
 mod startup;
@@ -175,6 +176,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
         });
     }
     let cluster = Cluster::new(&hub);
+    hub.notify.set_token(secrets::get(&store.lock().unwrap_or_else(|p| p.into_inner()), &cfg.secret_service, notify::TOKEN_SECRET).ok().flatten());
     let qsl = Qsl::new(store.clone(), hub.clone(), cfg.secret_service.clone(), cfg.data_dir.clone(), cfg.qsl_endpoints);
     qsl.start();
     let startup = startup::Startup::new();
@@ -310,6 +312,8 @@ fn router(state: Shared, loopback_only: bool) -> Router {
         .route("/contests/refresh", post(contests_refresh))
         .route("/cluster", get(cluster_get).put(cluster_put))
         .route("/award-goals", get(goals_get).put(goals_put))
+        .route("/alerts", get(alerts_get).put(alerts_put))
+        .route("/alerts/test", post(alerts_test))
         .route("/cluster/connect", post(cluster_connect))
         .route("/cluster/send", post(cluster_send))
         .route("/cluster/spot", post(cluster_spot))
@@ -1899,6 +1903,56 @@ async fn cluster_get(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
 async fn cluster_put(State(s): State<Shared>, Json(cfg): Json<ClusterConfig>) -> ApiResult<serde_json::Value> {
     s.cluster.save_config(cfg).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))?;
     Ok(Json(s.cluster.snapshot()))
+}
+
+#[derive(Serialize)]
+struct AlertsView {
+    config: notify::NtfyConfig,
+    has_token: bool,
+    status: notify::NtfyStatus,
+}
+
+fn alerts_view(s: &Shared) -> AlertsView {
+    AlertsView { config: s.hub.notify.config(), has_token: s.hub.notify.has_token(), status: s.hub.notify.status() }
+}
+
+async fn alerts_get(State(s): State<Shared>) -> ApiResult<AlertsView> {
+    Ok(Json(alerts_view(&s)))
+}
+
+#[derive(Deserialize)]
+struct AlertsBody {
+    config: notify::NtfyConfig,
+    /// A new access token; empty removes it, absent keeps it.
+    token: Option<String>,
+}
+
+/// Saves the ntfy settings (the token goes to the system's password store).
+async fn alerts_put(State(s): State<Shared>, Json(b): Json<AlertsBody>) -> ApiResult<AlertsView> {
+    let text = serde_json::to_string(&b.config).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
+    let (svc, token) = (s.secret_service.clone(), b.token.clone());
+    db(&s, move |st| {
+        st.set_setting(notify::SETTING_KEY, &text)?;
+        if let Some(t) = &token {
+            secrets::set(st, &svc, notify::TOKEN_SECRET, Some(t.trim()).filter(|t| !t.is_empty()))?;
+        }
+        Ok(())
+    })
+    .await?;
+    s.hub.notify.set_config(b.config);
+    if let Some(t) = b.token {
+        s.hub.notify.set_token(Some(t));
+    }
+    Ok(Json(alerts_view(&s)))
+}
+
+/// Sends a test message now and says how it went.
+async fn alerts_test(State(s): State<Shared>) -> ApiResult<AlertsView> {
+    let msg = notify::Message { title: "QRZero test".into(), body: "Alerts from QRZero will arrive like this.".into(), tags: "white_check_mark" };
+    if let Err(e) = s.hub.notify.post(&msg).await {
+        return Err(ApiError(StatusCode::BAD_GATEWAY, e));
+    }
+    Ok(Json(alerts_view(&s)))
 }
 
 async fn goals_get(State(s): State<Shared>) -> ApiResult<qrzero_core::awards::Goals> {

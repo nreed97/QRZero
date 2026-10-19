@@ -226,6 +226,51 @@ async fn dx_marathon_counts_one_year() {
     assert_eq!(api.get(&format!("/logs/{log}/marathon?year=2025&calls=N0NONE")).await["score"], 0);
 }
 
+/// What the stand-in ntfy server got: (topic, title, priority, authorization, body).
+type NtfyPost = (String, String, String, String, String);
+
+#[tokio::test]
+async fn ntfy_test_message_goes_to_the_topic() {
+    let seen: Arc<std::sync::Mutex<Vec<NtfyPost>>> = Arc::default();
+    let rec = seen.clone();
+    let app = Router::new().route(
+        "/{topic}",
+        axum::routing::post(move |axum::extract::Path(topic): axum::extract::Path<String>, headers: axum::http::HeaderMap, body: String| {
+            let rec = rec.clone();
+            async move {
+                let h = |k: &str| headers.get(k).and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+                rec.lock().unwrap().push((topic, h("title"), h("priority"), h("authorization"), body));
+                "{}"
+            }
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+    let api = Api::new(String::new()).await;
+    let a = api.get("/alerts").await;
+    assert_eq!((a["config"]["enabled"].as_bool(), a["config"]["server"].as_str(), a["has_token"].as_bool()), (Some(false), Some("https://ntfy.sh"), Some(false)), "{a}");
+    // No topic yet: the test says so.
+    assert_eq!(api.call(reqwest::Method::POST, "/alerts/test", None).await.0, 502);
+    let config = json!({"enabled": true, "server": format!("http://{addr}/"), "topic": "qrzero-abc123", "priority": 4});
+    let (status, saved) = api.call(reqwest::Method::PUT, "/alerts", Some(json!({"config": config, "token": "tk_secret"}))).await;
+    assert_eq!(status, 200, "{saved}");
+    assert_eq!((saved["has_token"].as_bool(), saved["config"]["watch"].as_bool()), (Some(true), Some(true)));
+    let (status, _) = api.call(reqwest::Method::POST, "/alerts/test", None).await;
+    assert_eq!(status, 200);
+    let got = seen.lock().unwrap().clone();
+    assert_eq!(got.len(), 1);
+    let (topic, title, priority, auth, body) = &got[0];
+    assert_eq!((topic.as_str(), title.as_str(), priority.as_str(), auth.as_str()), ("qrzero-abc123", "QRZero test", "4", "Bearer tk_secret"));
+    assert!(body.contains("QRZero"));
+    // Saving without a token keeps it; an empty one removes it.
+    let (_, kept) = api.call(reqwest::Method::PUT, "/alerts", Some(json!({"config": config}))).await;
+    assert_eq!(kept["has_token"].as_bool(), Some(true));
+    let (_, gone) = api.call(reqwest::Method::PUT, "/alerts", Some(json!({"config": config, "token": ""}))).await;
+    assert_eq!(gone["has_token"].as_bool(), Some(false));
+}
+
 #[tokio::test]
 async fn award_goals_default_to_dxcc_and_save() {
     let api = Api::new(String::new()).await;

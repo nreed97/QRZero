@@ -222,6 +222,9 @@ export interface Spot {
 
 /** One award cell a spot would fill: new, or worked but not confirmed. */
 export interface GoalHit { award: AwardKind; key: string; column: string; status: "new" | "worked" }
+/** Push alerts through ntfy. */
+export interface NtfyConfig { enabled: boolean; server: string; topic: string; needed: boolean; level: number; watch: boolean; priority: number; repeat_min: number }
+export interface NtfyView { config: NtfyConfig; has_token: boolean; status: { at: number | null; sent: number; error: string | null } }
 /** What cluster spots are flagged for. */
 export interface Goals { awards: AwardKind[]; new_bands: boolean; new_modes: boolean; unconfirmed: boolean; bands: string[]; modes: string[]; counts: { lotw: boolean; paper: boolean; eqsl: boolean }; marathon: boolean }
 

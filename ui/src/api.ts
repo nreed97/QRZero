@@ -1,5 +1,5 @@
 import type { LogStats, UpdateInfo, ContestList, DxpedList, MostWanted, DxpedPlanned, PropagationReport } from "./types";
-import type { ClubAwards, Goals, Marathon, QslQueue, QslService, QslDownload, AwardHint, SlotGrid, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
+import type { ClubAwards, Goals, Marathon, NtfyConfig, NtfyView, QslQueue, QslService, QslDownload, AwardHint, SlotGrid, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
 function sessionToken(): string {
@@ -83,6 +83,11 @@ export const api = {
     const q = new URLSearchParams({ calls: o.calls.join(","), region: o.region, cwt_tagged: String(o.cwtTagged) });
     return json<ClubAwards>("GET", `/logs/${logId}/club-awards?${q}`);
   },
+  /** ntfy push alerts: settings, whether a token is saved, and how the last send went. */
+  alerts: () => json<NtfyView>("GET", "/alerts"),
+  /** `token`: undefined keeps the saved one, "" removes it. */
+  putAlerts: (config: NtfyConfig, token?: string) => json<NtfyView>("PUT", "/alerts", { config, token }),
+  testAlerts: () => json<NtfyView>("POST", "/alerts/test"),
   /** What cluster spots are flagged for. */
   goals: () => json<Goals>("GET", "/award-goals"),
   putGoals: (g: Goals) => json<Goals>("PUT", "/award-goals", g),

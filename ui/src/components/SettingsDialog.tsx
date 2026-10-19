@@ -12,6 +12,7 @@ import EntryFieldsEditor from "./EntryFieldsEditor";
 import { StartupAppsTab, UdpConnectionsTab } from "./ConnectionsSettings";
 import { confirmDelete } from "../display";
 import BackupsTab from "./BackupsTab";
+import AlertsTab from "./AlertsSettings";
 import KeyboardTab from "./KeyboardSettings";
 import { DISPLAY_DEFAULTS, beep, setDisplay, useDisplay } from "../display";
 import { UPDATES_CHANGED } from "./UpdateNotice";
@@ -43,14 +44,14 @@ interface Props {
   initialTab?: string;
 }
 
-type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "udp" | "startup" | "cluster" | "logs" | "lookup" | "awards" | "backups" | "keyboard" | "general";
+type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "udp" | "startup" | "cluster" | "alerts" | "logs" | "lookup" | "awards" | "backups" | "keyboard" | "general";
 
 /** The sections down the left of Settings, grouped. */
 const GROUPS: { name: string; tabs: Tab[] }[] = [
   { name: "Program", tabs: ["general", "backups", "keyboard"] },
   { name: "Station", tabs: ["station", "locations", "equipment", "logs"] },
   { name: "Logging", tabs: ["fields", "lookup", "awards"] },
-  { name: "Connections", tabs: ["radios", "udp", "cluster", "startup"] },
+  { name: "Connections", tabs: ["radios", "udp", "cluster", "alerts", "startup"] },
 ];
 
 const TAB_NAMES: Record<Tab, string> = {
@@ -65,6 +66,7 @@ const TAB_NAMES: Record<Tab, string> = {
   logs: "Logs",
   lookup: "Callsign lookup",
   awards: "Awards",
+  alerts: "Alerts",
   backups: "Backups",
   keyboard: "Keyboard",
   general: "General",
@@ -186,6 +188,7 @@ export default function SettingsDialog(props: Props) {
       {tab === "startup" && <StartupAppsTab onClose={props.onClose} />}
       {tab === "cluster" && <ClusterTab onClose={props.onClose} />}
       {tab === "awards" && <AwardsTab />}
+      {tab === "alerts" && <AlertsTab />}
       {tab === "backups" && <BackupsTab />}
       {tab === "keyboard" && <KeyboardTab />}
       {tab === "general" && <GeneralTab general={props.general} onGeneral={props.onGeneral} onWizard={props.onWizard} />}
