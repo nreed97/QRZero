@@ -256,6 +256,7 @@ fn router(state: Shared, loopback_only: bool) -> Router {
         .route("/logs/{id}/paper-queue", get(paper_queue))
         .route("/logs/{id}/awards/{award}", get(award))
         .route("/logs/{id}/club-awards", get(club_awards))
+        .route("/logs/{id}/marathon", get(marathon))
         .route("/logs/{id}/stats", get(log_stats))
         .route("/logs/{id}/cwt-extra", put(put_cwt_extra))
         .route("/logs/{id}/lookup/{call}", get(lookup))
@@ -744,6 +745,43 @@ async fn log_stats(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Query
         let mut tally = qrzero_core::stats::StatsTally::default();
         st.for_each_stats_qso(id, &calls, |c| cty_facts(cty.as_deref(), c).dxcc, |qso| tally.add(qso))?;
         Ok(tally.finish(&names))
+    })
+    .await?;
+    Ok(Json(out))
+}
+
+#[derive(Deserialize)]
+struct MarathonQuery {
+    /// Comma-separated station callsigns; empty means all.
+    #[serde(default)]
+    calls: String,
+    /// The calendar year; the current one when absent.
+    year: Option<i32>,
+}
+
+/// CQ DX Marathon progress for one year: countries and zones worked, counted when asked for.
+async fn marathon(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Query<MarathonQuery>) -> ApiResult<qrzero_core::marathon::Marathon> {
+    use qrzero_core::marathon;
+    let cty = s.hub.cty();
+    let calls: Vec<String> = q.calls.split(',').map(|c| c.trim().to_ascii_uppercase()).filter(|c| !c.is_empty()).collect();
+    let this_year = chrono::Datelike::year(&chrono::Utc::now());
+    let year = q.year.unwrap_or(this_year);
+    let out = db(&s, move |st| {
+        let year_of = |t: i64| chrono::DateTime::from_timestamp(t, 0).map_or(this_year, |d| chrono::Datelike::year(&d));
+        let mut years: Vec<i32> = match st.qso_time_range(id, &calls)? {
+            Some((first, last)) => (year_of(first)..=year_of(last).max(this_year)).rev().collect(),
+            None => vec![this_year],
+        };
+        if !years.contains(&year) {
+            years.push(year);
+            years.sort_unstable_by(|a, b| b.cmp(a));
+        }
+        let mut tally = marathon::MarathonTally::default();
+        let cty = cty.as_deref();
+        st.for_each_qso_between(id, &calls, marathon::year_start(year), marathon::year_start(year + 1), |qid, call, t, dxcc, cqz| {
+            tally.add(qid, call, t, marathon::country(cty, call, dxcc), marathon::zone(cty, call, cqz));
+        })?;
+        Ok(tally.finish(year, years))
     })
     .await?;
     Ok(Json(out))

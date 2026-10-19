@@ -1,5 +1,5 @@
 import type { LogStats, UpdateInfo, ContestList, DxpedList, MostWanted, DxpedPlanned, PropagationReport } from "./types";
-import type { ClubAwards, QslQueue, QslService, QslDownload, AwardHint, SlotGrid, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
+import type { ClubAwards, Marathon, QslQueue, QslService, QslDownload, AwardHint, SlotGrid, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
 function sessionToken(): string {
@@ -82,6 +82,12 @@ export const api = {
   clubAwards: (logId: number, o: { calls: string[]; region: "na_eu" | "other"; cwtTagged: boolean }) => {
     const q = new URLSearchParams({ calls: o.calls.join(","), region: o.region, cwt_tagged: String(o.cwtTagged) });
     return json<ClubAwards>("GET", `/logs/${logId}/club-awards?${q}`);
+  },
+  /** CQ DX Marathon countries and zones worked in one year (the current one when `year` is absent). */
+  marathon: (logId: number, o: { calls: string[]; year?: number }) => {
+    const q = new URLSearchParams({ calls: o.calls.join(",") });
+    if (o.year) q.set("year", String(o.year));
+    return json<Marathon>("GET", `/logs/${logId}/marathon?${q}`);
   },
   /** Sets the CWT points added by hand for a year (0 removes them). */
   putCwtExtra: (logId: number, year: number, points: number) => json<Record<string, number>>("PUT", `/logs/${logId}/cwt-extra`, { year, points }),

@@ -809,6 +809,13 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "DXCC", exact: true }).click();
   await expect(page.locator(".ftx-msg", { hasText: "Honor Roll" })).toBeVisible();
   await page.screenshot({ path: "e2e-results/awards-dxcc.png" });
+  // The DX Marathon counts one year at a time; these QSOs are from 2024.
+  await page.getByRole("button", { name: "Marathon", exact: true }).click();
+  await page.getByLabel("Marathon year").selectOption("2024");
+  await expect(page.locator(".marathon-score")).toHaveText(/^[1-9]\d*$/);
+  await expect(page.locator(".marathon-zones td")).toHaveCount(40);
+  await expect(page.locator(".club-table tbody tr", { hasText: "ZL1ABC" })).toContainText("2024-02-10");
+  await page.screenshot({ path: "e2e-results/awards-marathon.png" });
   await page.getByRole("button", { name: "SKCC" }).click();
   const centurion = page.locator(".club-table tbody tr", { hasText: "Centurion" }).first();
   await expect(centurion).toContainText("100");

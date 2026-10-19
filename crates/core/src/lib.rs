@@ -9,6 +9,7 @@ pub mod cwclubs;
 pub mod cty;
 pub mod error;
 pub mod hamqth;
+pub mod marathon;
 pub mod model;
 pub mod qrz;
 pub mod qsl;

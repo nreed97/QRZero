@@ -12,6 +12,7 @@ export const AWARD_LIST: { key: string; name: string; what: string; group: "main
   { key: "vucc", name: "VUCC", what: "Grid squares on 6 m and up", group: "main" },
   { key: "iota", name: "IOTA", what: "Island groups", group: "main" },
   { key: "counties", name: "Counties", what: "US counties (USA-CA)", group: "main" },
+  { key: "marathon", name: "Marathon", what: "CQ DX Marathon: countries and zones each year", group: "main" },
   { key: "skcc", name: "SKCC", what: "Straight Key Century Club levels (CW)", group: "cw" },
   { key: "cwops", name: "CWops", what: "ACA, CMA, ACMA and CWT medals (CW)", group: "cw" },
   { key: "naqcc", name: "NAQCC", what: "Friendship Club, 200 members (CW)", group: "cw" },

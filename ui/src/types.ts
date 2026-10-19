@@ -277,6 +277,9 @@ export interface AwardRow { key: string; name: string; cells: Record<string, Awa
 export interface AwardColumn { key: string; worked: number; confirmed: number; verified: number }
 /** WAS Triple Play: states confirmed through LoTW on each mode group since 2009, and on all three. */
 export interface TriplePlay { cw: number; phone: number; digital: number; all: number }
+/** The first QSO of a year with one DX Marathon country or zone. */
+export interface MarathonHit { key: string; name: string; call: string; date: string; id: number }
+export interface Marathon { year: number; years: number[]; countries: MarathonHit[]; zones: MarathonHit[]; missing_zones: number[]; score: number }
 export interface AwardTable { award: AwardKind; columns: AwardColumn[]; rows: AwardRow[]; total: number; triple_play?: TriplePlay }
 /** One CWT hour: QSOs logged, different call-and-band contacts (what counts), QSOs just outside the hour. */
 export interface CwtSession { date: string; hour: number; qsos: number; contacts: number; near: number; point: boolean }

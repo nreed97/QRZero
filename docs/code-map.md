@@ -23,7 +23,7 @@ Search tip: each Rust module starts with a `//!` doc comment saying what it is, 
 - QSO fields, bands and modes: `model.rs`, `band.rs`.
 - DXCC resolution from the country file: `cty.rs`. "Have I worked it?" sets: `worked.rs`.
 - Awards (DXCC, WAS, WAZ, WPX and the rest): `awards.rs`. CW club awards (SKCC, CWops, NAQCC, FISTS): `cwclubs.rs`.
-- Log statistics (the Statistics window's text summary): `stats.rs`.
+- Log statistics (the Statistics window's text summary): `stats.rs`. CQ DX Marathon (countries and zones per year): `marathon.rs`.
 - QSL services: uploads in `qsl.rs`; confirmation downloads, eQSL and matching in `confirm.rs`.
 - Callsign lookup: `qrz.rs`, `hamqth.rs`.
 - Tests: `crates/core/tests` (`perf.rs` is the ignored large-log speed test).

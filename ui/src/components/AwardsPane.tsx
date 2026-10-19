@@ -4,6 +4,7 @@ import { onLive } from "../live";
 import { localGet, localSet } from "../prefs";
 import { useAwardsOff, useTrackVerified } from "../awardsPref";
 import ClubAwards from "./ClubAwards";
+import MarathonView from "./MarathonView";
 import type { AwardKind, AwardTable, QsoFilter, StationCallsign } from "../types";
 
 const AWARDS: { key: AwardKind; name: string; what: string; row: string }[] = [
@@ -28,6 +29,8 @@ const CLUBS: { key: ClubKind; name: string }[] = [
 
 type ClubKind = "skcc" | "cwops" | "naqcc" | "fists";
 const isClub = (k: string): k is ClubKind => CLUBS.some((c) => c.key === k);
+/** Views that aren't an award table: the CW clubs and the DX Marathon. */
+type OtherKind = ClubKind | "marathon";
 
 /** Awards with a fixed list, so unworked rows are shown (the rest only list what you have worked). */
 const FIXED = new Set<AwardKind>(["dxcc", "was", "waz", "wac", "itu"]);
@@ -67,7 +70,7 @@ function summarize(t: AwardTable) {
 
 const COL_NAMES: Record<string, string> = { mixed: "Mixed", cw: "CW", phone: "Phone", digital: "Digital" };
 
-interface Opts { award: AwardKind | ClubKind; call: string; lotw: boolean; paper: boolean; eqsl: boolean; needed: boolean; hideCols: Record<string, string[]> }
+interface Opts { award: AwardKind | OtherKind; call: string; lotw: boolean; paper: boolean; eqsl: boolean; needed: boolean; hideCols: Record<string, string[]> }
 
 /** Award progress: one row per entity, state, zone or prefix, worked or confirmed per band and mode. */
 export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: number; callsigns: StationCallsign[]; onShowQsos: (f: QsoFilter) => void }) {
@@ -79,9 +82,11 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
   const verified = useTrackVerified();
   const awards = AWARDS.filter((a) => !hidden.includes(a.key));
   const clubs = CLUBS.filter((a) => !hidden.includes(a.key));
+  const marathonOn = !hidden.includes("marathon");
   // The award last looked at may have been switched off in Settings: fall back to the first one still on.
-  const none = awards.length + clubs.length === 0;
-  const current: AwardKind | ClubKind = hidden.includes(opts.award) ? (awards[0]?.key ?? clubs[0]?.key ?? "dxcc") : opts.award;
+  const none = awards.length + clubs.length === 0 && !marathonOn;
+  const current: AwardKind | OtherKind = hidden.includes(opts.award) ? (awards[0]?.key ?? (marathonOn ? "marathon" : clubs[0]?.key) ?? "dxcc") : opts.award;
+  const isTable = (k: AwardKind | OtherKind): k is AwardKind => k !== "marathon" && !isClub(k);
 
   const set = (patch: Partial<Opts>) => {
     const next = { ...opts, ...patch };
@@ -90,7 +95,7 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
   };
 
   useEffect(() => {
-    if (none || isClub(current)) return;
+    if (none || !isTable(current)) return;
     const kind = current;
     let live = true;
     setErr("");
@@ -116,6 +121,7 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
   }, []);
 
   const club = isClub(current) ? current : null;
+  const marathon = current === "marathon";
   const rows = useMemo(() => (table ? (opts.needed ? table.rows.filter((r) => r.cells.mixed !== "confirmed" && r.cells.mixed !== "verified") : table.rows) : []), [table, opts.needed]);
   // Columns (bands and modes) switched off for this award; totals and counts still use every column.
   const off = opts.hideCols[current] ?? [];
@@ -124,7 +130,7 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
   const award = AWARDS.find((a) => a.key === current) ?? AWARDS[0];
   const summary = useMemo(() => (table && table.award === current ? summarize(table) : null), [table, current]);
   const fiveTotal = summary ? FIVE_BANDS.reduce((n, b) => n + summary.five[b], 0) : 0;
-  const mixed = club ? undefined : table?.columns.find((c) => c.key === "mixed");
+  const mixed = club || marathon ? undefined : table?.columns.find((c) => c.key === "mixed");
 
   const show = (key: string) => {
     if (current === "dxcc") onShowQsos({ dxcc: Number(key) });
@@ -145,10 +151,11 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
   return (
     <div className="ftx awards">
       <div className="grid-tools">
-        {awards.length > 0 && <nav className="seg" aria-label="Award">
+        {(awards.length > 0 || marathonOn) && <nav className="seg" aria-label="Award">
           {awards.map((a) => (
             <button key={a.key} className={current === a.key ? "on" : ""} onClick={() => set({ award: a.key })}>{a.name}</button>
           ))}
+          {marathonOn && <button className={marathon ? "on" : ""} onClick={() => set({ award: "marathon" })}>Marathon</button>}
         </nav>}
         {clubs.length > 0 && <nav className="seg" aria-label="CW club award">
           {clubs.map((a) => (
@@ -159,14 +166,14 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
           <option value="">All my callsigns</option>
           {callsigns.map((c) => <option key={c.id}>{c.callsign}</option>)}
         </select>
-        {!club && <>
+        {!club && !marathon && <>
         <span className="muted small">Confirmed by:</span>
         <label className="check"><input type="checkbox" checked={opts.lotw} onChange={(e) => set({ lotw: e.target.checked })} /> LoTW</label>
         <label className="check"><input type="checkbox" checked={opts.paper} onChange={(e) => set({ paper: e.target.checked })} /> Cards</label>
         <label className="check"><input type="checkbox" checked={opts.eqsl} onChange={(e) => set({ eqsl: e.target.checked })} /> eQSL</label>
         <label className="check"><input type="checkbox" checked={opts.needed} onChange={(e) => set({ needed: e.target.checked })} /> Not yet confirmed</label>
         </>}
-        {!club && table && (
+        {isTable(current) && table && (
           <details className="award-cols">
             <summary title="Choose which band and mode columns to show for this award">Columns{off.length > 0 ? ` (${off.length} hidden)` : ""}</summary>
             <div className="award-cols-list">
@@ -204,7 +211,8 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
       )}
       {err && <div className="ftx-msg small err">{err}</div>}
       {club && <ClubAwards logId={logId} kind={club} call={opts.call} stamp={stamp} />}
-      {table && !club && (
+      {marathon && <MarathonView logId={logId} call={opts.call} stamp={stamp} onShowQsos={onShowQsos} />}
+      {table && isTable(current) && (
         <div className="award-scroll">
           <table className="award-table">
             <thead>
@@ -245,7 +253,7 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
           </table>
         </div>
       )}
-      {!club && <div className="ftx-msg small muted">
+      {isTable(current) && <div className="ftx-msg small muted">
         {current === "vucc" && "VUCC counts 4-character grid squares on 6 m and up. "}{current === "counties" && "Counties come from the County field (like OH,Franklin), which LoTW and QRZ fill in. "}{verified && (current === "dxcc" || current === "was") && `V verified (LoTW granted ${current === "dxcc" ? "DXCC" : "WAS"} credit), `}C confirmed, W worked but not confirmed. Click a row to see its QSOs in the log. Get confirmations with QSL, Download confirmations.
       </div>}
     </div>

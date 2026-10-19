@@ -206,6 +206,27 @@ async fn log_import_search_export() {
 }
 
 #[tokio::test]
+async fn dx_marathon_counts_one_year() {
+    let api = Api::new(String::new()).await;
+    let log = api.get("/logs").await[0]["id"].as_i64().unwrap();
+    for (call, date, dxcc, cqz) in [("W1AW", "20250601", "291", "5"), ("K1ABC", "20260102", "291", "5"), ("JA1XYZ", "20260103", "339", "25"), ("K2ABC", "20260104", "291", "5")] {
+        let fields = json!({"CALL": call, "QSO_DATE": date, "TIME_ON": "1200", "BAND": "20m", "MODE": "CW", "DXCC": dxcc, "CQZ": cqz});
+        api.post(&format!("/logs/{log}/qsos"), json!({"fields": fields})).await;
+    }
+    // The country file may or may not be loaded here, so check counts and calls, not country keys.
+    let m = api.get(&format!("/logs/{log}/marathon?year=2026")).await;
+    assert_eq!((m["year"].as_i64(), m["score"].as_u64()), (Some(2026), Some(4)), "{m}");
+    assert_eq!(m["countries"].as_array().unwrap().iter().map(|h| h["call"].as_str().unwrap()).collect::<Vec<_>>(), ["K1ABC", "JA1XYZ"]);
+    assert_eq!(m["zones"][0]["date"], "2026-01-02");
+    assert_eq!(m["missing_zones"].as_array().unwrap().len(), 38);
+    let years: Vec<i64> = m["years"].as_array().unwrap().iter().filter_map(Value::as_i64).collect();
+    assert!(years.contains(&2026) && years.contains(&2025) && years.windows(2).all(|w| w[0] > w[1]), "{years:?}");
+    let last = api.get(&format!("/logs/{log}/marathon?year=2025")).await;
+    assert_eq!(last["score"], 2);
+    assert_eq!(api.get(&format!("/logs/{log}/marathon?year=2025&calls=N0NONE")).await["score"], 0);
+}
+
+#[tokio::test]
 async fn qrz_lookup_and_cache() {
     let logins = Arc::new(AtomicUsize::new(0));
     let api = Api::new(mock_qrz(logins.clone()).await).await;

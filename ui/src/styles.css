@@ -706,6 +706,10 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 .club-table { margin: 6px; }
 .club-table td.name.small { white-space: normal; min-width: 260px; }
 .club-head { margin: 8px 8px 0; font-weight: 600; }
+.marathon-score { font-size: 1.15em; }
+.marathon-zones caption { text-align: left; padding: 2px 0; }
+.marathon-zones td { min-width: 26px; text-align: center; }
+.marathon-zones td.confirmed { cursor: pointer; }
 
 /* Needed now */
 .needed-row { display: grid; grid-template-columns: 84px 56px 96px minmax(90px, 1fr) 46px 72px 54px 50px 96px minmax(120px, 2fr); align-items: center; font-size: 12.5px; border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent); cursor: default; border-left: 3px solid transparent; }

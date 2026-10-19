@@ -11,6 +11,7 @@ The **Awards** pane, a tab next to the log to start with, shows how far you are 
 - **VUCC**: 4-character grid squares (like FN31) worked on 6 m and up. HF contacts don't count. Each band column shows that band's grid count, as the award is issued per band.
 - **IOTA**: Islands on the Air references (like EU-005), from the QSO's IOTA field.
 - **Counties**: US counties (USA-CA, 3077 of them), from the County field (like `OH,Franklin`). Downloading LoTW confirmations or a callsign lookup can fill it in.
+- **Marathon**: the CQ DX Marathon, countries and CQ zones worked in one calendar year. See **DX Marathon** below.
 
 - **SKCC** and **CWops**: the CW club awards, described under **CW club awards** below. They have their own buttons next to the others.
 
@@ -56,6 +57,16 @@ Each cell is V when a credited QSO falls in that cell; a cell with only plain co
 - **Not yet confirmed** hides rows that are already confirmed.
 - Pick one of your callsigns to count only QSOs made with it. Most awards are issued to one callsign.
 - Click a row to see its QSOs in the log. Click the button above the log (for example **DXCC 291 ×**) to show everything again.
+
+## DX Marathon
+
+The **Marathon** button shows one calendar year of the CQ DX Marathon: the countries and CQ zones you have worked that year. Pick the year in the box at the top; it starts on the current one. The score is countries plus zones. No confirmations are needed, so every QSO counts, on any band and mode.
+
+Countries are the DXCC entities plus the extra WAE ones the country file lists (Sicily, Shetland, the Vienna International Centre and so on). A QSO's country comes from its call in the country file, unless its DXCC field names a different DXCC entity (one LoTW corrected, say). Zones come from the CQ zone field, or the country file when it is blank.
+
+The 40 zones are shown as a grid, worked ones shaded; hover over one to see the first QSO with it. Below is every country worked that year, newest first, with the first QSO and its date. Click a zone or country to see the QSOs with that call in the log. Pick one of your callsigns at the top to count only QSOs made with it.
+
+QRZero only counts. It doesn't check the Marathon's own rules for your entry (which category you enter, or bands and modes the rules leave out); check those before you send in a score.
 
 ## CW club awards
 

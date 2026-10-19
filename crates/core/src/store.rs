@@ -682,6 +682,52 @@ impl Store {
         Ok(())
     }
 
+    /// The first and last QSO times in the log (Unix seconds), optionally only for some station callsigns.
+    pub fn qso_time_range(&self, log_id: i64, callsigns: &[String]) -> Result<Option<(i64, i64)>> {
+        let marks = vec!["?"; callsigns.len()].join(", ");
+        let calls = if callsigns.is_empty() { String::new() } else { format!(" AND station_callsign IN ({marks})") };
+        let mut args: Vec<Value> = vec![log_id.into()];
+        args.extend(callsigns.iter().map(|c| Value::from(c.to_ascii_uppercase())));
+        let (min, max): (Option<i64>, Option<i64>) = self.conn.query_row(
+            &format!("SELECT MIN(time_on), MAX(time_on) FROM qsos WHERE log_id = ?{calls}"),
+            params_from_iter(args),
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        Ok(min.zip(max))
+    }
+
+    /// Calls `f` with (id, call, time_on, DXCC, CQ zone) for each QSO from `since` to before
+    /// `until` (Unix seconds), optionally only for some station callsigns. For the DX Marathon.
+    pub fn for_each_qso_between(
+        &self,
+        log_id: i64,
+        callsigns: &[String],
+        since: i64,
+        until: i64,
+        mut f: impl FnMut(i64, &str, i64, Option<u32>, Option<u32>),
+    ) -> Result<()> {
+        let marks = vec!["?"; callsigns.len()].join(", ");
+        let calls = if callsigns.is_empty() { String::new() } else { format!(" AND station_callsign IN ({marks})") };
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT id, call, time_on, dxcc, json_extract(fields, '$.CQZ') FROM qsos
+             WHERE log_id = ?1 AND time_on >= ?2 AND time_on < ?3{calls}"
+        ))?;
+        let mut args: Vec<Value> = vec![log_id.into(), since.into(), until.into()];
+        args.extend(callsigns.iter().map(|c| Value::from(c.to_ascii_uppercase())));
+        let mut rows = stmt.query(params_from_iter(args))?;
+        while let Some(r) = rows.next()? {
+            let call: String = r.get(1)?;
+            let dxcc: Option<i64> = r.get(3)?;
+            let cqz = match r.get_ref(4)? {
+                rusqlite::types::ValueRef::Integer(z) => u32::try_from(z).ok(),
+                rusqlite::types::ValueRef::Text(t) => std::str::from_utf8(t).ok().and_then(|z| z.trim().parse().ok()),
+                _ => None,
+            };
+            f(r.get(0)?, &call, r.get(2)?, dxcc.and_then(|d| u32::try_from(d).ok()), cqz);
+        }
+        Ok(())
+    }
+
     /// Calls `f` with the statistics facts of every QSO in the log, optionally only for some
     /// station callsigns. `resolve` supplies a DXCC entity for QSOs without one.
     pub fn for_each_stats_qso(
