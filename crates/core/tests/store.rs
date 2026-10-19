@@ -317,6 +317,33 @@ fn pending_uploads_and_marking() {
 }
 
 #[test]
+fn new_lotw_confirmation_marks_club_log_upload_modified() {
+    let (mut st, log) = setup();
+    let base = [("QSO_DATE", "20240101"), ("TIME_ON", "1200"), ("BAND", "20m"), ("MODE", "CW"), ("STATION_CALLSIGN", "N0CALL")];
+    let q = |call: &str, extra: &[(&str, &str)]| {
+        let mut v = vec![("CALL", call)];
+        v.extend_from_slice(&base);
+        v.extend_from_slice(extra);
+        f(&v)
+    };
+    let sent = st.insert_qso(log, None, &q("W1AW", &[("CLUBLOG_QSO_UPLOAD_STATUS", "Y")])).unwrap();
+    let unsent = st.insert_qso(log, None, &q("K1ABC", &[])).unwrap();
+    let rcvd = f(&[("LOTW_QSL_RCVD", "Y"), ("LOTW_QSLRDATE", "20240301")]);
+    let (w1aw, k1abc) = (q("W1AW", &[]), q("K1ABC", &[]));
+    let items = || [(&w1aw, rcvd.clone(), Fields::new()), (&k1abc, rcvd.clone(), Fields::new())];
+    let same = |a: &Fields, b: &Fields| a["CALL"] == b["CALL"];
+    st.apply_confirmations(&[log], items(), same).unwrap();
+    let status = |st: &Store, id| st.get_qso(id).unwrap().fields.get("CLUBLOG_QSO_UPLOAD_STATUS").cloned();
+    assert_eq!(status(&st, sent.id).as_deref(), Some("M"));
+    assert_eq!(status(&st, unsent.id), None, "a QSO not on Club Log is left alone");
+
+    // Once re-uploaded, the same confirmation downloaded again doesn't queue it a second time.
+    st.mark_qsos(&[sent.id], &f(&[("CLUBLOG_QSO_UPLOAD_STATUS", "Y")])).unwrap();
+    st.apply_confirmations(&[log], items(), same).unwrap();
+    assert_eq!(status(&st, sent.id).as_deref(), Some("Y"));
+}
+
+#[test]
 fn paper_queue_holds_only_queued_cards_and_marking_touches_only_the_ids_given() {
     let (mut st, log) = setup();
     let q = |call: &str, sent: &str| {

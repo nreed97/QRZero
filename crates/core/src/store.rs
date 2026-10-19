@@ -562,6 +562,14 @@ impl Store {
                         stats.already += 1;
                         continue;
                     }
+                    // Club Log shows LoTW confirmations from the uploaded QSO, so a new one marks
+                    // a QSO already on Club Log for re-upload.
+                    let lotw = |f: &Fields| f.get("LOTW_QSL_RCVD").is_some_and(|v| v == "Y");
+                    if lotw(&fields) && !lotw(&before) {
+                        if let Some(v) = fields.get_mut("CLUBLOG_QSO_UPLOAD_STATUS").filter(|v| *v == "Y") {
+                            *v = "M".into();
+                        }
+                    }
                     let c = Columns::from_fields(&fields)?;
                     put.execute(params![serde_json::to_string(&fields)?, c.dxcc, now(), id])?;
                     stats.new += 1;
