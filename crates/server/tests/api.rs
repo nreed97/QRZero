@@ -227,6 +227,20 @@ async fn dx_marathon_counts_one_year() {
 }
 
 #[tokio::test]
+async fn award_goals_default_to_dxcc_and_save() {
+    let api = Api::new(String::new()).await;
+    let g = api.get("/award-goals").await;
+    assert_eq!((g["awards"].clone(), g["new_bands"].as_bool(), g["marathon"].as_bool()), (json!(["dxcc"]), Some(true), Some(false)), "{g}");
+    let (status, saved) = api
+        .call(reqwest::Method::PUT, "/award-goals", Some(json!({"awards": ["dxcc", "waz"], "marathon": true, "bands": ["20m"]})))
+        .await;
+    assert_eq!(status, 200, "{saved}");
+    // Fields left out take their defaults.
+    assert_eq!((saved["marathon"].as_bool(), saved["new_bands"].as_bool(), saved["unconfirmed"].as_bool()), (Some(true), Some(true), Some(false)));
+    assert_eq!(api.get("/award-goals").await["awards"], json!(["dxcc", "waz"]));
+}
+
+#[tokio::test]
 async fn qrz_lookup_and_cache() {
     let logins = Arc::new(AtomicUsize::new(0));
     let api = Api::new(mock_qrz(logins.clone()).await).await;

@@ -309,6 +309,7 @@ fn router(state: Shared, loopback_only: bool) -> Router {
         .route("/contests", get(contests_get))
         .route("/contests/refresh", post(contests_refresh))
         .route("/cluster", get(cluster_get).put(cluster_put))
+        .route("/award-goals", get(goals_get).put(goals_put))
         .route("/cluster/connect", post(cluster_connect))
         .route("/cluster/send", post(cluster_send))
         .route("/cluster/spot", post(cluster_spot))
@@ -1898,6 +1899,24 @@ async fn cluster_get(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
 async fn cluster_put(State(s): State<Shared>, Json(cfg): Json<ClusterConfig>) -> ApiResult<serde_json::Value> {
     s.cluster.save_config(cfg).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))?;
     Ok(Json(s.cluster.snapshot()))
+}
+
+async fn goals_get(State(s): State<Shared>) -> ApiResult<qrzero_core::awards::Goals> {
+    Ok(Json(s.hub.goals()))
+}
+
+/// Saves what spots are flagged for, then flags the kept spots again.
+async fn goals_put(State(s): State<Shared>, Json(goals): Json<qrzero_core::awards::Goals>) -> ApiResult<qrzero_core::awards::Goals> {
+    let (hub, cluster) = (s.hub.clone(), s.cluster.clone());
+    tokio::task::spawn_blocking(move || {
+        hub.set_goals(goals)?;
+        cluster.reflag();
+        Ok::<_, String>(hub.goals())
+    })
+    .await
+    .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .map(Json)
+    .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))
 }
 
 #[derive(Deserialize)]

@@ -212,9 +212,18 @@ export interface Spot {
   /** Where the spotter is. */
   spotter_entity?: Entity | null;
   needed: Needed | null;
+  /** The award goals the spot meets (Settings, Awards); null until the log's awards are counted. */
+  goals?: GoalHit[] | null;
+  /** A DX Marathon country or zone not yet worked this year, while Marathon alerts are on. */
+  marathon?: { country: boolean; zone: boolean } | null;
   /** Id of the watch list entry this station matches. */
   watched?: number | null;
 }
+
+/** One award cell a spot would fill: new, or worked but not confirmed. */
+export interface GoalHit { award: AwardKind; key: string; column: string; status: "new" | "worked" }
+/** What cluster spots are flagged for. */
+export interface Goals { awards: AwardKind[]; new_bands: boolean; new_modes: boolean; unconfirmed: boolean; bands: string[]; modes: string[]; counts: { lotw: boolean; paper: boolean; eqsl: boolean }; marathon: boolean }
 
 export interface ClusterNode { name: string; host: string; port: number; login: string; password: string; commands: string[] }
 export interface ClusterConfig { nodes: ClusterNode[]; auto_connect: boolean; spot_max_minutes: number; spot_comment: string }

@@ -117,6 +117,18 @@ You don't need to open this pane to see what a QSO would be worth. After a looku
 
 When none of that applies, it says *Nothing new for awards, all confirmed*. The block counts confirmations from the sources ticked under **Confirmed by** in this pane, and it updates when you change the band or mode. It always counts all your callsigns.
 
+## Spot flags
+
+**Settings…**, **Awards**, **Spot flags** decides which cluster spots are flagged as needed in the Cluster, Band map and Needed now panes, and so which ones alert:
+
+- The awards to chase: **DXCC**, **WAZ**, **WPX**, **WAC**, **ITU** and **IOTA**. These are the ones a spot can be placed in from its call, band and mode (IOTA only when the spot comment gives a reference like `OC-001`). DXCC is ticked to begin with.
+- **Flag a new band** and **Flag a new mode** (CW, Phone, Digital) for something you have already worked.
+- **Flag worked but not confirmed**: a slot you have worked but not had confirmed, as another chance at a confirmation. Tick which confirmations count.
+- **DX Marathon**: a country (DXCC or WAE) or CQ zone not yet worked this calendar year. Switch it off when you aren't entering the Marathon. While it is on, QRZero keeps a small list of this year's countries and zones; off, it keeps nothing.
+- **Bands** and **Modes**: spots on other bands or modes are never flagged, for any of the above.
+
+Changes apply at once, to the spots already listed too. The QSO panel's award lines and the FTx monitor aren't affected.
+
 ## Where the data comes from
 
 DXCC uses each QSO's DXCC field, or the country file if it has none. WAS uses the STATE field. QSOs with Alaska or Hawaii count for AK and HI even without a state. WAZ uses the CQZ field. WAC and ITU use the CONT and ITUZ fields, or the country file when they are blank. VUCC uses GRIDSQUARE, IOTA uses IOTA and Counties uses CNTY. Downloading LoTW confirmations fills in a blank state and zones from LoTW's records, which helps WAS and WAZ. LoTW's DXCC entity replaces the one in the log when a confirmation is downloaded, so award credit matches LoTW even where the country file had the call in another entity.

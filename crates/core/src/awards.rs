@@ -1077,6 +1077,111 @@ impl AwardIndex {
     }
 }
 
+/// Awards a cluster spot can be flagged for: the ones its call, band and mode (and an IOTA
+/// reference in the comment) are enough to place.
+pub const SPOT_AWARDS: [Award; 6] = [Award::Dxcc, Award::Waz, Award::Wpx, Award::Wac, Award::Itu, Award::Iota];
+
+/// What the operator chases, which decides the awards, bands and modes a spot is flagged for.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct Goals {
+    /// Awards whose needs flag a spot (from [`SPOT_AWARDS`]).
+    pub awards: Vec<Award>,
+    /// Flag a band not yet worked for something already worked.
+    pub new_bands: bool,
+    /// Flag a mode group (CW, Phone, Digital) not yet worked.
+    pub new_modes: bool,
+    /// Flag something worked but not yet confirmed (for the enabled columns), as another chance at a confirmation.
+    pub unconfirmed: bool,
+    /// Bands chased, like "20m"; empty means every band.
+    pub bands: Vec<String>,
+    /// Mode groups chased ("CW", "PHONE", "DIGITAL"); empty means all three.
+    pub modes: Vec<String>,
+    /// Which confirmations count, for `unconfirmed`.
+    pub counts: Counts,
+    /// Flag countries and CQ zones not yet worked this year, for the CQ DX Marathon.
+    pub marathon: bool,
+}
+
+impl Default for Goals {
+    /// DXCC entities, bands and modes: what spots were flagged for before goals existed.
+    fn default() -> Self {
+        Goals {
+            awards: vec![Award::Dxcc],
+            new_bands: true,
+            new_modes: true,
+            unconfirmed: false,
+            bands: Vec::new(),
+            modes: Vec::new(),
+            counts: Counts { lotw: true, paper: true, eqsl: false },
+            marathon: false,
+        }
+    }
+}
+
+/// One award cell a spot would fill (or could get confirmed).
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct GoalHit {
+    pub award: Award,
+    /// Row key (DXCC number, zone, prefix, continent, IOTA reference).
+    pub key: String,
+    /// "mixed", "cw", "phone", "digital" or a band like "20m".
+    pub column: String,
+    /// New (never worked) or Worked (worked, not confirmed).
+    pub status: HintStatus,
+}
+
+/// The cells in `hints` (for a spot on `band` in `mode`) that the goals chase, most
+/// important first: something new, then a new band, a new mode, and unconfirmed cells.
+pub fn goal_hits(hints: &[AwardHint], goals: &Goals, band: Option<&str>, mode: Option<&str>) -> Vec<GoalHit> {
+    if !goal_allows(goals, band, mode) {
+        return Vec::new();
+    }
+    let rank = |h: &GoalHit| match (h.status, h.column.as_str()) {
+        (HintStatus::New, "mixed") => 0,
+        (HintStatus::New, "cw" | "phone" | "digital") => 2,
+        (HintStatus::New, _) => 1,
+        _ => 3,
+    };
+    let mut out = Vec::new();
+    for h in hints.iter().filter(|h| goals.awards.contains(&h.award)) {
+        let hit = |c: &HintCell| GoalHit { award: h.award, key: h.key.clone(), column: c.column.clone(), status: c.status };
+        let Some(mixed) = h.cells.first() else { continue };
+        match mixed.status {
+            HintStatus::New => {
+                out.push(hit(mixed));
+                continue;
+            }
+            HintStatus::Worked if goals.unconfirmed => out.push(hit(mixed)),
+            _ => {}
+        }
+        for c in &h.cells[1..] {
+            let on = if matches!(c.column.as_str(), "cw" | "phone" | "digital") { goals.new_modes } else { goals.new_bands };
+            if on && (c.status == HintStatus::New || (c.status == HintStatus::Worked && goals.unconfirmed)) {
+                out.push(hit(c));
+            }
+        }
+    }
+    out.sort_by_key(|h| rank(h));
+    out
+}
+
+/// Whether a spot is on a band and in a mode group the goals chase.
+pub fn goal_allows(goals: &Goals, band: Option<&str>, mode: Option<&str>) -> bool {
+    let group = mode.and_then(mode_group);
+    let band_ok = goals.bands.is_empty() || band.is_some_and(|b| goals.bands.iter().any(|g| g.eq_ignore_ascii_case(b)));
+    let mode_ok = goals.modes.is_empty() || group.is_some_and(|g| goals.modes.iter().any(|m| m.eq_ignore_ascii_case(g)));
+    band_ok && mode_ok
+}
+
+/// The first IOTA reference (like "OC-001") in a spot comment.
+pub fn iota_in_text(text: &str) -> Option<String> {
+    const CONTS: [&str; 7] = ["AF", "AN", "AS", "EU", "NA", "OC", "SA"];
+    text.split(|c: char| !(c.is_ascii_alphanumeric() || c == '-'))
+        .filter_map(iota_ref)
+        .find(|r| CONTS.contains(&&r[..2]))
+}
+
 fn num_order(key: &str) -> u64 {
     key.parse().unwrap_or(u64::MAX)
 }
@@ -1149,6 +1254,35 @@ mod tests {
         let oh = tab.rows.iter().find(|r| r.key == "OH").unwrap();
         assert_eq!(oh.cells["phone"], Status::Confirmed);
         assert_eq!(Tally::new(Award::Waz, Counts::default(), BTreeMap::new()).finish(false).triple_play, None);
+    }
+
+    #[test]
+    fn goals_decide_which_spots_are_flagged() {
+        let mut idx = AwardIndex::default();
+        idx.add(&AwardQso { dxcc: Some(291), cq_zone: Some(5), cont: Some("NA".into()), ..q("K1ABC", "20m", "CW") });
+        let spot = |call: &str, dxcc, zone, band: &str, mode: &str| {
+            let s = AwardQso { dxcc: Some(dxcc), cq_zone: Some(zone), cont: Some("NA".into()), ..q(call, band, mode) };
+            idx.hints(&s, Counts { lotw: true, ..Counts::default() })
+        };
+        let summary = |hits: Vec<GoalHit>| hits.iter().map(|h| format!("{:?} {} {} {:?}", h.award, h.key, h.column, h.status)).collect::<Vec<_>>();
+        let g = Goals::default();
+        // A new band and mode for the US; the 40 m column comes before the mode.
+        assert_eq!(summary(goal_hits(&spot("W2XYZ", 291, 5, "40m", "SSB"), &g, Some("40m"), Some("SSB"))), ["Dxcc 291 40m New", "Dxcc 291 phone New"]);
+        assert!(goal_hits(&spot("W2XYZ", 291, 5, "20m", "CW"), &g, Some("20m"), Some("CW")).is_empty());
+        // WAZ chased: zone 4 is new, zone 5 only unconfirmed when asked for.
+        let waz = Goals { awards: vec![Award::Waz], new_bands: false, new_modes: false, ..Goals::default() };
+        assert_eq!(summary(goal_hits(&spot("W0XYZ", 291, 4, "20m", "CW"), &waz, Some("20m"), Some("CW"))), ["Waz 4 mixed New"]);
+        assert!(goal_hits(&spot("W2XYZ", 291, 5, "20m", "CW"), &waz, Some("20m"), Some("CW")).is_empty());
+        let unconf = Goals { unconfirmed: true, ..waz.clone() };
+        assert_eq!(summary(goal_hits(&spot("W2XYZ", 291, 5, "20m", "CW"), &unconf, Some("20m"), Some("CW"))), ["Waz 5 mixed Worked"]);
+        // Bands and modes not chased flag nothing.
+        let cw_only = Goals { modes: vec!["CW".into()], bands: vec!["40m".into()], ..waz };
+        assert!(goal_hits(&spot("W0XYZ", 291, 4, "40m", "SSB"), &cw_only, Some("40m"), Some("SSB")).is_empty());
+        assert!(goal_hits(&spot("W0XYZ", 291, 4, "20m", "CW"), &cw_only, Some("20m"), Some("CW")).is_empty());
+        assert_eq!(goal_hits(&spot("W0XYZ", 291, 4, "40m", "CW"), &cw_only, Some("40m"), Some("CW")).len(), 1);
+
+        assert_eq!(iota_in_text("QSX up 2, IOTA oc-001 tnx").as_deref(), Some("OC-001"));
+        assert_eq!(iota_in_text("UP-005 not an island"), None);
     }
 
     #[test]

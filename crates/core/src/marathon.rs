@@ -94,6 +94,45 @@ impl MarathonTally {
     }
 }
 
+/// The countries and zones already worked this year, for flagging spots the Marathon needs.
+#[derive(Clone, Debug, Default)]
+pub struct MarathonIndex {
+    pub year: i32,
+    countries: std::collections::HashSet<String>,
+    zones: std::collections::HashSet<u32>,
+}
+
+/// What a spot would add to this year's Marathon.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub struct MarathonNeed {
+    pub country: bool,
+    pub zone: bool,
+}
+
+impl MarathonIndex {
+    pub fn new(year: i32) -> Self {
+        MarathonIndex { year, ..Self::default() }
+    }
+
+    pub fn add(&mut self, country: Option<(String, String)>, zone: Option<u32>) {
+        if let Some((key, _)) = country {
+            self.countries.insert(key);
+        }
+        if let Some(z) = zone {
+            self.zones.insert(z);
+        }
+    }
+
+    /// `None` when the spot adds nothing.
+    pub fn need(&self, country: Option<&str>, zone: Option<u32>) -> Option<MarathonNeed> {
+        let n = MarathonNeed {
+            country: country.is_some_and(|c| !self.countries.contains(c)),
+            zone: zone.is_some_and(|z| !self.zones.contains(&z)),
+        };
+        (n.country || n.zone).then_some(n)
+    }
+}
+
 fn date(t: i64) -> String {
     chrono::DateTime::from_timestamp(t, 0).map_or_else(String::new, |d| d.format("%Y-%m-%d").to_string())
 }
@@ -140,5 +179,11 @@ I,Italy,248,EU,15,28,42.82,-12.58,-1.0,I;
         assert_eq!((m.zones[0].call.as_str(), m.zones[0].date.as_str()), ("IT9XYZ", "2026-01-01"));
         assert_eq!(m.missing_zones.len(), 39);
         assert_eq!(m.score, 3);
+
+        let mut idx = MarathonIndex::new(2026);
+        idx.add(country(Some(&cty), "I1ABC", None), Some(15));
+        assert_eq!(idx.need(Some("I"), Some(15)), None);
+        assert_eq!(idx.need(Some("IT9"), Some(15)), Some(MarathonNeed { country: true, zone: false }));
+        assert_eq!(idx.need(Some("I"), Some(14)), Some(MarathonNeed { country: false, zone: true }));
     }
 }

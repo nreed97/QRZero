@@ -10,7 +10,8 @@ use std::time::Duration;
 use qrzero_core::adif::{self, Fields};
 use qrzero_core::band::band_for_freq;
 use qrzero_core::cty::{CtyDb, Entity};
-use qrzero_core::awards::{SlotGrid, AwardHint, AwardIndex, AwardQso, Counts, CtyFacts};
+use qrzero_core::awards::{SlotGrid, AwardHint, AwardIndex, AwardQso, Counts, CtyFacts, GoalHit, Goals};
+use qrzero_core::marathon::{MarathonIndex, MarathonNeed};
 use qrzero_core::worked::{Needed, WorkedIndex};
 use qrzero_core::Store;
 use qrzero_radio::rig::{self, RigCommand, RigConfig, RigHandle, RigState};
@@ -24,6 +25,8 @@ use tokio::task::JoinHandle;
 use crate::udp_out::{Ctx as UdpCtx, Event as UdpEvent};
 
 const MAX_DECODES: usize = 1000;
+/// Settings key for the spot goals.
+const GOALS_KEY: &str = "award_goals";
 /// Where the country file comes from. cty.csv carries ADIF DXCC numbers; cty.dat is the fallback.
 pub const CTY_URLS: [&str; 2] = ["https://www.country-files.com/cty/cty.csv", "https://www.country-files.com/cty/cty.dat"];
 const CTY_MAX_AGE: Duration = Duration::from_secs(14 * 24 * 3600);
@@ -375,6 +378,10 @@ struct Inner {
     worked: Option<(i64, WorkedIndex)>,
     /// Award cells of one log, with the QSO version they reflect.
     awards: Option<AwardCells>,
+    /// What cluster spots are flagged for.
+    goals: Goals,
+    /// Countries and zones worked this year in one log, while Marathon spot alerts are on.
+    marathon: Option<(i64, MarathonIndex)>,
     instances: BTreeMap<String, FtxInstance>,
     /// Colour slot per instance id, in order of first appearance.
     ftx_colors: HashMap<String, u8>,
@@ -451,7 +458,92 @@ impl Hub {
         if let Err(e) = hub.load_cty_file() {
             tracing::info!("no country file yet: {e}");
         }
+        hub.lock().goals = hub.setting(GOALS_KEY).and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
         hub
+    }
+
+    /// What cluster spots are flagged for.
+    pub fn goals(&self) -> Goals {
+        self.lock().goals.clone()
+    }
+
+    /// Saves the spot goals, and counts this year's QSOs when Marathon alerts are on.
+    pub fn set_goals(self: &Arc<Self>, goals: Goals) -> Result<(), String> {
+        self.set_setting(GOALS_KEY, &serde_json::to_string(&goals).map_err(|e| e.to_string())?)?;
+        let marathon = goals.marathon;
+        self.lock().goals = goals;
+        if marathon {
+            self.build_marathon();
+        } else {
+            self.lock().marathon = None;
+        }
+        Ok(())
+    }
+
+    /// Counts the active log's countries and zones for this year (Marathon alerts), when they are on.
+    fn build_marathon(&self) {
+        let (log_id, on) = {
+            let inner = self.lock();
+            (inner.active.log_id, inner.goals.marathon)
+        };
+        let Some(log_id) = log_id.filter(|_| on) else { return };
+        let year = chrono::Datelike::year(&chrono::Utc::now());
+        let cty = self.cty();
+        let mut idx = MarathonIndex::new(year);
+        let (from, to) = (qrzero_core::marathon::year_start(year), qrzero_core::marathon::year_start(year + 1));
+        let res = self.with_store(|st| {
+            st.for_each_qso_between(log_id, &[], from, to, |_, call, _, dxcc, cqz| {
+                idx.add(qrzero_core::marathon::country(cty.as_deref(), call, dxcc), qrzero_core::marathon::zone(cty.as_deref(), call, cqz));
+            })
+        });
+        match res {
+            Ok(()) => self.lock().marathon = Some((log_id, idx)),
+            Err(e) => tracing::warn!("marathon index: {e}"),
+        }
+    }
+
+    /// The award goals a cluster spot meets, and what it adds to this year's Marathon. The goals are
+    /// `None` until the active log's award cells are counted (the spot then keeps its plain flags).
+    pub fn spot_needs(self: &Arc<Self>, call: &str, entity: Option<&Entity>, band: Option<&str>, mode: &str, comment: &str) -> (Option<Vec<GoalHit>>, Option<MarathonNeed>) {
+        let mode = Some(mode).filter(|m| !m.is_empty());
+        let q = AwardQso {
+            call: call.to_ascii_uppercase(),
+            band: band.map(str::to_string),
+            mode: mode.map(str::to_string),
+            dxcc: entity.and_then(|e| e.dxcc),
+            cq_zone: entity.map(|e| u32::from(e.cq)).filter(|&z| z > 0),
+            cont: entity.map(|e| e.cont.clone()).filter(|c| !c.is_empty()),
+            itu: entity.map(|e| u32::from(e.itu)).filter(|&z| z > 0),
+            iota: qrzero_core::awards::iota_in_text(comment),
+            ..AwardQso::default()
+        };
+        let cty = self.cty();
+        let country = qrzero_core::marathon::country(cty.as_deref(), call, None);
+        let year = chrono::Datelike::year(&chrono::Utc::now());
+        let mut inner = self.lock();
+        let log_id = inner.active.log_id;
+        let goals = &inner.goals;
+        let hits = inner
+            .awards
+            .as_ref()
+            .filter(|a| Some(a.log_id) == log_id)
+            .map(|a| qrzero_core::awards::goal_hits(&a.index.hints(&q, goals.counts), goals, band, mode));
+        let mut stale = false;
+        let marathon = match &inner.marathon {
+            Some((id, idx)) if goals.marathon && Some(*id) == log_id && qrzero_core::awards::goal_allows(goals, band, mode) => {
+                stale = idx.year != year;
+                idx.need(country.as_ref().map(|(k, _)| k.as_str()), q.cq_zone).filter(|_| !stale)
+            }
+            _ => None,
+        };
+        if stale {
+            // A new year: count again in the background, and say nothing until then.
+            inner.marathon = None;
+            drop(inner);
+            let hub = self.clone();
+            tokio::task::spawn_blocking(move || hub.build_marathon());
+        }
+        (hits, marathon)
     }
 
     /// Loads saved settings and starts the listeners. Call once from inside the runtime.
@@ -567,6 +659,10 @@ impl Hub {
             Err(e) => tracing::warn!("worked index: {e}"),
         });
         self.refresh_awards();
+        if self.lock().goals.marathon {
+            let hub = self.clone();
+            tokio::task::spawn_blocking(move || hub.build_marathon());
+        }
     }
 
     /// Recounts the active log's award cells in the background, after QSL
@@ -644,6 +740,16 @@ impl Hub {
                     a.index.add(&qso);
                     a.version = version;
                 }
+            }
+        }
+        if let Some((id, idx)) = self.lock().marathon.as_mut() {
+            let year = f.get("QSO_DATE").and_then(|d| d.get(..4)).and_then(|y| y.parse::<i32>().ok());
+            if *id == log_id && year == Some(idx.year) {
+                let cty = self.cty();
+                let call = f.get("CALL").map_or("", |c| c.as_str());
+                let dxcc = f.get("DXCC").and_then(|d| d.parse().ok());
+                let cqz = f.get("CQZ").and_then(|z| z.trim().parse().ok());
+                idx.add(qrzero_core::marathon::country(cty.as_deref(), call, dxcc), qrzero_core::marathon::zone(cty.as_deref(), call, cqz));
             }
         }
         if let Some((id, idx)) = self.lock().worked.as_mut() {

@@ -712,7 +712,7 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 .marathon-zones td.confirmed { cursor: pointer; }
 
 /* Needed now */
-.needed-row { display: grid; grid-template-columns: 84px 56px 96px minmax(90px, 1fr) 46px 72px 54px 50px 96px minmax(120px, 2fr); align-items: center; font-size: 12.5px; border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent); cursor: default; border-left: 3px solid transparent; }
+.needed-row { display: grid; grid-template-columns: 150px 56px 96px minmax(90px, 1fr) 46px 72px 54px 50px 96px minmax(120px, 2fr); align-items: center; font-size: 12.5px; border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent); cursor: default; border-left: 3px solid transparent; }
 .needed-row > span { padding: 1px 5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .needed-row .num { text-align: right; }
 .needed-row .call { font-weight: 700; }

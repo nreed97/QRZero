@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { onLive } from "../live";
 import { MODE_GROUP_NAME, modeGroup } from "../modes";
-import { compareNeeded, NEED_NAME, type NeedRank, needRank, spotKey } from "../needed";
+import { compareNeeded, type NeedRank, needLabel, needRank, spotKey } from "../needed";
 import { setNeededConfig, useNeededConfig } from "../neededPrefs";
 import type { MostWanted, Spot } from "../types";
 import type { DecodePick } from "./FtxMonitor";
@@ -36,6 +36,7 @@ export default function NeededPane({ onPick, onSettings }: { onPick: (p: DecodeP
     const off = onLive((e) => {
       if (e.type === "spot") setSpots((m) => new Map(m).set(spotKey(e.spot), e.spot));
       if (e.type === "cluster_state") setConnected(e.connected);
+      if (e.type === "spots_reflagged") api.cluster().then((c) => setSpots(new Map(c.spots.map((s) => [spotKey(s), s])))).catch(() => {});
     });
     return () => {
       clearInterval(t);
@@ -94,7 +95,7 @@ export default function NeededPane({ onPick, onSettings }: { onPick: (p: DecodeP
               onDoubleClick={() => onPick(spotPick(s, true))}
               title={s.tx_freq_hz ? `Click to fill in ${s.call}; double-click to tune too and set split to ${(s.tx_freq_hz / 1000).toFixed(2)} kHz` : `Click to fill in ${s.call}; double-click to tune too`}
             >
-              <span><span className={`flag ${rank === 0 ? "new" : "info"}`}>{NEED_NAME[rank]}</span></span>
+              <span><span className={`flag ${rank === 0 ? "new" : "info"}`}>{needLabel(s)}</span></span>
               <span className="mono num" title={wr === Infinity ? "" : `Club Log Most Wanted: number ${wr}`}>{wr === Infinity ? "" : wr}</span>
               <span className={`mono call ${s.watched ? "watched" : ""}`}>{s.call}</span>
               <span>{s.entity?.name ?? ""}</span>

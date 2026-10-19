@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { expandSpotComment, SPOT_COMMENT_MAX, SPOT_PLACEHOLDERS } from "../spotCheck";
-import type { ClusterConfig, ClusterNode, CtyStatus, Equipment, Fields, IntegrationStatus, Integrations, Location, Log, Settings, StationCallsign } from "../types";
+import type { AwardKind, ClusterConfig, ClusterNode, CtyStatus, Goals, Equipment, Fields, IntegrationStatus, Integrations, Location, Log, Settings, StationCallsign } from "../types";
 import { LOOKUP_SERVICES } from "../types";
 import { LOOKUP_SETTINGS_CHANGED } from "../lookupSettings";
 import type { EntryLayout, ModeLayouts } from "../fields";
@@ -16,7 +16,7 @@ import KeyboardTab from "./KeyboardSettings";
 import { DISPLAY_DEFAULTS, beep, setDisplay, useDisplay } from "../display";
 import { UPDATES_CHANGED } from "./UpdateNotice";
 import { MODES } from "../modes";
-import { NEED_NAME, type NeedRank } from "../needed";
+import type { NeedRank } from "../needed";
 import { setNeededConfig, useNeededConfig } from "../neededPrefs";
 import { SETTING_ENTRIES, type SettingEntry } from "../settingsIndex";
 import { setFrameless, useFrame } from "../frame";
@@ -607,9 +607,10 @@ function NeededAlertsSettings() {
         <label>
           Alert for{" "}
           <select value={c.level} onChange={(e) => setNeededConfig({ level: Number(e.target.value) as NeedRank })}>
-            <option value={0}>{NEED_NAME[0]}s only</option>
-            <option value={1}>New entities and new bands</option>
-            <option value={2}>New entities, bands and modes</option>
+            <option value={0}>Something new only (entity, zone, prefix, Marathon)</option>
+            <option value={1}>New ones and new bands</option>
+            <option value={2}>New ones, bands and modes</option>
+            <option value={3}>All of those, and unconfirmed</option>
           </select>
         </label>
         <label>
@@ -743,7 +744,74 @@ function AwardsTab() {
         <button onClick={() => setAwardsOff([])}>Select all</button>
         <button onClick={() => setAwardsOff(AWARD_LIST.map((a) => a.key))}>Clear all</button>
       </div>
+      <SpotGoals />
     </div>
+  );
+}
+
+const GOAL_AWARDS: { key: AwardKind; name: string; what: string }[] = [
+  { key: "dxcc", name: "DXCC", what: "entities" },
+  { key: "waz", name: "WAZ", what: "CQ zones" },
+  { key: "wpx", name: "WPX", what: "prefixes" },
+  { key: "wac", name: "WAC", what: "continents" },
+  { key: "itu", name: "ITU", what: "ITU zones" },
+  { key: "iota", name: "IOTA", what: "island groups, when the spot comment gives the reference" },
+];
+const GOAL_BANDS = ["160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m", "2m", "70cm"];
+const GOAL_MODES: [string, string][] = [["CW", "CW"], ["PHONE", "Phone"], ["DIGITAL", "Digital"]];
+
+/** What cluster spots are flagged for: awards, how far (new, band, mode, unconfirmed), bands, modes and the Marathon. */
+function SpotGoals() {
+  const [g, setG] = useState<Goals | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => { api.goals().then(setG).catch((e) => setErr(e.message)); }, []);
+  if (!g) return err ? <p className="err small">{err}</p> : null;
+  const save = (patch: Partial<Goals>) => {
+    const next = { ...g, ...patch };
+    setG(next);
+    api.putGoals(next).then(setG).catch((e) => setErr(e.message));
+  };
+  const toggle = <T,>(list: T[], v: T, on: boolean) => (on ? [...list.filter((x) => x !== v), v] : list.filter((x) => x !== v));
+  return (
+    <fieldset>
+      <legend>Spot flags (cluster, band map, Needed now)</legend>
+      <p className="small muted">A spot is flagged when it would add something to an award ticked here. Only awards a spot can be placed in from its call, band and mode are listed.</p>
+      <div className="row">
+        {GOAL_AWARDS.map((a) => (
+          <label key={a.key} className="check" title={a.what}>
+            <input type="checkbox" checked={g.awards.includes(a.key)} onChange={(e) => save({ awards: toggle(g.awards, a.key, e.target.checked) })} /> {a.name}
+          </label>
+        ))}
+      </div>
+      <label className="check"><input type="checkbox" checked={g.new_bands} onChange={(e) => save({ new_bands: e.target.checked })} /> Flag a new band for something already worked</label>
+      <label className="check"><input type="checkbox" checked={g.new_modes} onChange={(e) => save({ new_modes: e.target.checked })} /> Flag a new mode (CW, Phone, Digital)</label>
+      <div className="row">
+        <label className="check"><input type="checkbox" checked={g.unconfirmed} onChange={(e) => save({ unconfirmed: e.target.checked })} /> Flag worked but not confirmed;</label>
+        <span className="small muted">confirmed by:</span>
+        {(["lotw", "paper", "eqsl"] as const).map((k) => (
+          <label key={k} className="check">
+            <input type="checkbox" checked={g.counts[k]} onChange={(e) => save({ counts: { ...g.counts, [k]: e.target.checked } })} /> {k === "lotw" ? "LoTW" : k === "paper" ? "Cards" : "eQSL"}
+          </label>
+        ))}
+      </div>
+      <label className="check">
+        <input type="checkbox" checked={g.marathon} onChange={(e) => save({ marathon: e.target.checked })} /> <span><b>DX Marathon</b>: flag countries and CQ zones not yet worked this year</span>
+      </label>
+      <div className="row">
+        <span className="small muted">Bands:</span>
+        {GOAL_BANDS.map((b) => (
+          <label key={b} className="check"><input type="checkbox" checked={g.bands.length === 0 || g.bands.includes(b)} onChange={(e) => save({ bands: toggle(g.bands.length ? g.bands : GOAL_BANDS, b, e.target.checked) })} /> {b}</label>
+        ))}
+      </div>
+      <div className="row">
+        <span className="small muted">Modes:</span>
+        {GOAL_MODES.map(([k, name]) => (
+          <label key={k} className="check"><input type="checkbox" checked={g.modes.length === 0 || g.modes.includes(k)} onChange={(e) => save({ modes: toggle(g.modes.length ? g.modes : GOAL_MODES.map(([m]) => m), k, e.target.checked) })} /> {name}</label>
+        ))}
+      </div>
+      {err && <p className="err small">{err}</p>}
+      <p className="small muted">These apply at once, to the spots already listed too. Alerts for needed spots are set on the Cluster tab.</p>
+    </fieldset>
   );
 }
 

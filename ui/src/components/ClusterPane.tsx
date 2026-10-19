@@ -4,7 +4,7 @@ import { useColumnDrag } from "../columnDrag";
 import { distanceKm } from "../geo";
 import { onLive } from "../live";
 import { BANDS, MODE_GROUP_NAME, modeGroup } from "../modes";
-import { needRank } from "../needed";
+import { needLabels, needRank } from "../needed";
 import { localGet, localSet } from "../prefs";
 import type { Entity, Spot } from "../types";
 import type { DecodePick } from "./FtxMonitor";
@@ -54,11 +54,8 @@ function passes(s: Spot, f: Filters, home: Entity | null): boolean {
 
 function flagsOf(s: Spot): { text: string; cls: string }[] {
   const n = s.needed;
-  if (!n) return [];
-  const out: { text: string; cls: string }[] = [];
-  if (n.new_dxcc) out.push({ text: "New DXCC", cls: "new" });
-  if (n.new_band) out.push({ text: "New band", cls: "new" });
-  if (n.new_mode) out.push({ text: "New mode", cls: "new" });
+  const out: { text: string; cls: string }[] = needLabels(s).map((text) => ({ text, cls: text.startsWith("Unconfirmed") ? "info" : "new" }));
+  if (!n) return out;
   if (n.new_call && !n.new_dxcc) out.push({ text: "New call", cls: "info" });
   if (!n.new_call_band) out.push({ text: "Worked", cls: "dupe" });
   return out;
@@ -123,6 +120,8 @@ export default function ClusterPane({ onPick, onSettings }: { onPick: (p: Decode
       if (e.type === "spot") setSpots((list) => [e.spot, ...list.filter((s) => !(s.call === e.spot.call && Math.abs(s.freq_hz - e.spot.freq_hz) < 1000))].slice(0, KEEP));
       if (e.type === "cluster_line") setLines((l) => [...l, e.text].slice(-300));
       if (e.type === "cluster_state") setState({ state: e.state, connected: e.connected });
+      // The award goals changed: the server flagged its spots again.
+      if (e.type === "spots_reflagged") api.cluster().then((c) => setSpots(c.spots.slice().reverse())).catch(() => {});
     });
     return () => {
       clearInterval(t);

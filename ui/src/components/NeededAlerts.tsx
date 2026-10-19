@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { beep } from "../display";
 import { onLive } from "../live";
-import { AlertGate, NEED_NAME, needRank } from "../needed";
+import { AlertGate, needLabel, needRank } from "../needed";
 import { useNeededConfig } from "../neededPrefs";
 import type { Spot } from "../types";
 import type { DecodePick } from "./FtxMonitor";
@@ -57,7 +57,7 @@ export default function NeededAlerts({ onPick }: { onPick: (p: DecodePick) => vo
               setToasts((t) => t.filter((x) => x.id !== id));
             }}
           >
-            <b>{NEED_NAME[needRank(s) ?? 2]}</b> <span className="mono call">{s.call}</span> {s.entity?.name ?? ""}
+            <b>{needLabel(s)}</b> <span className="mono call">{s.call}</span> {s.entity?.name ?? ""}
             <br />
             <span className="mono">{s.band ?? ""} {(s.freq_hz / 1000).toFixed(1)} {s.mode}</span>
           </button>

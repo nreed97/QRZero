@@ -1,7 +1,7 @@
 //! DX cluster: one telnet connection (with failover through the user's node
 //! list), spots flagged against the open log, and a console.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, Weak};
 
 use qrzero_core::band::band_for_freq;
@@ -53,6 +53,10 @@ pub struct SpotInfo {
     /// Where the spotter is, from the country file.
     pub spotter_entity: Option<Entity>,
     pub needed: Option<Needed>,
+    /// The award goals (Settings, Awards) this spot meets; `None` until the log's awards are counted.
+    pub goals: Option<Vec<qrzero_core::awards::GoalHit>>,
+    /// A country or zone not yet worked this year, while Marathon alerts are on.
+    pub marathon: Option<qrzero_core::marathon::MarathonNeed>,
     /// The watch list entry this station matches.
     pub watched: Option<u64>,
 }
@@ -93,6 +97,23 @@ impl Cluster {
 
     fn lock(&self) -> std::sync::MutexGuard<'_, Inner> {
         self.inner.lock().unwrap_or_else(|p| p.into_inner())
+    }
+
+    /// Flags the kept spots again (after the goals change) and tells the UI to reload them.
+    pub fn reflag(&self) {
+        let Some(hub) = self.hub.upgrade() else { return };
+        // Worked out without holding the lock, as each spot takes the hub's.
+        let spots: Vec<SpotInfo> = self.lock().spots.iter().cloned().collect();
+        let flags: HashMap<u64, _> = spots
+            .iter()
+            .map(|s| (s.seq, hub.spot_needs(&s.call, s.entity.as_ref(), s.band.as_deref(), &s.mode, &s.comment)))
+            .collect();
+        for s in self.lock().spots.iter_mut() {
+            if let Some((goals, marathon)) = flags.get(&s.seq) {
+                (s.goals, s.marathon) = (goals.clone(), *marathon);
+            }
+        }
+        hub.emit(json!({"type": "spots_reflagged"}));
     }
 
     pub fn snapshot(&self) -> serde_json::Value {
@@ -230,6 +251,7 @@ impl Cluster {
                 // Spotters often log in as CALL-# or CALL/P; the country file wants the bare call.
                 let spotter_entity = hub.entity(s.spotter.split('-').next().unwrap_or(&s.spotter));
                 let needed = hub.needed(&s.call, entity.as_ref().and_then(|e| e.dxcc), band.as_deref(), Some(mode.as_str()).filter(|m| !m.is_empty()));
+                let (goals, marathon) = hub.spot_needs(&s.call, entity.as_ref(), band.as_deref(), &mode, &s.comment);
                 let sighting = crate::watch::Sighting {
                     call: &s.call,
                     entity_prefix: entity.as_ref().map(|e| e.prefix.as_str()),
@@ -261,6 +283,8 @@ impl Cluster {
                         entity,
                         spotter_entity,
                         needed,
+                        goals,
+                        marathon,
                         watched,
                     };
                     inner.spots.push_back(spot.clone());

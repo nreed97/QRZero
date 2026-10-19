@@ -1,5 +1,5 @@
 import type { LogStats, UpdateInfo, ContestList, DxpedList, MostWanted, DxpedPlanned, PropagationReport } from "./types";
-import type { ClubAwards, Marathon, QslQueue, QslService, QslDownload, AwardHint, SlotGrid, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
+import type { ClubAwards, Goals, Marathon, QslQueue, QslService, QslDownload, AwardHint, SlotGrid, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
 function sessionToken(): string {
@@ -83,6 +83,9 @@ export const api = {
     const q = new URLSearchParams({ calls: o.calls.join(","), region: o.region, cwt_tagged: String(o.cwtTagged) });
     return json<ClubAwards>("GET", `/logs/${logId}/club-awards?${q}`);
   },
+  /** What cluster spots are flagged for. */
+  goals: () => json<Goals>("GET", "/award-goals"),
+  putGoals: (g: Goals) => json<Goals>("PUT", "/award-goals", g),
   /** CQ DX Marathon countries and zones worked in one year (the current one when `year` is absent). */
   marathon: (logId: number, o: { calls: string[]; year?: number }) => {
     const q = new URLSearchParams({ calls: o.calls.join(",") });

@@ -3,6 +3,7 @@ import { api } from "../api";
 import type { PopContext } from "../bus";
 import { onLive, useInstances, useRadios } from "../live";
 import { BANDS, MODE_GROUP_NAME, bandForFreq, modeGroup } from "../modes";
+import { needLabel, needRank } from "../needed";
 import { localGet, localSet } from "../prefs";
 import type { FtxDecode, Spot } from "../types";
 import type { PaneActions } from "./SharedPanes";
@@ -84,7 +85,10 @@ function ageText(s: number): string {
 }
 
 const fmtKhz = (khz: number, step: number) => (step < 1 ? khz.toFixed(1) : khz.toFixed(0));
+/** FTx decodes carry only the plain flags. */
 const isNeeded = (n: Spot["needed"]) => !!n && (n.new_dxcc || n.new_band || n.new_mode || !!n.new_grid);
+/** Cluster spots also carry the award goals and Marathon needs. */
+const spotNeeded = (s: Spot) => needRank(s) !== null || !!s.needed?.new_grid;
 
 function needText(n: Spot["needed"]): string {
   if (!n) return "";
@@ -95,6 +99,9 @@ function needText(n: Spot["needed"]): string {
   if (n.new_grid) out.push("grid");
   return out.join(" ");
 }
+
+/** The first need of a spot, short enough for the band map label. */
+const spotNeedText = (s: Spot) => needLabel(s).replace(/^New /, "") || (s.needed?.new_grid ? "grid" : "");
 
 /** One thing to place beside the scale. */
 interface Item {
@@ -136,6 +143,7 @@ export default function BandMapPane({ ctx, act }: { ctx: PopContext; act: PaneAc
     const tick = setInterval(() => setNow(Date.now() / 1000), 10000);
     const off = onLive((e) => {
       if (e.type === "spot") setSpots((list) => [e.spot, ...list.filter((s) => s.call !== e.spot.call)].slice(0, 500));
+      if (e.type === "spots_reflagged") api.cluster().then((c) => setSpots(c.spots.slice().reverse())).catch(() => {});
       if (e.type === "decode") {
         const t = Date.now() / 1000;
         setDecodes((list) => [{ d: e.decode, at: t }, ...list.filter((x) => t - x.at < FTX_KEEP_S)].slice(0, 400));
@@ -209,7 +217,7 @@ export default function BandMapPane({ ctx, act }: { ctx: PopContext; act: PaneAc
       spots.filter((s) => {
         const khz = s.freq_hz / 1000;
         const age = now - s.received;
-        return (s.band === band || (khz >= lo && khz <= hi)) && (!maxAgeMin || age < maxAgeMin * 60) && (!prefs.needed || isNeeded(s.needed));
+        return (s.band === band || (khz >= lo && khz <= hi)) && (!maxAgeMin || age < maxAgeMin * 60) && (!prefs.needed || spotNeeded(s));
       }),
     [spots, band, lo, hi, now, maxAgeMin, prefs.needed],
   );
@@ -241,7 +249,7 @@ export default function BandMapPane({ ctx, act }: { ctx: PopContext; act: PaneAc
     const age = now - s.received;
     const n = s.needed;
     const worked = !!n && !n.new_call_band;
-    const need = needText(n);
+    const need = spotNeedText(s);
     const group = modeGroup(s.mode);
     items.push({
       key: `s${s.seq}`,

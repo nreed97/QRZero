@@ -17,7 +17,7 @@ QRZero connects to the first node and moves down the list if a node doesn't answ
 
 ## Spots
 
-Each spot shows the time, frequency, call, country, a best guess at the mode (from the comment, or the band plan), the spotter and the comment. Spots are flagged against the open log the same way as the FTx monitor: **New DXCC**, **New band**, **New mode**, **New call**, **Worked**. A new spot of a station on the same frequency replaces the older one.
+Each spot shows the time, frequency, call, country, a best guess at the mode (from the comment, or the band plan), the spotter and the comment. Spots are flagged against the open log: **New DXCC**, **New band**, **New mode**, **New call**, **Worked**. What counts as needed follows the **Spot flags** in Settings, Awards (see [Awards](11-awards.md)): add WAZ and a spot from a zone you haven't worked shows **New zone 25**, turn on unconfirmed and a worked but unconfirmed slot shows **Unconfirmed DXCC 20m**, turn on the DX Marathon and a country or zone not worked this year shows **Marathon country** or **Marathon zone**. A new spot of a station on the same frequency replaces the older one.
 
 - **Click a spot** to fill in the QSO panel with the call; the radio is left alone. **Double-click** a spot to fill it in and tune: when the panel follows a radio QRZero controls, the radio tunes to the spot and changes mode. If the comment says where the DX listens (`UP 5`, `QSX 14.205`), the radio is also put in split with that transmit frequency; see the Radios chapter.
 - To move a column, drag its heading left or right; a line shows where it will land. To make one wider or narrower, drag the right edge of its heading, and double-click that edge to give it its normal width back. The order and widths are remembered, and **Reset columns** (shown once you have changed something) puts them back. When the columns add up to more than the pane, it scrolls sideways.
@@ -28,7 +28,7 @@ Each spot shows the time, frequency, call, country, a best guess at the mode (fr
 
 ## Needed now
 
-The **Needed now** pane (Layout menu; it starts as a tab beside Cluster) lists only the spots on the air that would be new for your log, best first: a **new entity**, then a **new band** for an entity you have worked, then a **new mode**. Within each group the most wanted entity is on top, then the newest spot. It uses the same needed flags as the Cluster pane, so a spot shows here exactly when it would be flagged **New DXCC**, **New band** or **New mode** there. Click a spot to fill in the QSO panel, or double-click it to fill in and tune, just like in the Cluster pane.
+The **Needed now** pane (Layout menu; it starts as a tab beside Cluster) lists only the spots on the air that your log needs, best first: something new (an entity, or a zone, prefix and so on if you chase those, or a Marathon country or zone), then a **new band**, then a **new mode**, then an unconfirmed slot. Within each group the most wanted entity is on top, then the newest spot. It uses the same flags as the Cluster pane, so a spot shows here exactly when it is flagged as needed there. Click a spot to fill in the QSO panel, or double-click it to fill in and tune, just like in the Cluster pane.
 
 The **Wanted** column is the entity's rank on Club Log's public Most Wanted list (1 is the entity the most Club Log users still need), and it decides the order within a group. QRZero reads that list at most once a day, keeps it in your log database, and never asks Club Log about individual spots. Entities not on the list, or all of them when the list can't be read (offline, say), show a blank and fall back to newest first. No Club Log account is needed.
 
@@ -36,12 +36,12 @@ A call on the same band and mode is listed once, however many people spot it. Sp
 
 ### Alerts
 
-When a needed station is spotted, QRZero can play a sound and show a popup in the corner of the main window. Click the popup to fill in the station, or double-click it to fill in and tune (it then closes); it goes away by itself after a short while. A new entity gets a double beep, a new band or mode a single one.
+When a needed station is spotted, QRZero can play a sound and show a popup in the corner of the main window. Click the popup to fill in the station, or double-click it to fill in and tune (it then closes); it goes away by itself after a short while. Something new gets a double beep, a new band, mode or unconfirmed slot a single one.
 
 In **Settings**, **DX cluster**, under **Alerts for needed spots** (the **Alerts…** button in the pane takes you there):
 
 - **Play a sound** and **Show a popup** are switched on and off separately.
-- **Alert for** chooses how much alerts: new entities only, new entities and bands, or also new modes.
+- **Alert for** chooses how much alerts: something new only, also new bands, also new modes, or also unconfirmed slots. A Marathon country or zone counts as something new.
 - **Not again for the same call, band and mode within** sets how long before the same station can alert again (30 minutes to start with). A different band or mode is a different slot and alerts on its own. Spots the cluster sends when you first connect aren't alerted.
 
 The popups and the sound come from the main window only, so pop-out windows don't repeat them.
