@@ -16,8 +16,23 @@ pub struct Hit {
     pub date: String,
     /// QSO row id.
     pub id: i64,
+    /// Worked this year in these mode groups (any QSO, not just the first).
+    pub cw: bool,
+    pub phone: bool,
+    pub digital: bool,
     #[serde(skip)]
     time_on: i64,
+}
+
+impl Hit {
+    fn mark(&mut self, group: Option<&str>) {
+        match group {
+            Some("CW") => self.cw = true,
+            Some("PHONE") => self.phone = true,
+            Some("DIGITAL") => self.digital = true,
+            _ => {}
+        }
+    }
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
@@ -64,24 +79,37 @@ pub struct MarathonTally {
 }
 
 impl MarathonTally {
-    pub fn add(&mut self, id: i64, call: &str, time_on: i64, country: Option<(String, String)>, zone: Option<u32>) {
-        let hit = |key: String, name: String| Hit { key, name, call: call.to_string(), date: date(time_on), id, time_on };
+    /// `group` is the QSO's mode group ("CW", "PHONE" or "DIGITAL"), if it has a mode.
+    pub fn add(&mut self, id: i64, call: &str, time_on: i64, group: Option<&str>, country: Option<(String, String)>, zone: Option<u32>) {
+        let hit = |key: String, name: String| Hit { key, name, call: call.to_string(), date: date(time_on), id, time_on, cw: false, phone: false, digital: false };
         let earlier = |h: &Hit| time_on < h.time_on || (time_on == h.time_on && id < h.id);
         if let Some((key, name)) = country {
-            match self.countries.get(&key) {
-                Some(h) if !earlier(h) => {}
-                _ => {
-                    self.countries.insert(key.clone(), hit(key, name));
+            let mut h = match self.countries.remove(&key) {
+                Some(h) if !earlier(&h) => h,
+                old => {
+                    let mut n = hit(key.clone(), name);
+                    if let Some(o) = old {
+                        (n.cw, n.phone, n.digital) = (o.cw, o.phone, o.digital);
+                    }
+                    n
                 }
-            }
+            };
+            h.mark(group);
+            self.countries.insert(key, h);
         }
         if let Some(z) = zone {
-            match self.zones.get(&z) {
-                Some(h) if !earlier(h) => {}
-                _ => {
-                    self.zones.insert(z, hit(z.to_string(), format!("Zone {z}")));
+            let mut h = match self.zones.remove(&z) {
+                Some(h) if !earlier(&h) => h,
+                old => {
+                    let mut n = hit(z.to_string(), format!("Zone {z}"));
+                    if let Some(o) = old {
+                        (n.cw, n.phone, n.digital) = (o.cw, o.phone, o.digital);
+                    }
+                    n
                 }
-            }
+            };
+            h.mark(group);
+            self.zones.insert(z, h);
         }
     }
 
@@ -170,15 +198,18 @@ I,Italy,248,EU,15,28,42.82,-12.58,-1.0,I;
         let jan = year_start(2026);
         assert_eq!(jan, 1_767_225_600);
         let mut t = MarathonTally::default();
-        t.add(2, "IT9ABC", jan + 7200, country(Some(&cty), "IT9ABC", None), zone(Some(&cty), "IT9ABC", None));
-        t.add(1, "I1ABC", jan + 3600, country(Some(&cty), "I1ABC", None), Some(15));
-        t.add(3, "IT9XYZ", jan + 60, country(Some(&cty), "IT9XYZ", None), Some(15));
+        t.add(2, "IT9ABC", jan + 7200, Some("CW"), country(Some(&cty), "IT9ABC", None), zone(Some(&cty), "IT9ABC", None));
+        t.add(1, "I1ABC", jan + 3600, Some("PHONE"), country(Some(&cty), "I1ABC", None), Some(15));
+        t.add(3, "IT9XYZ", jan + 60, Some("CW"), country(Some(&cty), "IT9XYZ", None), Some(15));
         let m = t.finish(2026, vec![2026, 2025]);
         assert_eq!(m.countries.iter().map(|h| h.call.as_str()).collect::<Vec<_>>(), ["IT9XYZ", "I1ABC"]);
         assert_eq!(m.zones.len(), 1);
         assert_eq!((m.zones[0].call.as_str(), m.zones[0].date.as_str()), ("IT9XYZ", "2026-01-01"));
         assert_eq!(m.missing_zones.len(), 39);
         assert_eq!(m.score, 3);
+        let sicily = m.countries.iter().find(|h| h.key == "IT9").unwrap();
+        assert!(sicily.cw && !sicily.phone && !sicily.digital);
+        assert!(m.zones[0].cw && m.zones[0].phone, "a zone keeps the modes of its later QSOs");
 
         let mut idx = MarathonIndex::new(2026);
         idx.add(country(Some(&cty), "I1ABC", None), Some(15));

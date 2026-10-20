@@ -503,7 +503,7 @@ impl Hub {
         let mut idx = MarathonIndex::new(year);
         let (from, to) = (qrzero_core::marathon::year_start(year), qrzero_core::marathon::year_start(year + 1));
         let res = self.with_store(|st| {
-            st.for_each_qso_between(log_id, &[], from, to, |_, call, _, dxcc, cqz| {
+            st.for_each_qso_between(log_id, &[], from, to, |_, call, _, dxcc, cqz, _| {
                 idx.add(qrzero_core::marathon::country(cty.as_deref(), call, dxcc), qrzero_core::marathon::zone(cty.as_deref(), call, cqz));
             })
         });

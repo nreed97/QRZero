@@ -60,11 +60,11 @@ Each cell is V when a credited QSO falls in that cell; a cell with only plain co
 
 ## DX Marathon
 
-The **Marathon** button shows one calendar year of the CQ DX Marathon: the countries and CQ zones you have worked that year. Pick the year in the box at the top; it starts on the current one. The score is countries plus zones. No confirmations are needed, so every QSO counts, on any band and mode.
+The **Marathon** button shows one calendar year of the CQ DX Marathon: the countries and CQ zones you have worked that year. Pick the year in the box at the top; it starts on the current one. The score is countries plus zones. No confirmations are needed, so every QSO counts, on any band. The mode box next to the year is **Mixed** to start with, which counts every mode; pick **CW**, **Phone** or **Digital** to count only QSOs in that mode group, for a single-mode entry. Your choice is remembered.
 
 Countries are the DXCC entities plus the extra WAE ones the country file lists (Sicily, Shetland, the Vienna International Centre and so on). A QSO's country comes from its call in the country file, unless its DXCC field names a different DXCC entity (one LoTW corrected, say). Zones come from the CQ zone field, or the country file when it is blank.
 
-The 40 zones are shown as a grid, worked ones shaded; hover over one to see the first QSO with it. Below is every country worked that year, newest first, with the first QSO and its date. Click a zone or country to see the QSOs with that call in the log. Pick one of your callsigns at the top to count only QSOs made with it.
+The 40 zones are shown as a grid, worked ones shaded; hover over one to see the first QSO with it. Below is every country worked that year, newest first, with the first QSO and its date, and an x under CW, Phone or Digital for each mode group you have worked it on that year. A blank mode column is a country you still need on that mode. The zone tooltips list the modes too. Click a zone or country to see the QSOs with that call in the log. Pick one of your callsigns at the top to count only QSOs made with it.
 
 QRZero only counts. It doesn't check the Marathon's own rules for your entry (which category you enter, or bands and modes the rules leave out); check those before you send in a score.
 
