@@ -20,7 +20,7 @@ use crate::cwclubs::ClubQso;
 use crate::worked::WorkedIndex;
 
 /// Migrations in order; migration N brings the schema to user_version N.
-const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8, SCHEMA_V9];
+const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8, SCHEMA_V9, SCHEMA_V10];
 /// The newest schema this build knows (`PRAGMA user_version`).
 pub const SCHEMA_VERSION: i32 = MIGRATIONS.len() as i32;
 
@@ -85,6 +85,13 @@ DROP TABLE IF EXISTS lookup_cache;
 /// A callsign the operator no longer holds can be archived: hidden from pickers and automatic
 /// uploads, while its QSOs stay exactly as they were.
 const SCHEMA_V9: &str = "ALTER TABLE station_callsigns ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;";
+
+/// A small partial index over QSOs queued for a paper QSL card, so the queue opens without
+/// scanning every QSO. The WHERE clause must match `paper_queue` exactly.
+const SCHEMA_V10: &str = r#"
+CREATE INDEX qsos_paper_queue ON qsos (log_id, call, time_on)
+    WHERE json_extract(fields, '$.QSL_SENT') = 'Q';
+"#;
 
 const SCHEMA_V8: &str = r#"
 -- Equipment of a duplicate that the kept location doesn't already have moves across.
@@ -1783,6 +1790,21 @@ mod tests {
         st.create_equipment(1, "rig", "K3", &Fields::new()).unwrap();
         drop(st);
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn paper_queue_uses_its_partial_index() {
+        let st = Store::open_in_memory().unwrap();
+        let plan: String = st
+            .conn
+            .prepare("EXPLAIN QUERY PLAN SELECT id, log_id, location_id, fields FROM qsos WHERE log_id = 1 AND json_extract(fields, '$.QSL_SENT') = 'Q' ORDER BY call, time_on")
+            .unwrap()
+            .query_map([], |r| r.get::<_, String>(3))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect::<Vec<_>>()
+            .join(" / ");
+        assert!(plan.contains("qsos_paper_queue") && !plan.contains("TEMP B-TREE"), "{plan}");
     }
 
     #[test]
