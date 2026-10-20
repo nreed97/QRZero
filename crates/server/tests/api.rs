@@ -224,6 +224,10 @@ async fn dx_marathon_counts_one_year() {
     let last = api.get(&format!("/logs/{log}/marathon?year=2025")).await;
     assert_eq!(last["score"], 2);
     assert_eq!(api.get(&format!("/logs/{log}/marathon?year=2025&calls=N0NONE")).await["score"], 0);
+    // Bands and modes left out of Columns don't count.
+    assert_eq!(api.get(&format!("/logs/{log}/marathon?year=2026&bands=20m,40m&modes=CW")).await["score"], 4);
+    assert_eq!(api.get(&format!("/logs/{log}/marathon?year=2026&bands=40m")).await["score"], 0);
+    assert_eq!(api.get(&format!("/logs/{log}/marathon?year=2026&modes=PHONE,DIGITAL")).await["score"], 0);
 }
 
 /// What the stand-in ntfy server got: (topic, title, priority, authorization, body).

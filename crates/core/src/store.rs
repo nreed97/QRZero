@@ -704,12 +704,12 @@ impl Store {
         callsigns: &[String],
         since: i64,
         until: i64,
-        mut f: impl FnMut(i64, &str, i64, Option<u32>, Option<u32>),
+        mut f: impl FnMut(i64, &str, i64, Option<u32>, Option<u32>, Option<&str>, Option<&str>),
     ) -> Result<()> {
         let marks = vec!["?"; callsigns.len()].join(", ");
         let calls = if callsigns.is_empty() { String::new() } else { format!(" AND station_callsign IN ({marks})") };
         let mut stmt = self.conn.prepare(&format!(
-            "SELECT id, call, time_on, dxcc, json_extract(fields, '$.CQZ') FROM qsos
+            "SELECT id, call, time_on, dxcc, json_extract(fields, '$.CQZ'), band, mode FROM qsos
              WHERE log_id = ?1 AND time_on >= ?2 AND time_on < ?3{calls}"
         ))?;
         let mut args: Vec<Value> = vec![log_id.into(), since.into(), until.into()];
@@ -723,7 +723,8 @@ impl Store {
                 rusqlite::types::ValueRef::Text(t) => std::str::from_utf8(t).ok().and_then(|z| z.trim().parse().ok()),
                 _ => None,
             };
-            f(r.get(0)?, &call, r.get(2)?, dxcc.and_then(|d| u32::try_from(d).ok()), cqz);
+            let (band, mode): (Option<String>, Option<String>) = (r.get(5)?, r.get(6)?);
+            f(r.get(0)?, &call, r.get(2)?, dxcc.and_then(|d| u32::try_from(d).ok()), cqz, band.as_deref(), mode.as_deref());
         }
         Ok(())
     }

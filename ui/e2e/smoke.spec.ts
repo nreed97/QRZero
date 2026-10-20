@@ -814,6 +814,14 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByLabel("Marathon year").selectOption("2024");
   await expect(page.locator(".marathon-score")).toHaveText(/^[1-9]\d*$/);
   await expect(page.locator(".marathon-zones td")).toHaveCount(40);
+  // Columns: leaving out every mode empties the score, and it is kept apart from DXCC's columns.
+  const score = await page.locator(".marathon-score").innerText();
+  await page.locator(".award-cols summary").click();
+  for (const m of ["CW", "Phone", "Digital"]) await page.locator(".award-cols-list").getByLabel(m, { exact: true }).uncheck();
+  await expect(page.locator(".marathon-score")).toHaveText("0");
+  await page.screenshot({ path: "e2e-results/awards-marathon-columns.png" });
+  await page.locator(".award-cols-list").getByRole("button", { name: "Show all" }).click();
+  await expect(page.locator(".marathon-score")).toHaveText(score);
   await expect(page.locator(".club-table tbody tr", { hasText: "ZL1ABC" })).toContainText("2024-02-10");
   await page.screenshot({ path: "e2e-results/awards-marathon.png" });
   await page.getByRole("button", { name: "SKCC" }).click();
