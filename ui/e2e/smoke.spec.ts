@@ -814,13 +814,6 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByLabel("Marathon year").selectOption("2024");
   await expect(page.locator(".marathon-score")).toHaveText(/^[1-9]\d*$/);
   await expect(page.locator(".marathon-zones td")).toHaveCount(40);
-  // Columns: leaving out every mode empties the score, and it is kept apart from DXCC's columns.
-  await page.locator(".award-cols summary").click();
-  for (const m of ["CW", "Phone", "Digital"]) await page.locator(".award-cols-list").getByLabel(m, { exact: true }).uncheck();
-  await expect(page.locator(".marathon-score")).toHaveText("0");
-  await page.screenshot({ path: "e2e-results/awards-marathon-columns.png" });
-  await page.locator(".award-cols-list").getByRole("button", { name: "Show all" }).click();
-  await expect(page.locator(".marathon-score")).toHaveText(/^[1-9]\d*$/);
   await expect(page.locator(".club-table tbody tr", { hasText: "ZL1ABC" })).toContainText("2024-02-10");
   await page.screenshot({ path: "e2e-results/awards-marathon.png" });
   await page.getByRole("button", { name: "SKCC" }).click();
@@ -875,7 +868,6 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByRole("button", { name: "SKCC" })).toHaveCount(0);
   await fromMenu(page, "Settings…");
   await page.getByRole("button", { name: "Awards", exact: true }).click();
-  await page.screenshot({ path: "e2e-results/settings-awards.png" });
   await page.getByRole("button", { name: "Select all" }).click();
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await expect(page.getByRole("button", { name: "SKCC" })).toBeVisible();

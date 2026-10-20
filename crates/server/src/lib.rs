@@ -762,12 +762,6 @@ struct MarathonQuery {
     calls: String,
     /// The calendar year; the current one when absent.
     year: Option<i32>,
-    /// Comma-separated bands that count (`20m`); empty means all.
-    #[serde(default)]
-    bands: String,
-    /// Comma-separated mode groups that count (`CW`, `PHONE`, `DIGITAL`); empty means all.
-    #[serde(default)]
-    modes: String,
 }
 
 /// CQ DX Marathon progress for one year: countries and zones worked, counted when asked for.
@@ -777,8 +771,6 @@ async fn marathon(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Query<
     let calls: Vec<String> = q.calls.split(',').map(|c| c.trim().to_ascii_uppercase()).filter(|c| !c.is_empty()).collect();
     let this_year = chrono::Datelike::year(&chrono::Utc::now());
     let year = q.year.unwrap_or(this_year);
-    let list = |v: &str| -> Vec<String> { v.split(',').map(|c| c.trim().to_ascii_uppercase()).filter(|c| !c.is_empty()).collect() };
-    let (bands, modes) = (list(&q.bands), list(&q.modes));
     let out = db(&s, move |st| {
         let year_of = |t: i64| chrono::DateTime::from_timestamp(t, 0).map_or(this_year, |d| chrono::Datelike::year(&d));
         let mut years: Vec<i32> = match st.qso_time_range(id, &calls)? {
@@ -791,12 +783,7 @@ async fn marathon(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Query<
         }
         let mut tally = marathon::MarathonTally::default();
         let cty = cty.as_deref();
-        st.for_each_qso_between(id, &calls, marathon::year_start(year), marathon::year_start(year + 1), |qid, call, t, dxcc, cqz, band, mode| {
-            let band_ok = bands.is_empty() || band.is_some_and(|b| bands.contains(&b.trim().to_ascii_uppercase()));
-            let mode_ok = modes.is_empty() || mode.and_then(qrzero_core::awards::mode_group).is_some_and(|g| modes.iter().any(|m| m == g));
-            if !(band_ok && mode_ok) {
-                return;
-            }
+        st.for_each_qso_between(id, &calls, marathon::year_start(year), marathon::year_start(year + 1), |qid, call, t, dxcc, cqz| {
             tally.add(qid, call, t, marathon::country(cty, call, dxcc), marathon::zone(cty, call, cqz));
         })?;
         Ok(tally.finish(year, years))

@@ -778,7 +778,7 @@ function SpotGoals() {
   return (
     <fieldset>
       <legend>Spot flags (cluster, band map, Needed now)</legend>
-      <p className="small muted">A spot is flagged when it would add something to an award ticked here. Only awards a spot can be placed in from its call, band and mode are listed. Which bands and modes the Marathon counts is set under Columns in the Awards pane.</p>
+      <p className="small muted">A spot is flagged when it would add something to an award ticked here. Only awards a spot can be placed in from its call, band and mode are listed.</p>
       <div className="row">
         {GOAL_AWARDS.map((a) => (
           <label key={a.key} className="check" title={a.what}>

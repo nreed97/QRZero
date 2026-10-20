@@ -3,7 +3,7 @@ import { api } from "../api";
 import type { Marathon, QsoFilter } from "../types";
 
 /** CQ DX Marathon: countries and CQ zones worked in one calendar year. */
-export default function MarathonView({ logId, call, bands, modes, stamp, onShowQsos }: { logId: number; call: string; bands: string[]; modes: string[]; stamp: number; onShowQsos: (f: QsoFilter) => void }) {
+export default function MarathonView({ logId, call, stamp, onShowQsos }: { logId: number; call: string; stamp: number; onShowQsos: (f: QsoFilter) => void }) {
   const [year, setYear] = useState<number | undefined>(undefined);
   const [data, setData] = useState<Marathon | null>(null);
   const [err, setErr] = useState("");
@@ -12,13 +12,13 @@ export default function MarathonView({ logId, call, bands, modes, stamp, onShowQ
     let live = true;
     setErr("");
     api
-      .marathon(logId, { calls: call ? [call] : [], year, bands, modes })
+      .marathon(logId, { calls: call ? [call] : [], year })
       .then((d) => live && setData(d))
       .catch((e) => live && setErr(e.message));
     return () => {
       live = false;
     };
-  }, [logId, call, year, stamp, bands.join(), modes.join()]);
+  }, [logId, call, year, stamp]);
 
   if (err) return <div className="ftx-msg small err">{err}</div>;
   if (!data) return null;
@@ -70,7 +70,7 @@ export default function MarathonView({ logId, call, bands, modes, stamp, onShowQ
         </tbody>
       </table>
       <div className="ftx-msg small muted">
-        Bands and modes switched off under Columns are left out of the count. Countries are DXCC entities plus the WAE-only ones in the country file (Sicily, Shetland and so on), each counted once a year; no confirmations are needed. Zones are CQ zones. Newest first; click one to see its QSOs.
+        Countries are DXCC entities plus the WAE-only ones in the country file (Sicily, Shetland and so on), each counted once a year with any band and mode; no confirmations are needed. Zones are CQ zones. Newest first; click one to see its QSOs.
       </div>
     </div>
   );

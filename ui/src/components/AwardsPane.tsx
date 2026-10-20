@@ -37,10 +37,6 @@ const FIXED = new Set<AwardKind>(["dxcc", "was", "waz", "wac", "itu"]);
 
 /** The DXCC Challenge counts entity-band slots on these 10 bands; the 5-band awards (5BDXCC, 5BWAS, 5BWAZ) count these 5. */
 const CHALLENGE_BANDS = ["160m", "80m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m"];
-/** The Marathon's Columns: bands and mode groups that count towards it (kept apart from every other award's). */
-const MARATHON_BANDS = ["160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m", "2m", "70cm"];
-const MARATHON_MODES = ["CW", "PHONE", "DIGITAL"];
-const MARATHON_COL_NAMES: Record<string, string> = { CW: "CW", PHONE: "Phone", DIGITAL: "Digital" };
 const FIVE_BANDS = ["80m", "40m", "20m", "15m", "10m"];
 const HONOR_COLS = ["mixed", "cw", "phone", "digital"];
 /** The DXCC Honor Roll takes current entities confirmed to within this many of the total. */
@@ -130,8 +126,6 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
   // Columns (bands and modes) switched off for this award; totals and counts still use every column.
   const off = opts.hideCols[current] ?? [];
   const cols = table ? table.columns.filter((c) => !off.includes(c.key)) : [];
-  const marathonBands = marathon ? MARATHON_BANDS.filter((b) => !off.includes(b)) : [];
-  const marathonModes = marathon ? MARATHON_MODES.filter((m) => !off.includes(m)) : [];
   const toggleCol = (key: string) => set({ hideCols: { ...opts.hideCols, [current]: off.includes(key) ? off.filter((k) => k !== key) : [...off, key] } });
   const award = AWARDS.find((a) => a.key === current) ?? AWARDS[0];
   const summary = useMemo(() => (table && table.award === current ? summarize(table) : null), [table, current]);
@@ -190,17 +184,6 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
             </div>
           </details>
         )}
-        {marathon && (
-          <details className="award-cols">
-            <summary title="Choose which modes and bands count towards the Marathon">Columns{off.length > 0 ? ` (${off.length} hidden)` : ""}</summary>
-            <div className="award-cols-list">
-              {[...MARATHON_MODES, ...MARATHON_BANDS].map((k) => (
-                <label key={k} className="check"><input type="checkbox" checked={!off.includes(k)} onChange={() => toggleCol(k)} /> {MARATHON_COL_NAMES[k] ?? k.replace(/(\d)m$/, "$1 m")}</label>
-              ))}
-              {off.length > 0 && <button className="small" onClick={() => set({ hideCols: { ...opts.hideCols, [current]: [] } })}>Show all</button>}
-            </div>
-          </details>
-        )}
         <span className="spacer" />
         {mixed && (
           <span className="award-score">
@@ -228,7 +211,7 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
       )}
       {err && <div className="ftx-msg small err">{err}</div>}
       {club && <ClubAwards logId={logId} kind={club} call={opts.call} stamp={stamp} />}
-      {marathon && <MarathonView logId={logId} call={opts.call} bands={marathonBands.length === MARATHON_BANDS.length ? [] : marathonBands.length ? marathonBands : ["-"]} modes={marathonModes.length === MARATHON_MODES.length ? [] : marathonModes.length ? marathonModes : ["-"]} stamp={stamp} onShowQsos={onShowQsos} />}
+      {marathon && <MarathonView logId={logId} call={opts.call} stamp={stamp} onShowQsos={onShowQsos} />}
       {table && isTable(current) && (
         <div className="award-scroll">
           <table className="award-table">

@@ -60,7 +60,7 @@ Each cell is V when a credited QSO falls in that cell; a cell with only plain co
 
 ## DX Marathon
 
-The **Marathon** button shows one calendar year of the CQ DX Marathon: the countries and CQ zones you have worked that year. Pick the year in the box at the top; it starts on the current one. The score is countries plus zones. No confirmations are needed, so every QSO counts. Use **Columns** in the toolbar to leave out modes (CW, Phone, Digital) or bands you don't enter with; QSOs on those no longer count. The choice is kept for the Marathon alone and doesn't change DXCC's or any other award's. Cluster spot flags still follow Settings, Awards, Spot flags.
+The **Marathon** button shows one calendar year of the CQ DX Marathon: the countries and CQ zones you have worked that year. Pick the year in the box at the top; it starts on the current one. The score is countries plus zones. No confirmations are needed, so every QSO counts, on any band and mode.
 
 Countries are the DXCC entities plus the extra WAE ones the country file lists (Sicily, Shetland, the Vienna International Centre and so on). A QSO's country comes from its call in the country file, unless its DXCC field names a different DXCC entity (one LoTW corrected, say). Zones come from the CQ zone field, or the country file when it is blank.
 
