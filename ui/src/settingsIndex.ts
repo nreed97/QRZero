@@ -36,7 +36,7 @@ export const SETTING_ENTRIES: SettingEntry[] = [
   E("radios", "Rotator", "rotor pstrotator rotctld gs-232 yaesu serial baud antenna"),
   E("radios", "Control a rotator", "rotor enable"),
   E("radios", "Let N1MM (or another program) turn the rotator through QRZero", "rotor n1mm serve"),
-  E("radios", "Country file", "cty dxcc prefix download ad1c"),
+  E("lookup", "Country file", "cty dxcc prefix download ad1c"),
   E("udp", "UDP connections", "relay forward custom message n1mm log4om"),
   E("startup", "Startup programs", "launch start wsjtx n1mm programs"),
   E("cluster", "Connect when QRZero starts", "dx cluster telnet auto connect"),

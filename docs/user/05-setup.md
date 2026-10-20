@@ -5,7 +5,7 @@ Open **Settings…** from the **☰** menu at the right of the top bar. Its sect
 - **Program**: General (colours, text size, units, formats, reports, setup wizard), Backups, Keyboard
 - **Station**: Callsigns, Locations, Equipment, Logs
 - **Logging**: Entry fields, Callsign lookup, Awards
-- **Connections**: Radios and programs (WSJT-X, JTDX, N1MM, PstRotatorAz, country file), UDP connections, DX cluster, Startup programs
+- **Connections**: Radios and programs (WSJT-X, JTDX, N1MM, rotator), UDP connections, DX cluster, Startup programs
 
 Click a section to show it on the right. Settings opens on **General**.
 

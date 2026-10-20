@@ -188,7 +188,7 @@ export default function SettingsDialog(props: Props) {
       {tab === "startup" && <StartupAppsTab onClose={props.onClose} />}
       {tab === "cluster" && <ClusterTab onClose={props.onClose} />}
       {tab === "awards" && <AwardsTab />}
-      {tab === "alerts" && <AlertsTab />}
+      {tab === "alerts" && <AlertsTab onClose={props.onClose} />}
       {tab === "backups" && <BackupsTab />}
       {tab === "keyboard" && <KeyboardTab />}
       {tab === "general" && <GeneralTab general={props.general} onGeneral={props.onGeneral} onWizard={props.onWizard} />}
@@ -329,6 +329,44 @@ function LogsTab({ logs, logId, onSwitchLog, guard }: Props & { guard: Guard }) 
   );
 }
 
+/** The country file behind DXCC entities. It acts at once; it is not part of the form's Save. */
+function CountryFileSettings() {
+  const [cty, setCty] = useState<CtyStatus | null>(null);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  useEffect(() => { api.cty().then(setCty).catch(() => {}); }, []);
+  const run = async (fn: () => Promise<CtyStatus>) => {
+    setMsg({ text: "Loading the country file…", ok: true });
+    try {
+      setCty(await fn());
+      setMsg({ text: "Country file loaded.", ok: true });
+    } catch (e) {
+      setMsg({ text: (e as Error).message, ok: false });
+    }
+  };
+  return (
+    <fieldset>
+      <legend>Country file</legend>
+      <p className="small muted">
+        Works out the DXCC entity of a call for the FTx monitor, spots and the map, from AD1C's country files
+        (country-files.com). QRZero downloads it every two weeks. These buttons act at once.
+      </p>
+      <p>
+        {cty && cty.entities > 0
+          ? `${cty.entities} entities loaded from ${cty.file}${cty.age_days !== null ? `, ${cty.age_days} day${cty.age_days === 1 ? "" : "s"} old` : ""}.`
+          : "No country file loaded yet."}
+      </p>
+      <div className="row">
+        <button onClick={() => run(api.updateCty)}>Download now</button>
+        <label className="button-like">
+          Load cty.csv or cty.dat…
+          <input type="file" accept=".csv,.dat,text/plain" hidden onChange={(e) => e.target.files?.[0] && run(() => api.installCty(e.target.files![0]))} />
+        </label>
+      </div>
+      {msg && <p className={msg.ok ? "small" : "err"}>{msg.text}</p>}
+    </fieldset>
+  );
+}
+
 function LookupTab({ onClose }: { onClose: () => void }) {
   const [s, setS] = useState<Settings | null>(null);
   const [passwords, setPasswords] = useState<Record<string, string>>({});
@@ -440,6 +478,8 @@ function LookupTab({ onClose }: { onClose: () => void }) {
         </p>
       </fieldset>
 
+      <CountryFileSettings />
+
       <SaveBar msg={msg} onSave={save} onClose={onClose} />
     </div>
   );
@@ -448,12 +488,10 @@ function LookupTab({ onClose }: { onClose: () => void }) {
 function RadiosTab({ onClose }: { onClose: () => void }) {
   const [cfg, setCfg] = useState<Integrations | null>(null);
   const [status, setStatus] = useState<IntegrationStatus | null>(null);
-  const [cty, setCty] = useState<CtyStatus | null>(null);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   useEffect(() => {
     api.integrations().then((r) => { setCfg(r.config); setStatus(r.status); }).catch((e) => setMsg({ text: e.message, ok: false }));
-    api.cty().then(setCty).catch(() => {});
   }, []);
   if (!cfg) return <p className="muted">Loading…</p>;
 
@@ -468,15 +506,6 @@ function RadiosTab({ onClose }: { onClose: () => void }) {
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
       return false;
-    }
-  };
-  const ctyRun = async (fn: () => Promise<CtyStatus>) => {
-    setMsg({ text: "Loading the country file…", ok: true });
-    try {
-      setCty(await fn());
-      setMsg({ text: "Country file loaded.", ok: true });
-    } catch (e) {
-      setMsg({ text: (e as Error).message, ok: false });
     }
   };
   const check = (k: keyof Integrations, label: string) => (
@@ -562,26 +591,6 @@ function RadiosTab({ onClose }: { onClose: () => void }) {
       </fieldset>
 
       <SaveBar msg={msg} onSave={save} onClose={onClose} />
-
-      <fieldset>
-        <legend>Country file</legend>
-        <p className="small muted">
-          Works out the DXCC entity of a call for the FTx monitor, spots and the map, from AD1C's country files
-          (country-files.com). QRZero downloads it every two weeks.
-        </p>
-        <p>
-          {cty && cty.entities > 0
-            ? `${cty.entities} entities loaded from ${cty.file}${cty.age_days !== null ? `, ${cty.age_days} day${cty.age_days === 1 ? "" : "s"} old` : ""}.`
-            : "No country file loaded yet."}
-        </p>
-        <div className="row">
-          <button onClick={() => ctyRun(api.updateCty)}>Download now</button>
-          <label className="button-like">
-            Load cty.csv or cty.dat…
-            <input type="file" accept=".csv,.dat,text/plain" hidden onChange={(e) => e.target.files?.[0] && ctyRun(() => api.installCty(e.target.files![0]))} />
-          </label>
-        </div>
-      </fieldset>
     </div>
   );
 }
