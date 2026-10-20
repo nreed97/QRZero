@@ -129,13 +129,27 @@ struct AppState {
     qsl: Arc<Qsl>,
     propagation: Arc<propagation::Propagation>,
     startup: Arc<startup::Startup>,
-    /// Award tables by request, with the QSO version they were counted at.
+    /// Award tables, statistics and club awards by request, with the QSO version they were counted at.
     award_cache: AwardCache,
     /// What happened to a restore staged before this start.
     last_restore: Option<backups::RestoreResult>,
 }
 
-type AwardCache = Arc<Mutex<std::collections::HashMap<String, (i64, Arc<AwardTable>)>>>;
+type AwardCache = Arc<Mutex<std::collections::HashMap<String, (i64, Arc<dyn std::any::Any + Send + Sync>)>>>;
+
+/// Returns the result cached under `key` if no QSO has changed since, else counts it with
+/// `compute` and keeps it (dropping results from older versions).
+fn cached_count<T: Send + Sync + 'static>(cache: &AwardCache, st: &Store, key: String, compute: impl FnOnce() -> qrzero_core::Result<T>) -> qrzero_core::Result<Arc<T>> {
+    let version = st.qso_version()?;
+    if let Some(t) = cache.lock().unwrap_or_else(|p| p.into_inner()).get(&key).filter(|(v, _)| *v == version).and_then(|(_, t)| t.clone().downcast::<T>().ok()) {
+        return Ok(t);
+    }
+    let table = Arc::new(compute()?);
+    let mut c = cache.lock().unwrap_or_else(|p| p.into_inner());
+    c.retain(|_, (v, _)| *v == version);
+    c.insert(key, (version, table.clone()));
+    Ok(table)
+}
 
 type Shared = Arc<AppState>;
 
@@ -714,18 +728,12 @@ async fn award(State(s): State<Shared>, Path((id, award)): Path<(i64, Award)>, Q
     let key = format!("{id}|{award:?}|{}|{}{}{}{}|{}|{}", calls.join(","), q.lotw, q.paper, q.eqsl, q.verified, q.unworked, cty.as_ref().map_or(0, |c| c.len()));
     let cache = s.award_cache.clone();
     let table = db(&s, move |st| {
-        let version = st.qso_version()?;
-        if let Some(t) = cache.lock().unwrap_or_else(|p| p.into_inner()).get(&key).filter(|(v, _)| *v == version) {
-            return Ok(t.1.clone());
-        }
-        let mut tally = Tally::new(award, counts, names).with_verified(q.verified);
-        let resolve = |c: &str| cty_facts(cty.as_deref(), c);
-        st.for_each_award_qso(id, &calls, resolve, |qso| tally.add(qso))?;
-        let table = Arc::new(tally.finish(q.unworked));
-        let mut c = cache.lock().unwrap_or_else(|p| p.into_inner());
-        c.retain(|_, (v, _)| *v == version);
-        c.insert(key, (version, table.clone()));
-        Ok(table)
+        cached_count(&cache, st, key, || {
+            let mut tally = Tally::new(award, counts, names).with_verified(q.verified);
+            let resolve = |c: &str| cty_facts(cty.as_deref(), c);
+            st.for_each_award_qso(id, &calls, resolve, |qso| tally.add(qso))?;
+            Ok(tally.finish(q.unworked))
+        })
     })
     .await?;
     Ok(Json(table.as_ref().clone()))
@@ -746,13 +754,17 @@ async fn log_stats(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Query
         .as_ref()
         .map(|c| c.entities().iter().filter_map(|e| e.dxcc.map(|d| (d, e.name.clone()))).collect())
         .unwrap_or_default();
+    let key = format!("stats|{id}|{}|{}", calls.join(","), cty.as_ref().map_or(0, |c| c.len()));
+    let cache = s.award_cache.clone();
     let out = db(&s, move |st| {
-        let mut tally = qrzero_core::stats::StatsTally::default();
-        st.for_each_stats_qso(id, &calls, |c| cty_facts(cty.as_deref(), c).dxcc, |qso| tally.add(qso))?;
-        Ok(tally.finish(&names))
+        cached_count(&cache, st, key, || {
+            let mut tally = qrzero_core::stats::StatsTally::default();
+            st.for_each_stats_qso(id, &calls, |c| cty_facts(cty.as_deref(), c).dxcc, |qso| tally.add(qso))?;
+            Ok(tally.finish(&names))
+        })
     })
     .await?;
-    Ok(Json(out))
+    Ok(Json(out.as_ref().clone()))
 }
 
 #[derive(Deserialize)]
@@ -822,15 +834,21 @@ async fn club_awards(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Que
     let cty = s.hub.cty();
     let calls: Vec<String> = q.calls.split(',').map(|c| c.trim().to_ascii_uppercase()).filter(|c| !c.is_empty()).collect();
     let opts = qrzero_core::cwclubs::CwtOptions { region: q.region, tagged_only: q.cwt_tagged };
+    let cache = s.award_cache.clone();
     let out = db(&s, move |st| {
-        let mut tally = qrzero_core::cwclubs::ClubTally::default();
-        tally.set_cwt_extra(load_cwt_extra(st, id));
-        let my_dxcc = |c: &str| cty_facts(cty.as_deref(), c).dxcc;
-        st.for_each_club_qso(id, &calls, my_dxcc, |qso| tally.add(qso))?;
-        Ok(tally.finish(opts))
+        // The hand-added CWT points live in settings, not in QSOs, so they are part of the key.
+        let extra = load_cwt_extra(st, id);
+        let key = format!("clubs|{id}|{}|{:?}|{}|{}|{extra:?}", calls.join(","), q.region, q.cwt_tagged, cty.as_ref().map_or(0, |c| c.len()));
+        cached_count(&cache, st, key, || {
+            let mut tally = qrzero_core::cwclubs::ClubTally::default();
+            tally.set_cwt_extra(extra);
+            let my_dxcc = |c: &str| cty_facts(cty.as_deref(), c).dxcc;
+            st.for_each_club_qso(id, &calls, my_dxcc, |qso| tally.add(qso))?;
+            Ok(tally.finish(opts))
+        })
     })
     .await?;
-    Ok(Json(out))
+    Ok(Json(out.as_ref().clone()))
 }
 
 /// CWT points added by hand for a log, by year.

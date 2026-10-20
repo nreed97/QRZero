@@ -279,6 +279,41 @@ async fn ntfy_test_message_goes_to_the_topic() {
     assert_eq!(gone["has_token"].as_bool(), Some(false));
 }
 
+/// Statistics and club awards are kept until a QSO changes; they must never go stale.
+#[tokio::test]
+async fn statistics_and_club_awards_follow_the_log() {
+    let api = Api::new(String::new()).await;
+    let log = api.get("/logs").await[0]["id"].as_i64().unwrap();
+    let qso = |call: &str, extra: Value| {
+        let mut f = json!({"CALL": call, "QSO_DATE": "20240101", "TIME_ON": "1200", "FREQ": "7.030", "MODE": "CW"});
+        f.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        json!({"fields": f})
+    };
+    let stats = format!("/logs/{log}/stats");
+    let clubs = format!("/logs/{log}/club-awards");
+    assert_eq!(api.get(&stats).await["total_qsos"], 0);
+    let empty_clubs = api.get(&clubs).await;
+
+    let id = api.post(&format!("/logs/{log}/qsos"), qso("W1AW", json!({"SKCC": "1234T"}))).await["id"].as_i64().unwrap();
+    let (s1, c1) = (api.get(&stats).await, api.get(&clubs).await);
+    assert_eq!(s1["total_qsos"], 1);
+    assert_ne!(c1, empty_clubs, "the SKCC QSO shows up in the club awards");
+    // Asking again gives exactly the same answer.
+    assert_eq!((api.get(&stats).await, api.get(&clubs).await), (s1.clone(), c1.clone()));
+
+    // Editing and deleting change both answers.
+    api.call(reqwest::Method::PUT, &format!("/qsos/{id}"), Some(qso("K1ABC", json!({"SKCC": "1234T"})))).await;
+    api.post(&format!("/logs/{log}/qsos"), qso("K2ABC", json!({}))).await;
+    assert_eq!(api.get(&stats).await["total_qsos"], 2);
+    api.post("/qsos/delete", json!({"ids": [id]})).await;
+    assert_eq!(api.get(&stats).await["total_qsos"], 1);
+    assert_eq!(api.get(&clubs).await, empty_clubs);
+
+    // Points added by hand are not QSOs, but still change the CWT answer.
+    api.call(reqwest::Method::PUT, &format!("/logs/{log}/cwt-extra"), Some(json!({"year": 2024, "points": 7}))).await;
+    assert_ne!(api.get(&clubs).await, empty_clubs);
+}
+
 #[tokio::test]
 async fn award_goals_default_to_dxcc_and_save() {
     let api = Api::new(String::new()).await;
