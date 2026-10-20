@@ -56,3 +56,5 @@
 /* Cluster and FTx rows for a watched station. */
 .flag.watched { color: var(--watch, var(--src-3)); }
 .spot-row .call.watched, .ftx-row .watched-call { color: var(--watch, var(--src-3)); font-weight: 700; }
+.watch-table.sized { table-layout: fixed; }
+.watch-table.sized td { overflow: hidden; text-overflow: ellipsis; }

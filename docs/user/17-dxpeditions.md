@@ -21,6 +21,8 @@ Ones that would be new are in bold, and ones that are on the air now come first.
 
 Bands and modes are judged on your active log, per entity, the way DXCC counts them: an entity worked on 20m CW still needs 17m, and still needs Phone and Digital.
 
+To make a column wider or narrower, drag the right edge of its heading; double-click that edge to give the column its normal width back. Widths are remembered on this computer.
+
 ## Click to fill in, double-click to tune
 
 Click a row to fill in the call in the QSO panel. Double-click it to also tune: if the call has been spotted, your radio goes to its frequency and mode, just like double-clicking a spot in the Cluster pane.

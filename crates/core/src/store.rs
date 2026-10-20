@@ -210,8 +210,10 @@ impl Store {
     }
 
     fn init(conn: Connection) -> Result<Self> {
+        // FULL syncs the WAL on every commit, so a QSO that was logged survives a power cut. Interactive
+        // writes are single commits; bulk work (import, confirmations, deletes) is one transaction each.
         conn.execute_batch(
-            "PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON;",
+            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA foreign_keys = ON;",
         )?;
         let mut store = Store { conn };
         store.migrate()?;
@@ -1781,5 +1783,14 @@ mod tests {
         st.create_equipment(1, "rig", "K3", &Fields::new()).unwrap();
         drop(st);
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn commits_are_synced_to_disk() {
+        let dir = tempfile::tempdir().unwrap();
+        let st = Store::open(&dir.path().join("qrzero.db")).unwrap();
+        // 2 = FULL: a logged QSO survives a power cut, not just an app crash.
+        let mode: i32 = st.conn.query_row("PRAGMA synchronous", [], |r| r.get(0)).unwrap();
+        assert_eq!(mode, 2);
     }
 }

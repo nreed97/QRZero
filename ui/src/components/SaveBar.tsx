@@ -23,7 +23,7 @@ export function SaveNote({ msg }: { msg: SaveMsg }) {
 /** The message plus Save and Save and close, shared by every settings page. `onSave` resolves true when it worked. */
 export default function SaveBar({ msg, onSave, onClose, children }: { msg: SaveMsg; onSave: () => Promise<boolean>; onClose?: () => void; children?: React.ReactNode }) {
   return (
-    <div className="buttons">
+    <div className="buttons save-bar">
       <SaveNote msg={msg} />
       <span className="spacer" />
       {children}

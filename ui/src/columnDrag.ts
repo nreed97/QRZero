@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
+import { useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { localGet, localSet } from "./prefs";
 
 interface Saved {
@@ -87,4 +87,29 @@ export function useColumnDrag(store: string, defaults: string[], head: RefObject
   const changed = saved.order.some((k, i) => k !== defaults[i]) || Object.keys(saved.widths).length > 0;
 
   return { order: saved.order, widths: saved.widths, moving, resize, move, setWidth, reset, changed };
+}
+
+/** A resizable column: its key, its usual grid track and the least width that track takes. */
+export type Track = { key: string; track: string; min: number };
+
+/**
+ * Dragged widths for a grid table whose rows get their columns from `--cols` / `--cols-min` on the
+ * table element (`style`). `grip(key)` gives the props for the drag handle in that column's header.
+ */
+export function useColumnWidths(store: string, cols: Track[]) {
+  const drag = useColumnDrag(store, cols.map((c) => c.key), useRef(null));
+  const sized = Object.keys(drag.widths).length > 0;
+  const grip = (key: string) => ({
+    className: "col-resize",
+    title: "Drag to resize, double-click to reset",
+    onPointerDown: (e: ReactPointerEvent<HTMLElement>) => drag.resize(e, key),
+    onDoubleClick: () => drag.setWidth(key, 0),
+  });
+  const style = sized
+    ? ({
+        "--cols": cols.map((c) => (drag.widths[c.key] ? `${drag.widths[c.key]}px` : c.track)).join(" "),
+        "--cols-min": `${3 + cols.reduce((n, c) => n + (drag.widths[c.key] ?? c.min), 0)}px`,
+      } as CSSProperties)
+    : undefined;
+  return { widths: drag.widths, grip, style, sized };
 }

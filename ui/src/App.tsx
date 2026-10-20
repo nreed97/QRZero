@@ -9,7 +9,7 @@ import type { Equipment, Fields, Location, Log, LookupResult, Qso, QsoFilter, Sl
 import { localClock, utcClock } from "./util";
 import { useDisplay } from "./display";
 import { DEFAULT_COLUMNS, DEFAULT_LAYOUT, type EntryLayout, type ModeLayouts } from "./fields";
-import { gridToLatLon, positionOf } from "./geo";
+import { bearing, gridToLatLon, positionOf } from "./geo";
 import { localGet, localSet, usePref } from "./prefs";
 import EntryPanel, { type EntryContext, type Prefill } from "./components/EntryPanel";
 import { type DecodePick } from "./components/FtxMonitor";
@@ -325,6 +325,39 @@ export default function App() {
   };
 
   const pick = (p: DecodePick) => setPrefill({ nonce: Date.now(), call: p.call, grid: p.grid, band: p.band, mode: p.mode, freq_hz: p.freq_hz, tx_freq_hz: p.tx_freq_hz, ftx: p.ftx, qsy: p.qsy });
+
+  // F2: show New QSO (or its window) and put the cursor in the call box.
+  useShortcut("gotocall", () => {
+    if (dialog !== null) return false;
+    const cur = wsRef.current;
+    if (cur.popped.includes("entry")) focusWindow("entry");
+    else {
+      setWs({ ...cur, root: showPane(cur.root, "entry") });
+      setTimeout(() => document.querySelector<HTMLInputElement>('[data-testid="call"]')?.focus(), 0);
+    }
+  });
+
+  // Ctrl+E: edit the newest QSO in the log, the one at the top of the grid.
+  useShortcut("editlast", () => {
+    if (dialog !== null || logId === null) return false;
+    api.search(logId, {}, 0, 1).then((r) => (r.rows[0] ? openEditor(r.rows[0]) : setNotice("The log is empty."))).catch((e) => setNotice((e as Error).message));
+  });
+
+  // Alt+J: turn the rotator to the call in the entry box. A call not looked up yet is looked up first.
+  useShortcut("rotate", () => {
+    if (dialog !== null) return false;
+    const c = (entry.fields.CALL ?? "").trim().toUpperCase();
+    if (c.length < 3) return void setNotice("Type a call first, then press the rotate key.");
+    if (!home) return void setNotice("Set the location's position first to turn the rotator.");
+    const aim = (pos: { lat: number; lon: number } | null) => {
+      if (!pos) return setNotice(`No position known for ${c}.`);
+      const az = Math.round(bearing(home, pos));
+      api.rotate(az).then(() => setNotice(`Turning to ${az}° for ${c}`)).catch((e) => setNotice((e as Error).message));
+    };
+    if (lookup && lookup.call === c) return aim(dx);
+    if (logId === null) return;
+    api.lookup(logId, c, false).then((r) => aim((r.station && positionOf(r.station)) || gridToLatLon(entry.fields.GRIDSQUARE ?? "") || (r.entity ? { lat: r.entity.lat, lon: r.entity.lon } : null))).catch((e) => setNotice((e as Error).message));
+  });
 
   const refreshGrid = () => {
     setRefreshKey((k) => k + 1);

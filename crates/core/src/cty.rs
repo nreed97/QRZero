@@ -524,11 +524,16 @@ Vienna Intl Ctr:          15:  28:  EU:   48.20:   -16.30:    -1.0:  *4U1V:
             "Q1ABC",
             "JA1ABC/QRP",
         ];
-        let start = std::time::Instant::now();
-        let hits = (0..100_000)
-            .filter(|i| db.lookup(calls[i % calls.len()]).is_some())
-            .count();
-        let took = start.elapsed();
+        // Best of three: a busy CI runner can stall one pass, but a slow algorithm is slow every time.
+        let mut took = std::time::Duration::MAX;
+        let mut hits = 0;
+        for _ in 0..3 {
+            let start = std::time::Instant::now();
+            hits = (0..100_000)
+                .filter(|i| db.lookup(calls[i % calls.len()]).is_some())
+                .count();
+            took = took.min(start.elapsed());
+        }
         assert_eq!(hits, 100_000 / calls.len() * (calls.len() - 1));
         assert!(took.as_millis() < 500, "100k lookups took {took:?}");
     }

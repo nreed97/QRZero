@@ -26,6 +26,8 @@ Contests that have finished are dropped.
 
 The box at the top picks All modes, CW, Phone or Digital. A contest whose mode isn't named stays in the list whichever you pick. The choice is remembered on this computer.
 
+To make a column wider or narrower, drag the right edge of its heading; double-click that edge to give the column its normal width back. Widths are remembered on this computer.
+
 ## Dates and times
 
 All times are UTC. The calendar is a volunteer's page and the sponsors change dates now and then, so check the rules before you plan around a contest.

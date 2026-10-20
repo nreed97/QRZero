@@ -378,6 +378,10 @@ button.caption svg { fill: none; stroke: currentColor; stroke-width: 1; shape-re
 .check { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
 .buttons { display: flex; gap: 6px; justify-content: flex-end; align-items: center; margin-top: 10px; }
 .buttons .muted { margin-right: auto; }
+/* Save / Save and close stay at the bottom of a Settings page however long it is. */
+.settings-page { display: flex; flex-direction: column; }
+.settings-page > div:has(> .save-bar) { flex: 1 0 auto; display: flex; flex-direction: column; }
+.settings-page .save-bar { position: sticky; bottom: -12px; margin: auto -14px -12px; padding: 8px 14px; background: var(--bg); border-top: 1px solid var(--line); }
 fieldset { border: 1px solid var(--line); border-radius: 2px; margin: 0 0 8px; padding: 4px 8px 6px; }
 legend { color: var(--muted); font-size: 12px; padding: 0 4px; }
 .chip { display: inline-flex; align-items: center; gap: 4px; margin: 1px 10px 1px 0; }
@@ -511,7 +515,7 @@ table.list.fields input:not([type=checkbox]), table.list.fields select { width: 
 .ftx-timer.tx { color: var(--err); font-weight: 600; }
 .ftx-msg { padding: 2px 8px; border-bottom: 1px solid var(--line); }
 .ftx-table { flex: 1; overflow: auto; min-height: 100px; }
-.ftx-row { display: grid; grid-template-columns: 76px 32px 38px 46px 48px minmax(180px, 2fr) minmax(90px, 1fr) 50px minmax(110px, 1.2fr); align-items: center; font-size: 12.5px; border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent); cursor: default; border-left: 3px solid var(--src, transparent); }
+.ftx-row { display: grid; grid-template-columns: var(--cols, 76px 32px 38px 46px 48px minmax(180px, 2fr) minmax(90px, 1fr) 50px minmax(110px, 1.2fr)); min-width: var(--cols-min, 0); align-items: center; font-size: 12.5px; border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent); cursor: default; border-left: 3px solid var(--src, transparent); }
 .ftx-row .src-tag { color: var(--src); font-weight: 700; }
 .ftx-row > span { padding: 1px 5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ftx-row .num { text-align: right; }
@@ -629,8 +633,9 @@ button.chip { white-space: nowrap; }
 .grid-head .col-head.moving, .spot-row.head .col-head.moving { opacity: 0.45; }
 .grid-head .col-head.drop-before, .spot-row.head .col-head.drop-before { box-shadow: inset 2px 0 0 var(--accent); }
 .grid-head .col-head.drop-after, .spot-row.head .col-head.drop-after { box-shadow: inset -2px 0 0 var(--accent); }
-.grid-head .col-resize, .spot-row.head .col-resize { position: absolute; top: 0; right: 0; bottom: 0; width: 6px; padding: 0; cursor: col-resize; }
-.grid-head .col-resize:hover, .spot-row.head .col-resize:hover { background: var(--line); }
+.ftx-row.head > span, .needed-row.head > span { position: relative; }
+.grid-head .col-resize, .spot-row.head .col-resize, .ftx-row.head .col-resize, .needed-row.head .col-resize, .watch-table th .col-resize { position: absolute; top: 0; right: 0; bottom: 0; width: 8px; padding: 0; cursor: col-resize; box-shadow: inset -1px 0 0 var(--line); }
+.grid-head .col-resize:hover, .spot-row.head .col-resize:hover, .ftx-row.head .col-resize:hover, .needed-row.head .col-resize:hover, .watch-table th .col-resize:hover { background: var(--line); }
 
 /* Settings: UDP connections and startup programs */
 table.list.udp-conns select { width: 100%; box-sizing: border-box; }
@@ -712,7 +717,7 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 .marathon-zones td.confirmed { cursor: pointer; }
 
 /* Needed now */
-.needed-row { display: grid; grid-template-columns: 150px 56px 96px minmax(90px, 1fr) 46px 72px 54px 50px 96px minmax(120px, 2fr); align-items: center; font-size: 12.5px; border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent); cursor: default; border-left: 3px solid transparent; }
+.needed-row { display: grid; grid-template-columns: var(--cols, 150px 56px 96px minmax(90px, 1fr) 46px 72px 54px 50px 96px minmax(120px, 2fr)); min-width: var(--cols-min, 0); align-items: center; font-size: 12.5px; border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent); cursor: default; border-left: 3px solid transparent; }
 .needed-row > span { padding: 1px 5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .needed-row .num { text-align: right; }
 .needed-row .call { font-weight: 700; }
@@ -755,3 +760,7 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 
 .stats-text { margin: 0 0 8px; padding: 6px 8px; border: 1px solid var(--line); background: var(--bg); font-family: ui-monospace, Consolas, monospace; font-size: 12px; max-height: 60vh; overflow: auto; user-select: text; }
 .stats-bar { display: flex; justify-content: flex-end; gap: 6px; }
+
+/* Keyboard row selection in the spot and decode lists. */
+.kb-list:focus { outline: none; }
+.kb-list:focus [data-kb-sel] { outline: 1px solid var(--accent); outline-offset: -1px; }

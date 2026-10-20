@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "../watch.css";
 import "../dxped.css";
 import { api } from "../api";
+import { useColumnDrag } from "../columnDrag";
 import { onLive } from "../live";
 import { localGet, localSet } from "../prefs";
 import type { DxpedItem, DxpedList, DxpedPlanned } from "../types";
 import type { PaneActions } from "./SharedPanes";
 
 const MODE_NAME: Record<string, string> = { CW: "CW", PHONE: "Phone", DIGITAL: "Digital" };
+const COLS: [string, string, string?][] = [["call", "Call"], ["when", "When"], ["need", "New for you"], ["spot", "Last spot"], ["entity", "Entity", "wide"], ["note", "Note", "wide"]];
 const blank = (): DxpedPlanned => ({ id: 0, call: "", start: "", end: "", note: "" });
 const utc = (t: number) => new Date(t * 1000).toISOString().slice(11, 16);
 // One formatter for every row: toLocaleDateString builds a new one on each call, which is slow.
@@ -29,6 +31,8 @@ function needText(i: DxpedItem): string {
 export default function DxpedPane({ act }: { act: PaneActions }) {
   const [list, setList] = useState<DxpedList | null>(null);
   const [onlyNeeded, setOnlyNeeded] = useState(() => localGet("qrzero.dxped", { only: false }).only);
+  const colDrag = useColumnDrag("qrzero.dxpedCols", COLS.map((c) => c[0]), useRef(null));
+  const sized = Object.keys(colDrag.widths).length > 0;
   const [draft, setDraft] = useState<DxpedPlanned | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -120,9 +124,17 @@ export default function DxpedPane({ act }: { act: PaneActions }) {
           </div>
         )}
         {shown.length > 0 && (
-          <table className="watch-table hits">
+          <table className={`watch-table hits${sized ? " sized" : ""}`}>
             <thead>
-              <tr><th>Call</th><th>When</th><th>New for you</th><th>Last spot</th><th className="wide">Entity</th><th className="wide">Note</th><th /></tr>
+              <tr>
+                {COLS.map(([key, label, cls]) => (
+                  <th key={key} className={cls} style={colDrag.widths[key] ? { width: colDrag.widths[key] } : undefined}>
+                    {label}
+                    <span className="col-resize" onPointerDown={(e) => colDrag.resize(e, key)} onDoubleClick={() => colDrag.setWidth(key, 0)} title="Drag to resize, double-click to reset" />
+                  </th>
+                ))}
+                <th />
+              </tr>
             </thead>
             <tbody>
               {shown.map((i) => (

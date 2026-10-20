@@ -8,16 +8,18 @@ const ADIF = `Test file<EOH>
 <CALL:5>K1XYZ<QSO_DATE:8>20240106<TIME_ON:6>021530<FREQ:5>7.074<MODE:4>MFSK<SUBMODE:3>FT4<EOR>
 `;
 
-/** Double-clicks a log row and returns the editor window, trying again when a slow runner doesn't open it. */
-async function openEditorWindow(page: Page, call: string): Promise<Page> {
+/** Double-clicks a row and returns the editor window, trying again when a slow runner doesn't open it. */
+async function dblclickForEditor(page: Page, row: Locator, what: string): Promise<Page> {
   for (let i = 0; i < 3; i++) {
     const popup = page.waitForEvent("popup", { timeout: 10_000 }).catch(() => undefined);
-    await page.locator(".grid-row", { hasText: call }).dblclick();
+    await row.dblclick();
     const win = await popup;
     if (win) return win;
   }
-  throw new Error(`the editor window for ${call} didn't open`);
+  throw new Error(`the editor window for ${what} didn't open`);
 }
+
+const openEditorWindow = (page: Page, call: string) => dblclickForEditor(page, page.locator(".grid-row", { hasText: call }), call);
 
 test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.goto("/?token=e2e");
@@ -191,6 +193,15 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // period stays on top. By offset, JA1XYZ (1100 Hz) comes before EA8AB (1120 Hz) in the older period.
   const msgs = ftx.locator(".ftx-table .ftx-row .msg");
   await expect(msgs).toHaveText(["N0CALL EA8AB R-10", "CQ DL1ABC JO62", "N0CALL EA8AB IL18", "CQ JA1XYZ PM95"]);
+  // From the keyboard: arrows select a decode, Enter fills it into the QSO panel and the cursor lands in the call box.
+  await ftx.getByRole("table", { name: /^Decodes/ }).focus();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("call")).toHaveValue("DL1ABC");
+  await expect(page.getByTestId("call")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("call")).toHaveValue("");
   await opts();
   await ftx.getByLabel("Offset").check();
   await expect(msgs).toHaveText(["N0CALL EA8AB R-10", "CQ DL1ABC JO62", "CQ JA1XYZ PM95", "N0CALL EA8AB IL18"]);
@@ -551,7 +562,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await call.press("Tab");
   const worked = page.locator(".worked-pane");
   await expect(worked.locator("tbody tr")).toHaveCount(1);
-  const [editWin2] = await Promise.all([page.waitForEvent("popup"), worked.locator("tbody tr").first().dblclick()]);
+  const editWin2 = await dblclickForEditor(page, worked.locator("tbody tr").first(), "K1XYZ in Worked before");
   await expect(editWin2.getByLabel("Call", { exact: true })).toHaveValue("K1XYZ");
   await Promise.all([editWin2.waitForEvent("close"), closeWindow(editWin2.getByRole("button", { name: "Close editor" }))]);
 

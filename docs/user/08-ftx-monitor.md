@@ -36,6 +36,7 @@ Rows calling you are highlighted, and needed stations are shaded. Stations on yo
 
 - **Click** a decode to put the call, grid, band and mode into the QSO panel and look it up. Clicking never retunes a radio: the QSO panel switches to the radio (slice) that program is tied to, or to one already on that band, and just fills in the form.
 - **Double-click** to have that WSJT-X call the station, as if you'd double-clicked it in WSJT-X.
+- **From the keyboard** (list view), click the table or <kbd>Tab</kbd> to it, then <kbd>Up</kbd> and <kbd>Down</kbd> select a decode, <kbd>Enter</kbd> fills it in like a click and <kbd>Ctrl</kbd>+<kbd>Enter</kbd> calls the station like a double-click.
 - **CQ only** and **Needed only** narrow the list; the source box (**All sources**) shows one WSJT-X or JTDX at a time.
 - The **period timer** is a short readout on each WSJT-X or JTDX control line, such as `E 9 TX`: **E** or **O** says whether the current transmit/receive period is an even or an odd one, and the number is the seconds left in it (15 s periods for FT8, 7.5 s for FT4, 60 s for JT modes, otherwise the period the program reports). WSJT-X doesn't report which slot it transmits in, so once a program has transmitted, QRZero remembers that slot and adds **TX** or **RX** (red in the transmit slot). Until then only the letter and seconds show. It follows this computer's clock, which must be set accurately, as for WSJT-X itself. Switch it off with **Period timer** in **Options**.
 - **Options** (in the toolbar) holds the settings you change less often: **View**, **Within each period, sort by**, **Period breaks**, **Pin calling you**, **Period timer** and **Alerts and filters…**. Choices stay in the menu until you click elsewhere, and are remembered.
@@ -105,6 +106,8 @@ WSJT-X's UDP interface only accepts a short list of requests, so some things sti
 - **The dial frequency, band and power**, Hold Tx Freq, auto sequencing and the other settings.
 - **JTDX** accepts fewer requests than WSJT-X: it ignores switching configuration, and may ignore other requests depending on its version.
 
+To make a column wider or narrower, drag the right edge of its heading; double-click that edge to give the column its normal width back. Widths are remembered on this computer. (In the list view; the grouped view has fixed columns.)
+
 ### Your transmissions in the list
 
 Each time a program transmits, the message is added to the list once for that period, marked **TX** in red with the Tx offset in the Freq column and **Sent** in the Flags column. In **Call boxes** it is a red **TX:** line at the top of that period. These lines always show, whatever the filters; click and double-click do nothing on them. They need WSJT-X 2.1 or later, which sends the Tx message.
@@ -156,6 +159,6 @@ In N1MM open **Config → Configure Ports, Mode Control, Winkey, etc → Broadca
 
 ## Country file
 
-DXCC entities for decodes, spots and the map come from AD1C's country files (country-files.com). QRZero downloads `cty.csv` when it first starts and every two weeks after. If your PC can't reach the site, download the file elsewhere and use **Load cty.csv or cty.dat…**.
+DXCC entities for decodes, spots and the map come from AD1C's country files (country-files.com). QRZero downloads `cty.csv` when it first starts and every two weeks after. If your PC can't reach the site, download the file elsewhere and use **Load cty.csv or cty.dat…**. Both buttons are in **Settings → Callsign lookup**, under **Country file**, and act at once.
 
 When a QSO is logged without a DXCC entity (for example with QRZ lookups off), QRZero fills in `DXCC`, `COUNTRY`, `CONT`, `CQZ` and `ITUZ` from the country file.

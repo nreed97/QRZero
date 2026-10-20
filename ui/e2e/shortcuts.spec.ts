@@ -19,6 +19,11 @@ test("the defaults match the keys QRZero always had", () => {
   expect(def("help")).toBe("F1");
   expect(def("editsave")).toBe("Ctrl+S");
   expect(def("radioswap")).toBe("`");
+  expect(def("gotocall")).toBe("F2");
+  expect(def("editlast")).toBe("Ctrl+E");
+  expect(def("rotate")).toBe("Alt+J");
+  expect(def("panenext")).toBe("Alt+PageDown");
+  expect(def("paneprev")).toBe("Alt+PageUp");
 });
 
 test("conflicts and unsafe keys are refused", () => {
@@ -29,4 +34,11 @@ test("conflicts and unsafe keys are refused", () => {
   expect(problemWith("Ctrl+C", {}, "settings")).toMatch(/Windows/);
   expect(problemWith("Alt+3", {}, "settings")).toMatch(/always does something else/);
   expect(problemWith("Ctrl+Shift+K", {}, "settings")).toBeNull();
+});
+
+test("no two default shortcuts share a key, and each default is allowed", () => {
+  const keys = SHORTCUTS.map((s) => s.def).filter((d): d is string => !!d);
+  expect(new Set(keys).size).toBe(keys.length);
+  for (const s of SHORTCUTS) if (s.def) expect(problemWith(s.def, {}, s.id)).toBeNull();
+  expect(press("PageDown", { alt: true })).toBe("Alt+PageDown");
 });
