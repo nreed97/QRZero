@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { useColumnWidths, type Track } from "../columnDrag";
 import { onLive } from "../live";
+import { useListKeys } from "../listKeys";
 import { MODE_GROUP_NAME, modeGroup } from "../modes";
 import { compareNeeded, type NeedRank, needLabel, needRank, spotKey } from "../needed";
 import { setNeededConfig, useNeededConfig } from "../neededPrefs";
@@ -72,6 +73,8 @@ export default function NeededPane({ onPick, onSettings }: { onPick: (p: DecodeP
     return out.sort((a, b) => compareNeeded({ ...a, received: a.s.received }, { ...b, received: b.s.received }));
   }, [spots, now, cfg.listMin, wanted]);
 
+  const kb = useListKeys(rows, (r) => spotKey(r.s), (r, tune) => onPick(spotPick(r.s, tune)));
+
   return (
     <div className="ftx cluster needed-pane">
       <div className="grid-tools">
@@ -90,7 +93,7 @@ export default function NeededPane({ onPick, onSettings }: { onPick: (p: DecodeP
         <button onClick={onSettings} title="Sound and popup alerts for needed spots">Alerts…</button>
       </div>
       {err && <div className="ftx-msg small err">{err}</div>}
-      <div className="ftx-table needed-table" role="table" aria-label="Needed now" style={cols.style}>
+      <div className="ftx-table needed-table kb-list" role="table" aria-label="Needed now (arrows select, Enter fills in, Ctrl+Enter tunes too)" style={cols.style} {...kb.props}>
         <div className="needed-row head" role="row">
           {[["New", ""], ["Wanted", "Club Log Most Wanted rank of the entity"], ["Call", ""], ["Country", ""], ["Band", ""], ["Freq", ""], ["Mode", ""], ["UTC", ""], ["Spotter", ""], ["Comment", ""]].map(([label, tip], i) => (
             <span key={label} title={tip || undefined}>{label}<span {...cols.grip(COLS[i].key)} /></span>
@@ -107,6 +110,7 @@ export default function NeededPane({ onPick, onSettings }: { onPick: (p: DecodeP
             <div
               key={spotKey(s)}
               className={`needed-row ${group ? `mode-${group}` : ""} ${rank === 0 ? "needed" : ""}`}
+              {...kb.rowProps(spotKey(s))}
               role="row"
               onClick={() => onPick(spotPick(s))}
               onDoubleClick={() => onPick(spotPick(s, true))}

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import "../workspace.css";
+import { useShortcut } from "../shortcuts";
 import {
   canPopOut,
   insertPane,
@@ -217,6 +218,19 @@ function TabGroup({ node, path, ctx }: { node: Tabs; path: Path; ctx: Ctx }) {
   const [zone, setZone] = useState<Zone | null>(null);
   const [menu, setMenu] = useState<{ id: PaneId; x: number; y: number } | null>(null);
   const body = useRef<HTMLDivElement>(null);
+  const group = useRef<HTMLElement>(null);
+
+  // Step through this group's tabs while the keyboard focus is inside it.
+  const step = (dir: number) => {
+    const el = group.current;
+    if (!el || !el.contains(document.activeElement) || node.panes.length < 2) return false;
+    const next = node.panes[(node.panes.indexOf(node.active) + dir + node.panes.length) % node.panes.length];
+    ctx.onActivate(next);
+    // The old pane hides, so keep the focus on the tab to let the key repeat.
+    setTimeout(() => el.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus(), 0);
+  };
+  useShortcut("panenext", () => step(1));
+  useShortcut("paneprev", () => step(-1));
 
   useEffect(() => {
     if (!menu) return;
@@ -250,7 +264,7 @@ function TabGroup({ node, path, ctx }: { node: Tabs; path: Path; ctx: Ctx }) {
   };
 
   return (
-    <section className="ws-group" aria-label={node.panes.map(paneTitle).join(", ")}>
+    <section ref={group} className="ws-group" aria-label={node.panes.map(paneTitle).join(", ")}>
       <div
         className="ws-tabs"
         role="tablist"

@@ -760,3 +760,7 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 
 .stats-text { margin: 0 0 8px; padding: 6px 8px; border: 1px solid var(--line); background: var(--bg); font-family: ui-monospace, Consolas, monospace; font-size: 12px; max-height: 60vh; overflow: auto; user-select: text; }
 .stats-bar { display: flex; justify-content: flex-end; gap: 6px; }
+
+/* Keyboard row selection in the spot and decode lists. */
+.kb-list:focus { outline: none; }
+.kb-list:focus [data-kb-sel] { outline: 1px solid var(--accent); outline-offset: -1px; }

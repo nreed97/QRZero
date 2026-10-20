@@ -18,6 +18,10 @@ The fields below the first line can be changed: see **Entry fields**.
 | <kbd>Esc</kbd> | Clear the form |
 | <kbd>Space</kbd> in the call field | Jump to the sent report |
 | <kbd>Tab</kbd> | Next field |
+| <kbd>F2</kbd> | Go to the call box, from anywhere (shows New QSO if it is hidden behind another tab) |
+| <kbd>Ctrl</kbd>+<kbd>E</kbd> | Edit the newest QSO in the log |
+| <kbd>Alt</kbd>+<kbd>J</kbd> | Turn the rotator to the call you have typed (looks it up first if needed; needs a rotator in Settings) |
+| <kbd>Alt</kbd>+<kbd>Page Down</kbd> / <kbd>Page Up</kbd> | Next / previous tab in the group of panes you are in |
 | <kbd>F1</kbd> | This guide (can be changed, see **Keyboard shortcuts** below) |
 
 Two buttons next to **Clear** deal with callsign lookups:
