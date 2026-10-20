@@ -1,25 +1,41 @@
-import { useState } from "react";
+import { memo, useCallback, useState } from "react";
 import type { PopContext } from "../bus";
 import { localGet, localSet } from "../prefs";
 import { useIntegrations, useRotator } from "../live";
 import type { Fields, Qso, QsoFilter, SlotPick } from "../types";
 import type { PaneId } from "../workspace";
-import AwardsPane from "./AwardsPane";
-import ClusterPane from "./ClusterPane";
-import FtxMonitor, { type DecodePick } from "./FtxMonitor";
+import AwardsPaneView from "./AwardsPane";
+import ClusterPaneView from "./ClusterPane";
+import FtxMonitorView, { type DecodePick } from "./FtxMonitor";
 import LookupPanel, { SlotsPane } from "./LookupPanel";
-import MapPanel, { type MapView } from "./MapPanel";
+import MapPanelView, { type MapView } from "./MapPanel";
 import WorkedPane from "./WorkedPane";
 import BandMapPane from "./BandMapPane";
 import WatchPane from "./WatchPane";
-import ContestsPane from "./ContestsPane";
-import DxpedPane from "./DxpedPane";
-import NeededPane from "./NeededPane";
+import ContestsPaneView from "./ContestsPane";
+import DxpedPaneView from "./DxpedPane";
+import NeededPaneView from "./NeededPane";
 import PropagationPane from "./PropagationPane";
 import RotatorPane from "./RotatorPane";
 import NotesPane from "./NotesPane";
-import ClubsPane from "./ClubsPane";
+import ClubsPaneView from "./ClubsPane";
 import EntryHost from "./EntryHost";
+
+// Typing in the call box re-renders the whole app. These panes only depend on props that rarely
+// change, so they skip those renders.
+const AwardsPane = memo(AwardsPaneView);
+const ClusterPane = memo(ClusterPaneView);
+const FtxMonitor = memo(FtxMonitorView);
+const DxpedPane = memo(DxpedPaneView);
+const NeededPane = memo(NeededPaneView);
+const ContestsPane = memo(ContestsPaneView);
+const ClubsPane = memo(ClubsPaneView);
+// The map is drawn again only when a position or a setting changes, not on every render.
+const MapPanel = memo(MapPanelView, (a, b) => {
+  const same = (p: typeof a.home, q: typeof b.home) => p === q || (!!p && !!q && p.lat === q.lat && p.lon === q.lon);
+  return same(a.home, b.home) && same(a.dx, b.dx) && a.homeLabel === b.homeLabel && a.dxLabel === b.dxLabel && a.units === b.units
+    && a.view === b.view && a.shade === b.shade && a.rotator === b.rotator && a.onView === b.onView && a.onShade === b.onShade;
+});
 
 export interface PaneActions {
   onPick: (p: DecodePick) => void;
@@ -37,6 +53,22 @@ export default function SharedPane({ id, ctx, act }: { id: PaneId; ctx: PopConte
   const rotatorAz = useRotator();
   const [mapView, setMapView] = useState<MapView>(localGet("qrzero.map", { view: "flat" as MapView }).view);
   const [mapShade, setMapShade] = useState<boolean>(localGet("qrzero.map", { shade: true }).shade);
+  const { onSettings } = act;
+  const clusterSettings = useCallback(() => onSettings("cluster"), [onSettings]);
+  const onMapView = useCallback(
+    (v: MapView) => {
+      setMapView(v);
+      localSet("qrzero.map", { view: v, shade: mapShade });
+    },
+    [mapShade],
+  );
+  const onMapShade = useCallback(
+    (on: boolean) => {
+      setMapShade(on);
+      localSet("qrzero.map", { view: mapView, shade: on });
+    },
+    [mapView],
+  );
 
   switch (id) {
     case "entry":
@@ -71,21 +103,15 @@ export default function SharedPane({ id, ctx, act }: { id: PaneId; ctx: PopConte
           units={ctx.units}
           rotator={integrations?.rotator_enabled ? rotatorAz : undefined}
           view={mapView}
-          onView={(v) => {
-            setMapView(v);
-            localSet("qrzero.map", { view: v, shade: mapShade });
-          }}
+          onView={onMapView}
           shade={mapShade}
-          onShade={(on) => {
-            setMapShade(on);
-            localSet("qrzero.map", { view: mapView, shade: on });
-          }}
+          onShade={onMapShade}
         />
       );
     case "ftx":
       return <FtxMonitor mycall={ctx.stationCall} onPick={act.onPick} />;
     case "cluster":
-      return <ClusterPane onPick={act.onPick} onSettings={() => act.onSettings("cluster")} />;
+      return <ClusterPane onPick={act.onPick} onSettings={clusterSettings} />;
     case "awards":
       return <AwardsPane logId={ctx.logId} callsigns={ctx.callsigns} onShowQsos={act.onShowQsos} />;
     case "bandmap":
@@ -95,7 +121,7 @@ export default function SharedPane({ id, ctx, act }: { id: PaneId; ctx: PopConte
     case "dxped":
       return <DxpedPane act={act} />;
     case "needed":
-      return <NeededPane onPick={act.onPick} onSettings={() => act.onSettings("cluster")} />;
+      return <NeededPane onPick={act.onPick} onSettings={clusterSettings} />;
     case "contests":
       return <ContestsPane />;
     case "propagation":

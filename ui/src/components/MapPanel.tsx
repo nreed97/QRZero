@@ -96,6 +96,13 @@ export default function MapPanel({ home, homeLabel, dx, dxLabel, units, view, on
     return geoCircle().center([sun.lon + 180, -sun.lat]).radius(90)();
   }, [now]);
 
+  // The world drawing only changes with the projection, not when the other station does.
+  const base = useMemo(
+    () => ({ sea: path({ type: "Sphere" }) ?? "", graticule: path(geoGraticule10()) ?? "", land: path(land) ?? "", borders: path(borders) ?? "" }),
+    [path],
+  );
+  const nightPath = useMemo(() => path(night) ?? "", [path, night]);
+
   const info = home && dx ? pathInfo(home, dx) : null;
   let shortPath = "", longPath = "";
   if (home && dx) {
@@ -160,11 +167,11 @@ export default function MapPanel({ home, homeLabel, dx, dxLabel, units, view, on
       </div>
       <div className="map-box" ref={box}>
         <svg width={size.w} height={size.h} onContextMenu={onMapMenu} role="img" aria-label="Map of the path between you and the other station">
-          <path className="sea" d={path({ type: "Sphere" }) ?? ""} />
-          <path className="graticule" d={path(geoGraticule10()) ?? ""} />
-          <path className="land" d={path(land) ?? ""} />
-          <path className="borders" d={path(borders) ?? ""} />
-          {shade && <path className="night" d={path(night) ?? ""} />}
+          <path className="sea" d={base.sea} />
+          <path className="graticule" d={base.graticule} />
+          <path className="land" d={base.land} />
+          <path className="borders" d={base.borders} />
+          {shade && <path className="night" d={nightPath} />}
           {longPath && <path className="long-path" d={longPath} />}
           {shortPath && <path className="short-path" d={shortPath} />}
           {beamPath && <path className="beam-path" d={beamPath} />}

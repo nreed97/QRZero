@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import MainMenu from "./components/MainMenu";
 import WindowControls from "./components/WindowControls";
@@ -13,15 +13,9 @@ import { gridToLatLon, positionOf } from "./geo";
 import { localGet, localSet, usePref } from "./prefs";
 import EntryPanel, { type EntryContext, type Prefill } from "./components/EntryPanel";
 import { type DecodePick } from "./components/FtxMonitor";
-import QslDialog from "./components/QslDialog";
 import { onLive, useRadios } from "./live";
 import LogGrid from "./components/LogGrid";
-import ImportDialog from "./components/ImportDialog";
-import ExportDialog from "./components/ExportDialog";
-import SettingsDialog, { type GeneralPrefs } from "./components/SettingsDialog";
-import HelpView from "./components/HelpView";
-import AboutDialog from "./components/AboutDialog";
-import StatsDialog from "./components/StatsDialog";
+import type { GeneralPrefs } from "./components/SettingsDialog";
 import SharedPane, { type PaneActions } from "./components/SharedPanes";
 import Workspace from "./components/Workspace";
 import LayoutMenu from "./components/LayoutMenu";
@@ -29,8 +23,17 @@ import { closeWindow, listen, openPopout, post, type BusMsg, type PopContext, ty
 import { DEFAULT_WORKSPACE, PANES, allPanes, canPopOut, findPane, nodeAt, removePane, sanitize, showPane, type PaneId, type Split, type Tabs, type Workspace as WS, type Zone } from "./workspace";
 import { newConfirmLines } from "./newConfirms";
 import NeededAlerts from "./components/NeededAlerts";
-import SetupWizard from "./components/SetupWizard";
 import { useShortcut } from "./shortcuts";
+
+// Dialogs are loaded when first opened, which keeps the start-up download small.
+const SettingsDialog = lazy(() => import("./components/SettingsDialog"));
+const QslDialog = lazy(() => import("./components/QslDialog"));
+const ImportDialog = lazy(() => import("./components/ImportDialog"));
+const ExportDialog = lazy(() => import("./components/ExportDialog"));
+const HelpView = lazy(() => import("./components/HelpView"));
+const AboutDialog = lazy(() => import("./components/AboutDialog"));
+const StatsDialog = lazy(() => import("./components/StatsDialog"));
+const SetupWizard = lazy(() => import("./components/SetupWizard"));
 
 type Dialog = "import" | "export" | "settings" | "help" | "wizard" | "qsl" | "qslqueue" | "stats" | "about" | null;
 
@@ -370,6 +373,22 @@ export default function App() {
     },
   };
 
+  // The panes get the same object every render (calling the latest handlers), so the ones that
+  // only need these actions can skip renders caused by typing in the call box.
+  const actionsRef = useRef(actions);
+  actionsRef.current = actions;
+  const paneActions = useMemo<PaneActions>(
+    () => ({
+      onPick: (p) => actionsRef.current.onPick(p),
+      onEdit: (q) => actionsRef.current.onEdit(q),
+      onCopy: (f) => actionsRef.current.onCopy(f),
+      onShowQsos: (f) => actionsRef.current.onShowQsos(f),
+      onSlot: (s) => actionsRef.current.onSlot(s),
+      onSettings: (tab) => actionsRef.current.onSettings(tab),
+    }),
+    [],
+  );
+
   const popCtx: PopContext | null =
     logId === null
       ? null
@@ -591,77 +610,79 @@ export default function App() {
                 editingId={editing?.id ?? null}
               />
             );
-          return popCtx && <SharedPane id={id} ctx={popCtx} act={actions} />;
+          return popCtx && <SharedPane id={id} ctx={popCtx} act={paneActions} />;
         }}
       />
 
-      {dialog === "wizard" && (
-        <SetupWizard
-          logId={logId}
-          callsigns={callsigns}
-          locations={locations}
-          equipment={equipment}
-          onChanged={async () => {
-            await reloadStation();
-            refreshGrid();
-          }}
-          onLayout={setLayout}
-          onClose={() => setDialog(null)}
-        />
-      )}
-      {dialog === "import" && (
-        <ImportDialog
-          logId={logId}
-          locations={locations}
-          defaultLocationId={locationId}
-          onClose={() => setDialog(null)}
-          onImported={() => {
-            refreshGrid();
-            reloadStation();
-          }}
-        />
-      )}
-      {dialog === "export" && (
-        <ExportDialog
-          logId={logId}
-          logName={currentLog?.name ?? "log"}
-          selection={selection}
-          gridFilter={filter}
-          callsigns={callsigns}
-          locations={locations}
-          onClose={() => setDialog(null)}
-        />
-      )}
-      {dialog === "settings" && (
-        <SettingsDialog
-          logId={logId}
-          logs={logs}
-          callsigns={callsigns}
-          locations={locations}
-          equipment={equipment}
-          layout={layout}
-          onLayout={setLayout}
-          modeLayouts={modeLayouts}
-          onModeLayouts={setModeLayouts}
-          general={general}
-          onGeneral={setGeneral}
-          onWizard={() => setDialog("wizard")}
-          onChanged={() => {
-            loadLogs();
-            reloadStation();
-          }}
-          onSwitchLog={setLogId}
-          initialTab={settingsTab}
-          onClose={() => {
-            setDialog(null);
-            setSettingsTab(undefined);
-          }}
-        />
-      )}
-      {(dialog === "qsl" || dialog === "qslqueue") && logId !== null && <QslDialog tab={dialog === "qsl" ? "online" : "queue"} logId={logId} callsigns={activeCalls} locations={locations} onClose={() => setDialog(null)} />}
-      {dialog === "stats" && logId !== null && <StatsDialog logId={logId} onClose={() => setDialog(null)} />}
-      {dialog === "help" && <HelpView onClose={() => setDialog(null)} />}
-      {dialog === "about" && <AboutDialog onClose={() => setDialog(null)} />}
+      <Suspense fallback={null}>
+        {dialog === "wizard" && (
+          <SetupWizard
+            logId={logId}
+            callsigns={callsigns}
+            locations={locations}
+            equipment={equipment}
+            onChanged={async () => {
+              await reloadStation();
+              refreshGrid();
+            }}
+            onLayout={setLayout}
+            onClose={() => setDialog(null)}
+          />
+        )}
+        {dialog === "import" && (
+          <ImportDialog
+            logId={logId}
+            locations={locations}
+            defaultLocationId={locationId}
+            onClose={() => setDialog(null)}
+            onImported={() => {
+              refreshGrid();
+              reloadStation();
+            }}
+          />
+        )}
+        {dialog === "export" && (
+          <ExportDialog
+            logId={logId}
+            logName={currentLog?.name ?? "log"}
+            selection={selection}
+            gridFilter={filter}
+            callsigns={callsigns}
+            locations={locations}
+            onClose={() => setDialog(null)}
+          />
+        )}
+        {dialog === "settings" && (
+          <SettingsDialog
+            logId={logId}
+            logs={logs}
+            callsigns={callsigns}
+            locations={locations}
+            equipment={equipment}
+            layout={layout}
+            onLayout={setLayout}
+            modeLayouts={modeLayouts}
+            onModeLayouts={setModeLayouts}
+            general={general}
+            onGeneral={setGeneral}
+            onWizard={() => setDialog("wizard")}
+            onChanged={() => {
+              loadLogs();
+              reloadStation();
+            }}
+            onSwitchLog={setLogId}
+            initialTab={settingsTab}
+            onClose={() => {
+              setDialog(null);
+              setSettingsTab(undefined);
+            }}
+          />
+        )}
+        {(dialog === "qsl" || dialog === "qslqueue") && logId !== null && <QslDialog tab={dialog === "qsl" ? "online" : "queue"} logId={logId} callsigns={activeCalls} locations={locations} onClose={() => setDialog(null)} />}
+        {dialog === "stats" && logId !== null && <StatsDialog logId={logId} onClose={() => setDialog(null)} />}
+        {dialog === "help" && <HelpView onClose={() => setDialog(null)} />}
+        {dialog === "about" && <AboutDialog onClose={() => setDialog(null)} />}
+      </Suspense>
     </div>
   );
 }
