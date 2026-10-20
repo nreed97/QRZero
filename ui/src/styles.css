@@ -378,6 +378,10 @@ button.caption svg { fill: none; stroke: currentColor; stroke-width: 1; shape-re
 .check { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
 .buttons { display: flex; gap: 6px; justify-content: flex-end; align-items: center; margin-top: 10px; }
 .buttons .muted { margin-right: auto; }
+/* Save / Save and close stay at the bottom of a Settings page however long it is. */
+.settings-page { display: flex; flex-direction: column; }
+.settings-page > div:has(> .save-bar) { flex: 1 0 auto; display: flex; flex-direction: column; }
+.settings-page .save-bar { position: sticky; bottom: -12px; margin: auto -14px -12px; padding: 8px 14px; background: var(--bg); border-top: 1px solid var(--line); }
 fieldset { border: 1px solid var(--line); border-radius: 2px; margin: 0 0 8px; padding: 4px 8px 6px; }
 legend { color: var(--muted); font-size: 12px; padding: 0 4px; }
 .chip { display: inline-flex; align-items: center; gap: 4px; margin: 1px 10px 1px 0; }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import SaveBar from "./SaveBar";
 import type { NtfyConfig, NtfyView } from "../types";
 
 /** A topic nobody will guess: anyone who knows a topic on a public ntfy server can read it. */
@@ -10,7 +11,7 @@ function randomTopic(): string {
 }
 
 /** Push alerts to a phone or desktop through ntfy (ntfy.sh is free; a self-hosted server works too). */
-export default function AlertsTab() {
+export default function AlertsTab({ onClose }: { onClose: () => void }) {
   const [view, setView] = useState<NtfyView | null>(null);
   const [cfg, setCfg] = useState<NtfyConfig | null>(null);
   const [token, setToken] = useState("");
@@ -112,15 +113,13 @@ export default function AlertsTab() {
         <label className="check"><input type="checkbox" checked={cfg.watch} onChange={(e) => set({ watch: e.target.checked })} /> Watch list and DXpedition alerts</label>
         <p className="small muted">Which spots are needed follows Settings, Awards, Spot flags (awards, bands, modes, the DX Marathon). Spots the cluster replays when it connects are not sent.</p>
       </fieldset>
-      <div className="row">
-        <button className="primary" disabled={!dirty} onClick={save}>Save</button>
-        <button disabled={busy || !cfg.topic} onClick={test}>Send test</button>
-        {msg && <span className={`small ${msg.err ? "err" : ""}`}>{msg.text}</span>}
-      </div>
       <p className="small muted">
         {view.status.at ? `Last alert sent ${new Date(view.status.at * 1000).toLocaleTimeString()}; ${view.status.sent} sent since QRZero started.` : "Nothing sent since QRZero started."}
         {view.status.error ? <span className="err"> Last error: {view.status.error}</span> : null}
       </p>
+      <SaveBar msg={msg ? { text: msg.text, ok: !msg.err } : null} onSave={save} onClose={onClose}>
+        <button disabled={busy || !cfg.topic} onClick={test}>Send test</button>
+      </SaveBar>
     </div>
   );
 }
