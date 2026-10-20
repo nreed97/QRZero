@@ -719,6 +719,10 @@ function AwardsTab() {
   return (
     <div className="general-tab">
       <p className="muted">Tick the awards you chase. An award you untick disappears from the Awards pane and from the award hints in the QSO panel. Nothing is deleted from your log, and ticking it again brings it all back.</p>
+      <div className="row">
+        <button onClick={() => setAwardsOff([])}>Select all</button>
+        <button onClick={() => setAwardsOff(AWARD_LIST.map((a) => a.key))}>Clear all</button>
+      </div>
       <fieldset>
         <legend>Awards</legend>
         {group("main").map((a) => (
@@ -743,10 +747,6 @@ function AwardsTab() {
         </label>
         <p className="small muted">Off, every LoTW confirmation shows as C. On, QSOs with credit show V. LoTW grants credit itself, so under QSL, LoTW a Download verified credit button then appears; it reads the credit from all your LoTW confirmations.</p>
       </fieldset>
-      <div className="row">
-        <button onClick={() => setAwardsOff([])}>Select all</button>
-        <button onClick={() => setAwardsOff(AWARD_LIST.map((a) => a.key))}>Clear all</button>
-      </div>
       <SpotGoals />
     </div>
   );
@@ -786,6 +786,9 @@ function SpotGoals() {
           </label>
         ))}
       </div>
+      <label className="check">
+        <input type="checkbox" checked={g.marathon} onChange={(e) => save({ marathon: e.target.checked })} /> <span><b>DX Marathon</b>: flag countries and CQ zones not yet worked this year</span>
+      </label>
       <label className="check"><input type="checkbox" checked={g.new_bands} onChange={(e) => save({ new_bands: e.target.checked })} /> Flag a new band for something already worked</label>
       <label className="check"><input type="checkbox" checked={g.new_modes} onChange={(e) => save({ new_modes: e.target.checked })} /> Flag a new mode (CW, Phone, Digital)</label>
       <div className="row">
@@ -797,17 +800,14 @@ function SpotGoals() {
           </label>
         ))}
       </div>
-      <label className="check">
-        <input type="checkbox" checked={g.marathon} onChange={(e) => save({ marathon: e.target.checked })} /> <span><b>DX Marathon</b>: flag countries and CQ zones not yet worked this year</span>
-      </label>
       <div className="row">
-        <span className="small muted">Bands:</span>
+        <span className="small muted">Only these bands:</span>
         {GOAL_BANDS.map((b) => (
           <label key={b} className="check"><input type="checkbox" checked={g.bands.length === 0 || g.bands.includes(b)} onChange={(e) => save({ bands: toggle(g.bands.length ? g.bands : GOAL_BANDS, b, e.target.checked) })} /> {b}</label>
         ))}
       </div>
       <div className="row">
-        <span className="small muted">Modes:</span>
+        <span className="small muted">Only these modes:</span>
         {GOAL_MODES.map(([k, name]) => (
           <label key={k} className="check"><input type="checkbox" checked={g.modes.length === 0 || g.modes.includes(k)} onChange={(e) => save({ modes: toggle(g.modes.length ? g.modes : GOAL_MODES.map(([m]) => m), k, e.target.checked) })} /> {name}</label>
         ))}
