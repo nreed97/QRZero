@@ -762,6 +762,9 @@ struct MarathonQuery {
     calls: String,
     /// The calendar year; the current one when absent.
     year: Option<i32>,
+    /// "cw", "phone" or "digital" to count only that mode group; empty or "mixed" counts every mode.
+    #[serde(default)]
+    mode: String,
 }
 
 /// CQ DX Marathon progress for one year: countries and zones worked, counted when asked for.
@@ -771,6 +774,12 @@ async fn marathon(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Query<
     let calls: Vec<String> = q.calls.split(',').map(|c| c.trim().to_ascii_uppercase()).filter(|c| !c.is_empty()).collect();
     let this_year = chrono::Datelike::year(&chrono::Utc::now());
     let year = q.year.unwrap_or(this_year);
+    let group = match q.mode.to_ascii_lowercase().as_str() {
+        "cw" => Some("CW"),
+        "phone" => Some("PHONE"),
+        "digital" => Some("DIGITAL"),
+        _ => None,
+    };
     let out = db(&s, move |st| {
         let year_of = |t: i64| chrono::DateTime::from_timestamp(t, 0).map_or(this_year, |d| chrono::Datelike::year(&d));
         let mut years: Vec<i32> = match st.qso_time_range(id, &calls)? {
@@ -783,8 +792,12 @@ async fn marathon(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Query<
         }
         let mut tally = marathon::MarathonTally::default();
         let cty = cty.as_deref();
-        st.for_each_qso_between(id, &calls, marathon::year_start(year), marathon::year_start(year + 1), |qid, call, t, dxcc, cqz| {
-            tally.add(qid, call, t, marathon::country(cty, call, dxcc), marathon::zone(cty, call, cqz));
+        st.for_each_qso_between(id, &calls, marathon::year_start(year), marathon::year_start(year + 1), |qid, call, t, dxcc, cqz, mode| {
+            let this = mode.and_then(qrzero_core::awards::mode_group);
+            if group.is_some_and(|g| this != Some(g)) {
+                return;
+            }
+            tally.add(qid, call, t, this, marathon::country(cty, call, dxcc), marathon::zone(cty, call, cqz));
         })?;
         Ok(tally.finish(year, years))
     })

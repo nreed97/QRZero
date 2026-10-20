@@ -92,8 +92,9 @@ export const api = {
   goals: () => json<Goals>("GET", "/award-goals"),
   putGoals: (g: Goals) => json<Goals>("PUT", "/award-goals", g),
   /** CQ DX Marathon countries and zones worked in one year (the current one when `year` is absent). */
-  marathon: (logId: number, o: { calls: string[]; year?: number }) => {
+  marathon: (logId: number, o: { calls: string[]; year?: number; mode?: string }) => {
     const q = new URLSearchParams({ calls: o.calls.join(",") });
+    if (o.mode) q.set("mode", o.mode);
     if (o.year) q.set("year", String(o.year));
     return json<Marathon>("GET", `/logs/${logId}/marathon?${q}`);
   },

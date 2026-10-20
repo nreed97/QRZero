@@ -224,6 +224,14 @@ async fn dx_marathon_counts_one_year() {
     let last = api.get(&format!("/logs/{log}/marathon?year=2025")).await;
     assert_eq!(last["score"], 2);
     assert_eq!(api.get(&format!("/logs/{log}/marathon?year=2025&calls=N0NONE")).await["score"], 0);
+    // One mode group at a time: a phone QSO with a new zone counts for Phone and Mixed, not CW.
+    let fields = json!({"CALL": "ZS1ABC", "QSO_DATE": "20260105", "TIME_ON": "1200", "BAND": "20m", "MODE": "SSB", "DXCC": "462", "CQZ": "38"});
+    api.post(&format!("/logs/{log}/qsos"), json!({"fields": fields})).await;
+    let score = |mode: &'static str| {
+        let api = &api;
+        async move { api.get(&format!("/logs/{log}/marathon?year=2026&mode={mode}")).await["score"].as_u64() }
+    };
+    assert_eq!((score("mixed").await, score("cw").await, score("phone").await, score("digital").await), (Some(6), Some(4), Some(2), Some(0)));
 }
 
 /// What the stand-in ntfy server got: (topic, title, priority, authorization, body).

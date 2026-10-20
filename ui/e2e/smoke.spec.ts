@@ -827,6 +827,12 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.locator(".marathon-zones td")).toHaveCount(40);
   await expect(page.locator(".club-table tbody tr", { hasText: "ZL1ABC" })).toContainText("2024-02-10");
   await page.screenshot({ path: "e2e-results/awards-marathon.png" });
+  // A mode group counts only its own QSOs; Digital with none leaves a zero score.
+  const mixedScore = Number(await page.locator(".marathon-score").textContent());
+  await page.getByLabel("Marathon mode").selectOption("cw");
+  await expect(async () => expect(Number(await page.locator(".marathon-score").textContent())).toBeLessThanOrEqual(mixedScore)).toPass();
+  await page.screenshot({ path: "e2e-results/awards-marathon-cw.png" });
+  await page.getByLabel("Marathon mode").selectOption("mixed");
   await page.getByRole("button", { name: "SKCC" }).click();
   const centurion = page.locator(".club-table tbody tr", { hasText: "Centurion" }).first();
   await expect(centurion).toContainText("100");
