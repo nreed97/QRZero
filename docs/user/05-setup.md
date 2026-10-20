@@ -146,6 +146,10 @@ The **Keyboard** tab lists the keys QRZero responds to and lets you change them.
 | User guide | Anywhere | <kbd>F1</kbd> |
 | Settings | Anywhere | none |
 | QSL: LoTW, QRZ, Club Log | Anywhere | none |
+| Go to the call box (brings New QSO forward) | Anywhere | <kbd>F2</kbd> |
+| Edit the newest QSO in the log | Anywhere | <kbd>Ctrl</kbd>+<kbd>E</kbd> |
+| Turn the rotator to the entered call | Anywhere | <kbd>Alt</kbd>+<kbd>J</kbd> |
+| Next / previous pane in the group of tabs you are in | Anywhere | <kbd>Alt</kbd>+<kbd>Page Down</kbd> / <kbd>Page Up</kbd> |
 | Swap between radio 1 and 2 | QSO entry | <kbd>`</kbd> |
 | Save the QSO | Edit QSO window | <kbd>Ctrl</kbd>+<kbd>S</kbd> |
 | Previous / next QSO in the log grid | Edit QSO window | <kbd>Alt</kbd>+<kbd>Up</kbd> / <kbd>Down</kbd> |

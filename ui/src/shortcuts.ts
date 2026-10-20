@@ -60,15 +60,15 @@ export function isShortcut(id: string, e: Pick<KeyboardEvent, "key" | "ctrlKey" 
 }
 
 /** Runs `fn` whenever the key assigned to `id` is pressed anywhere in the window. */
-export function useShortcut(id: string, fn: () => void) {
+/** `fn` can return false to say the key wasn't for it, leaving the key to other handlers. */
+export function useShortcut(id: string, fn: () => void | boolean) {
   useSubscription();
   const ref = useRef(fn);
   ref.current = fn;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (capture.active || e.defaultPrevented || !isShortcut(id, e)) return;
-      e.preventDefault();
-      ref.current();
+      if (ref.current() !== false) e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

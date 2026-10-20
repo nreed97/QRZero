@@ -191,6 +191,15 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // period stays on top. By offset, JA1XYZ (1100 Hz) comes before EA8AB (1120 Hz) in the older period.
   const msgs = ftx.locator(".ftx-table .ftx-row .msg");
   await expect(msgs).toHaveText(["N0CALL EA8AB R-10", "CQ DL1ABC JO62", "N0CALL EA8AB IL18", "CQ JA1XYZ PM95"]);
+  // From the keyboard: arrows select a decode, Enter fills it into the QSO panel and the cursor lands in the call box.
+  await ftx.getByRole("table", { name: /^Decodes/ }).focus();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("call")).toHaveValue("DL1ABC");
+  await expect(page.getByTestId("call")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("call")).toHaveValue("");
   await opts();
   await ftx.getByLabel("Offset").check();
   await expect(msgs).toHaveText(["N0CALL EA8AB R-10", "CQ DL1ABC JO62", "CQ JA1XYZ PM95", "N0CALL EA8AB IL18"]);

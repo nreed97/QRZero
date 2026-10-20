@@ -3,6 +3,7 @@ import { api } from "../api";
 import { useColumnDrag } from "../columnDrag";
 import { distanceKm } from "../geo";
 import { onLive } from "../live";
+import { useListKeys } from "../listKeys";
 import { BANDS, MODE_GROUP_NAME, modeGroup } from "../modes";
 import { needLabels, needRank } from "../needed";
 import { localGet, localSet } from "../prefs";
@@ -153,6 +154,9 @@ export default function ClusterPane({ onPick, onSettings }: { onPick: (p: Decode
     [spots, filters, now, home],
   );
 
+  const pickSpot = (s: Spot, qsy = false): DecodePick => ({ call: s.call, grid: null, band: s.band, mode: s.mode, freq_hz: s.freq_hz, tx_freq_hz: s.tx_freq_hz ?? undefined, qsy });
+  const kb = useListKeys(shown, (s) => String(s.seq), (s, tune) => onPick(pickSpot(s, tune)));
+
   const activeExtra = (filters.origin ? 1 : 0) + (filters.hideSelf ? 1 : 0) + (filters.hideHome ? 1 : 0) + (filters.hideUnknown ? 1 : 0) + (filters.hideCont.length ? 1 : 0);
   const toggleCont = (c: string) => setFilter({ hideCont: filters.hideCont.includes(c) ? filters.hideCont.filter((x) => x !== c) : [...filters.hideCont, c] });
 
@@ -236,7 +240,7 @@ export default function ClusterPane({ onPick, onSettings }: { onPick: (p: Decode
         </div>
       )}
       {err && <div className="ftx-msg small err">{err}</div>}
-      <div className="ftx-table" role="table" aria-label="Spots">
+      <div className="ftx-table kb-list" role="table" aria-label="Spots (arrows select, Enter fills in, Ctrl+Enter tunes too)" {...kb.props}>
         <div className="spot-row head" role="row" ref={head} style={rowStyle}>
           {cols.map((c, i) => {
             const m = colDrag.moving;
@@ -261,6 +265,7 @@ export default function ClusterPane({ onPick, onSettings }: { onPick: (p: Decode
             <div
               key={s.seq}
               className={`spot-row ${group ? `mode-${group}` : ""} ${flags[0]?.cls === "new" ? "needed" : ""} ${flags.some((f) => f.cls === "dupe") ? "worked" : ""}`}
+              {...kb.rowProps(String(s.seq))}
               role="row"
               style={rowStyle}
               onClick={() => onPick({ call: s.call, grid: null, band: s.band, mode: s.mode, freq_hz: s.freq_hz, tx_freq_hz: s.tx_freq_hz ?? undefined })}

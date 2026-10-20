@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } fr
 import { api } from "../api";
 import { useColumnWidths, type Track } from "../columnDrag";
 import { onLive, useInstances } from "../live";
+import { useListKeys } from "../listKeys";
 import { localGet, localSet } from "../prefs";
 import { ALERTS, activeAlerts, isWorked, passes, useFtxAlerts, type AlertKind, type FtxAlertConfig } from "../ftxAlerts";
 import type { FtxDecode, FtxInstance } from "../types";
@@ -216,6 +217,10 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
     [cycles, filters.sort, cfg, pinned],
   );
 
+  // Keyboard order is the order on screen; our own transmissions can't be picked.
+  const keyRows = useMemo(() => [...calling, ...periods.flatMap((p) => p.rows)].filter((d) => !d.tx), [calling, periods]);
+  const kb = useListKeys(keyRows, (d) => `${d.seq}`, (d, answerIt) => (answerIt ? void answer(d) : pick(d)));
+
   const row = (d: FtxDecode) => {
     if (d.tx) {
       return (
@@ -246,6 +251,7 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
       <div
         key={d.seq}
         className={cls}
+        {...kb.rowProps(`${d.seq}`)}
         style={main ? ({ "--alert": cfg.alerts[main].color } as CSSProperties) : undefined}
         role="row"
         onClick={() => pick(d)}
@@ -303,7 +309,7 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
           ))}
         </div>
       ) : (
-        <div className="ftx-table" role="table" aria-label="Decodes" style={cols.style}>
+        <div className="ftx-table kb-list" role="table" aria-label="Decodes (arrows select, Enter fills in, Ctrl+Enter calls them)" style={cols.style} {...kb.props}>
           <div className="ftx-row head" role="row">
             {[["UTC", ""], ["Src", "Source: slice or instance"], ["dB", ""], ["DT", ""], ["Freq", ""], ["Message", ""], ["Country", ""], ["Band", ""], ["Flags", ""]].map(([label, tip], i) => (
               <span key={label} title={tip || undefined}>{label}<span {...cols.grip(COLS[i].key)} /></span>
