@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { api } from "../api";
+import { useColumnWidths, type Track } from "../columnDrag";
 import { onLive, useInstances } from "../live";
 import { localGet, localSet } from "../prefs";
 import { ALERTS, activeAlerts, isWorked, passes, useFtxAlerts, type AlertKind, type FtxAlertConfig } from "../ftxAlerts";
@@ -129,7 +130,20 @@ function describe(id: string, inst: FtxInstance | undefined): string {
   return lines.join("\n");
 }
 
+const COLS: Track[] = [
+  { key: "utc", track: "76px", min: 76 },
+  { key: "src", track: "32px", min: 32 },
+  { key: "db", track: "38px", min: 38 },
+  { key: "dt", track: "46px", min: 46 },
+  { key: "freq", track: "48px", min: 48 },
+  { key: "message", track: "minmax(180px, 2fr)", min: 180 },
+  { key: "country", track: "minmax(90px, 1fr)", min: 90 },
+  { key: "band", track: "50px", min: 50 },
+  { key: "flags", track: "minmax(110px, 1.2fr)", min: 110 },
+];
+
 export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick) => void; mycall: string }) {
+  const cols = useColumnWidths("qrzero.ftxCols", COLS);
   const [decodes, setDecodes] = useState<FtxDecode[]>([]);
   const [filters, setFilters] = useState<Filters>(() => localGet("qrzero.ftx", DEFAULTS));
   const [selected, setSelected] = useState<number | null>(null);
@@ -289,9 +303,11 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
           ))}
         </div>
       ) : (
-        <div className="ftx-table" role="table" aria-label="Decodes">
+        <div className="ftx-table" role="table" aria-label="Decodes" style={cols.style}>
           <div className="ftx-row head" role="row">
-            <span>UTC</span><span title="Source: slice or instance">Src</span><span>dB</span><span>DT</span><span>Freq</span><span>Message</span><span>Country</span><span>Band</span><span>Flags</span>
+            {[["UTC", ""], ["Src", "Source: slice or instance"], ["dB", ""], ["DT", ""], ["Freq", ""], ["Message", ""], ["Country", ""], ["Band", ""], ["Flags", ""]].map(([label, tip], i) => (
+              <span key={label} title={tip || undefined}>{label}<span {...cols.grip(COLS[i].key)} /></span>
+            ))}
           </div>
           {shown.length === 0 && <div className="empty muted">No decodes{decodes.length ? " match the filters" : " yet"}.</div>}
           {calling.length > 0 && (
