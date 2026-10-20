@@ -875,6 +875,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByRole("button", { name: "SKCC" })).toHaveCount(0);
   await fromMenu(page, "Settings…");
   await page.getByRole("button", { name: "Awards", exact: true }).click();
+  await page.screenshot({ path: "e2e-results/settings-awards.png" });
   await page.getByRole("button", { name: "Select all" }).click();
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await expect(page.getByRole("button", { name: "SKCC" })).toBeVisible();
