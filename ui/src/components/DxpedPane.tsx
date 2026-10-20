@@ -12,7 +12,9 @@ const MODE_NAME: Record<string, string> = { CW: "CW", PHONE: "Phone", DIGITAL: "
 const COLS: [string, string, string?][] = [["call", "Call"], ["when", "When"], ["need", "New for you"], ["spot", "Last spot"], ["entity", "Entity", "wide"], ["note", "Note", "wide"]];
 const blank = (): DxpedPlanned => ({ id: 0, call: "", start: "", end: "", note: "" });
 const utc = (t: number) => new Date(t * 1000).toISOString().slice(11, 16);
-const short = (d: string) => (d ? new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" }) : "");
+// One formatter for every row: toLocaleDateString builds a new one on each call, which is slow.
+const dayFormat = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
+const short = (d: string) => (d ? dayFormat.format(new Date(`${d}T00:00:00Z`)) : "");
 const dates = (i: DxpedItem) => (i.start || i.end ? `${short(i.start)} - ${short(i.end)}` : "no dates");
 
 function needText(i: DxpedItem): string {
