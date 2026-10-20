@@ -338,8 +338,15 @@ pub fn roll_back(data_dir: &Path) -> Result<String> {
         .find(|b| b.kind == Kind::BeforeRestore)
         .ok_or_else(|| Error::NotFound("a backup from before the restore".into()))?;
     let db = db_path(data_dir);
+    // Copy aside first so a failure partway leaves the current log in place, not half a file.
+    let tmp = data_dir.join(STAGING);
+    remove_db_files(&tmp)?;
+    if let Err(e) = fs::copy(backup_dir(data_dir).join(&before.name), &tmp) {
+        let _ = remove_db_files(&tmp);
+        return Err(e.into());
+    }
     remove_db_files(&db)?;
-    fs::copy(backup_dir(data_dir).join(&before.name), &db)?;
+    fs::rename(&tmp, &db)?;
     Ok(before.name)
 }
 

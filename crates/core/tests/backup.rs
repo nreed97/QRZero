@@ -174,3 +174,41 @@ fn restores_an_older_schema_and_migrates_it() {
     // Migrated far enough to use notes (schema 5).
     st.set_note(1, "W1AW", "hi").unwrap();
 }
+
+#[test]
+fn a_restore_interrupted_after_the_log_was_removed_finishes_on_the_next_start() {
+    let dir = tempfile::tempdir().unwrap();
+    let st = open_with(dir.path(), &["W1AW", "K1ABC"]);
+    let b = backup::create(dir.path(), Kind::Manual).unwrap();
+    st.insert_qso(1, None, &qso("N0CALL")).unwrap();
+    drop(st);
+    backup::stage_backup(dir.path(), &b.name).unwrap();
+    // Killed between deleting the old log and moving the staged file into place.
+    std::fs::remove_file(backup::db_path(dir.path())).unwrap();
+    assert!(backup::pending(dir.path()).is_some());
+    assert!(backup::apply_pending(dir.path()).unwrap().is_some());
+    assert_eq!(qso_count(&Store::open(&backup::db_path(dir.path())).unwrap()), 2);
+    assert!(backup::pending(dir.path()).is_none());
+}
+
+#[test]
+fn rolling_back_puts_the_pre_restore_log_back_whole() {
+    let dir = tempfile::tempdir().unwrap();
+    let st = open_with(dir.path(), &["W1AW"]);
+    let b = backup::create(dir.path(), Kind::Manual).unwrap();
+    st.insert_qso(1, None, &qso("K1ABC")).unwrap();
+    st.insert_qso(1, None, &qso("N0CALL")).unwrap();
+    drop(st);
+    backup::stage_backup(dir.path(), &b.name).unwrap();
+    backup::apply_pending(dir.path()).unwrap().unwrap();
+    assert_eq!(qso_count(&Store::open(&backup::db_path(dir.path())).unwrap()), 1);
+    backup::roll_back(dir.path()).unwrap();
+    assert_eq!(qso_count(&Store::open(&backup::db_path(dir.path())).unwrap()), 3);
+    // Nothing is left half-done in the data folder.
+    let stray: Vec<_> = std::fs::read_dir(dir.path())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|n| n.contains("pending") || n.contains("staging") || n.ends_with(".tmp"))
+        .collect();
+    assert!(stray.is_empty(), "{stray:?}");
+}
