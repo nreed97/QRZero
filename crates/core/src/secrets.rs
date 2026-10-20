@@ -13,10 +13,18 @@ use crate::store::Store;
 pub fn get(_store: &Store, service: &str, name: &str) -> Result<Option<String>> {
     use crate::error::Error;
     let entry = keyring::Entry::new(service, name).map_err(|e| Error::Secret(e.to_string()))?;
-    match entry.get_password() {
-        Ok(p) => Ok(Some(p)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => Err(Error::Secret(e.to_string())),
+    // The OS store can fail a read for a moment under load; a missing entry is final, anything else gets a few tries.
+    let mut tries = 0;
+    loop {
+        match entry.get_password() {
+            Ok(p) => return Ok(Some(p)),
+            Err(keyring::Error::NoEntry) => return Ok(None),
+            Err(e) if tries >= 2 => return Err(Error::Secret(e.to_string())),
+            Err(_) => {
+                tries += 1;
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+        }
     }
 }
 
