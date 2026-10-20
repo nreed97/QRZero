@@ -105,6 +105,8 @@ WSJT-X's UDP interface only accepts a short list of requests, so some things sti
 - **The dial frequency, band and power**, Hold Tx Freq, auto sequencing and the other settings.
 - **JTDX** accepts fewer requests than WSJT-X: it ignores switching configuration, and may ignore other requests depending on its version.
 
+To make a column wider or narrower, drag the right edge of its heading; double-click that edge to give the column its normal width back. Widths are remembered on this computer. (In the list view; the grouped view has fixed columns.)
+
 ### Your transmissions in the list
 
 Each time a program transmits, the message is added to the list once for that period, marked **TX** in red with the Tx offset in the Freq column and **Sent** in the Flags column. In **Call boxes** it is a red **TX:** line at the top of that period. These lines always show, whatever the filters; click and double-click do nothing on them. They need WSJT-X 2.1 or later, which sends the Tx message.

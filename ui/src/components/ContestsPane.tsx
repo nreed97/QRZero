@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "../watch.css";
 import "../contests.css";
 import { api } from "../api";
+import { useColumnDrag } from "../columnDrag";
 import { localGet, localSet } from "../prefs";
 import type { ContestItem, ContestList } from "../types";
 
@@ -23,7 +24,11 @@ function span(secs: number): string {
 }
 
 /** Contests on the air now and coming up, from the WA7BNM Contest Calendar. */
+const CONTEST_COLS = [["contest", "Contest"], ["when", "When (UTC)"], ["link", ""], ["mode", "Mode"], ["act", ""]];
+
 export default function ContestsPane() {
+  const colDrag = useColumnDrag("qrzero.contestsCols", CONTEST_COLS.map((c) => c[0]), useRef(null));
+  const sized = Object.keys(colDrag.widths).length > 0;
   const [list, setList] = useState<ContestList | null>(null);
   const [mode, setMode] = useState(() => localGet("qrzero.contests", { mode: "" }).mode);
   const [busy, setBusy] = useState(false);
@@ -89,9 +94,16 @@ export default function ContestsPane() {
           </div>
         )}
         {items.length > 0 && (
-          <table className="watch-table hits">
+          <table className={`watch-table hits${sized ? " sized" : ""}`}>
             <thead>
-              <tr><th>Contest</th><th>When (UTC)</th><th /><th>Mode</th><th /></tr>
+              <tr>
+                {CONTEST_COLS.map(([key, label]) => (
+                  <th key={key} style={colDrag.widths[key] ? { width: colDrag.widths[key] } : undefined}>
+                    {label}
+                    {key !== "act" && <span className="col-resize" onPointerDown={(e) => colDrag.resize(e, key)} onDoubleClick={() => colDrag.setWidth(key, 0)} title="Drag to resize, double-click to reset" />}
+                  </th>
+                ))}
+              </tr>
             </thead>
             <tbody>
               {onNow.length > 0 && <tr className="group"><td colSpan={5}>On now</td></tr>}

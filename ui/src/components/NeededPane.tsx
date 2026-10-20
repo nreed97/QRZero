@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
+import { useColumnWidths, type Track } from "../columnDrag";
 import { onLive } from "../live";
 import { MODE_GROUP_NAME, modeGroup } from "../modes";
 import { compareNeeded, type NeedRank, needLabel, needRank, spotKey } from "../needed";
@@ -11,8 +12,22 @@ import "../watch.css";
 export const spotPick = (s: Spot, qsy = false): DecodePick => ({ call: s.call, grid: null, band: s.band, mode: s.mode, freq_hz: s.freq_hz, tx_freq_hz: s.tx_freq_hz ?? undefined, qsy });
 
 /** Cluster spots on the air now that would be new for the log, best first. */
+const COLS: Track[] = [
+  { key: "new", track: "150px", min: 150 },
+  { key: "wanted", track: "56px", min: 56 },
+  { key: "call", track: "96px", min: 96 },
+  { key: "country", track: "minmax(90px, 1fr)", min: 90 },
+  { key: "band", track: "46px", min: 46 },
+  { key: "freq", track: "72px", min: 72 },
+  { key: "mode", track: "54px", min: 54 },
+  { key: "utc", track: "50px", min: 50 },
+  { key: "spotter", track: "96px", min: 96 },
+  { key: "comment", track: "minmax(120px, 2fr)", min: 120 },
+];
+
 export default function NeededPane({ onPick, onSettings }: { onPick: (p: DecodePick) => void; onSettings: () => void }) {
   const cfg = useNeededConfig();
+  const cols = useColumnWidths("qrzero.neededCols", COLS);
   const [spots, setSpots] = useState<Map<string, Spot>>(new Map());
   const [connected, setConnected] = useState(false);
   const [now, setNow] = useState(Date.now() / 1000);
@@ -75,9 +90,11 @@ export default function NeededPane({ onPick, onSettings }: { onPick: (p: DecodeP
         <button onClick={onSettings} title="Sound and popup alerts for needed spots">Alerts…</button>
       </div>
       {err && <div className="ftx-msg small err">{err}</div>}
-      <div className="ftx-table needed-table" role="table" aria-label="Needed now">
+      <div className="ftx-table needed-table" role="table" aria-label="Needed now" style={cols.style}>
         <div className="needed-row head" role="row">
-          <span>New</span><span title="Club Log Most Wanted rank of the entity">Wanted</span><span>Call</span><span>Country</span><span>Band</span><span>Freq</span><span>Mode</span><span>UTC</span><span>Spotter</span><span>Comment</span>
+          {[["New", ""], ["Wanted", "Club Log Most Wanted rank of the entity"], ["Call", ""], ["Country", ""], ["Band", ""], ["Freq", ""], ["Mode", ""], ["UTC", ""], ["Spotter", ""], ["Comment", ""]].map(([label, tip], i) => (
+            <span key={label} title={tip || undefined}>{label}<span {...cols.grip(COLS[i].key)} /></span>
+          ))}
         </div>
         {rows.length === 0 && (
           <div className="empty muted">

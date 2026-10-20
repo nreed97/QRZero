@@ -34,6 +34,8 @@ The **Wanted** column is the entity's rank on Club Log's public Most Wanted list
 
 A call on the same band and mode is listed once, however many people spot it. Spots drop off after the time chosen in the pane (30 minutes to start with). It works for every mode: CW, phone and digital spots are ranked together, with the mode coloured as in the Cluster pane.
 
+Drag the right edge of a column heading to make it wider or narrower, and double-click the edge to put it back; the widths are remembered.
+
 ### Alerts
 
 When a needed station is spotted, QRZero can play a sound and show a popup in the corner of the main window. Click the popup to fill in the station, or double-click it to fill in and tune (it then closes); it goes away by itself after a short while. Something new gets a double beep, a new band, mode or unconfirmed slot a single one.
