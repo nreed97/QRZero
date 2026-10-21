@@ -57,5 +57,5 @@ Search tip: each Rust module starts with a `//!` doc comment saying what it is, 
 
 ## Desktop shell and release
 
-- `src-tauri`: windows (frameless by default, driven by `qrzero:` page-title commands), icons, installer config (`tauri.conf.json`).
+- `src-tauri`: windows (frameless by default, driven by `qrzero:` page-title commands), remembered window size/place/maximized state (`window_state.rs`), icons, installer config (`tauri.conf.json`).
 - CI jobs (Linux tests plus e2e, Windows installer, macOS build) are in `.github/workflows/ci.yml`; tag-triggered release builds are in `.github/workflows/release.yml`; the website deploy is `.github/workflows/pages.yml`.

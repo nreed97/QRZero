@@ -113,6 +113,7 @@ export function openPopout(id: WindowId): Window | null {
 
 /** Called in the popped-out window to remember where it is. */
 export function saveGeometry(id: WindowId) {
+  if (isMaximized()) return; // the desktop shell remembers that; the size to come back to stays as it was
   const top = localGet<Geometry | null>(geoKey(id), null)?.top;
   localSet(geoKey(id), { w: window.innerWidth, h: window.innerHeight, x: window.screenX, y: window.screenY, ...(top ? { top } : {}) });
 }

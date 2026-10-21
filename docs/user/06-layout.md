@@ -22,7 +22,7 @@ The **×** at the top right of a pane hides it. Show it again from **Layout** in
 
 The arrow button next to the **×** opens the pane in its own window (or right-click the pane's tab and pick **Pop out**), so you can put the FTx monitor, the cluster or the map on a second screen. Every pane except Log can pop out, including New QSO: put the entry form on one screen and the rest on another. The spots you click, the radio and the keyboard shortcuts work the same from the pop-out, and the QSOs you log show up in the main window. A QSO half-typed when you pop the form out or dock it back is cleared. Clicking a decode, a spot or a QSO in a popped-out pane works just as it does in the main window.
 
-Close the window, or click **Dock back** (the arrow-into-a-box icon in its title bar), to put the pane back where it was in the main window (in the same tab group, or on the same side of its neighbour). QRZero remembers where each window was and reopens it there next time. When you close QRZero, the popped-out windows close with it.
+Close the window, or click **Dock back** (the arrow-into-a-box icon in its title bar), to put the pane back where it was in the main window (in the same tab group, or on the same side of its neighbour). QRZero remembers where each window was, and whether it was maximized, and reopens it the same way next time. When you close QRZero, the popped-out windows close with it.
 
 In the desktop app, the **Always on top** button (the pin icon) in a pop-out's title bar keeps that window above your other windows (handy for a logging form over a full-screen radio program). The pin is highlighted while it is on. It affects only that window, and QRZero remembers the setting for each pane. A browser tab can't do this, so the button is not shown there.
 
@@ -33,6 +33,8 @@ In a web browser, allow pop-ups for QRZero's page, or the window can't open.
 ## Frameless windows
 
 The desktop app draws its own title bar: the top bar of the main window, and the bar along the top of each pop-out and of the QSO editor, take the place of the system frame. Drag an empty part of the bar to move the window, double-click it to maximize or restore, and drag any edge to resize. On Windows and Linux, minimize, maximize and close sit at the right end of the bar; on macOS the usual window buttons stay at the top left. Closing a pop-out this way docks its pane back, the same as **Dock back**.
+
+The main window reopens the way you closed it: at the same size and place, or maximized if you closed it maximized. Restoring it from maximized takes it back to the last smaller size. Maximizing is not the same as full screen; both keep working as before. If the saved place is no longer on a connected screen, the window opens on the main screen instead.
 
 To go back to the system frame, untick **Frameless windows** in **Settings**, **General** (or in the **☰** menu). On Windows and Linux every open window changes at once; on macOS the change applies the next time QRZero starts. Either way it is remembered. A browser tab always has the browser's own frame, so the option is not shown there.
 

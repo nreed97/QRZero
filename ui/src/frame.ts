@@ -64,6 +64,11 @@ export function shell(cmd: string) {
   }, 100);
 }
 
+let maximized = false;
+if (typeof window !== "undefined") window.addEventListener("qrzero-frame", (e) => { maximized = !!(e as CustomEvent<{ max?: boolean }>).detail?.max; });
+/** Whether the desktop shell says this window is maximized (its size is then not the one to come back to). */
+export const isMaximized = () => maximized;
+
 /** This window's frame, and whether it is maximized. */
 export function useFrame() {
   const [state, setState] = useState(() => ({ ...info(), max: false }));
