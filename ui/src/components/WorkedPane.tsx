@@ -158,10 +158,9 @@ export default function WorkedPane({ logId, call, lookup, entry, refreshKey, sel
 
   const summary = useMemo(() => {
     const bands = [...new Set(all.map((q) => bandOf(q.fields)).filter(Boolean))].sort((a, b) => bandRank(a) - bandRank(b));
-    const modes = [...new Set(all.map((q) => modeLabel(q.fields)).filter(Boolean))].sort();
-    const slots = new Set<string>();
-    for (const q of all) if (confirmed(q.fields) && bandOf(q.fields)) slots.add(`${bandOf(q.fields)} ${modeLabel(q.fields)}`.trim());
-    const conf = [...slots].sort((a, b) => bandRank(a.split(" ")[0]) - bandRank(b.split(" ")[0]) || a.localeCompare(b));
+    // Sideband is one mode here: LSB and USB are listed as SSB.
+    const modes = [...new Set(all.map((q) => (["LSB", "USB"].includes(modeLabel(q.fields).toUpperCase()) ? "SSB" : modeLabel(q.fields))).filter(Boolean))].sort();
+    const conf = [...new Set(all.filter((q) => confirmed(q.fields)).map((q) => bandOf(q.fields)).filter(Boolean))].sort((a, b) => bandRank(a) - bandRank(b));
     const first = all.length ? fmtDate(all[all.length - 1].fields) : "";
     const callOf = (q: Qso) => (q.fields.CALL ?? "").toUpperCase();
     const calls = new Set(all.map(callOf)).size;
@@ -348,7 +347,7 @@ export default function WorkedPane({ logId, call, lookup, entry, refreshKey, sel
             <span><b>Bands</b> {summary.bands.join(" ") || "none"}</span>
             <span><b>Modes</b> {summary.modes.join(" ") || "none"}</span>
             <span><b>First QSO</b> {summary.first || "unknown"}</span>
-            <span><b>Confirmed</b> {summary.conf.length ? <span className="wb-conf">{summary.conf.join(", ")}</span> : "none"}</span>
+            <span><b>Confirmed</b> {summary.conf.length ? <span className="wb-conf">{summary.conf.join(" ")}</span> : "none"}</span>
             {error && <span className="err">{error}</span>}
           </div>
         )}
