@@ -25,7 +25,7 @@ export interface WorkedPaneProps {
 /** Station details worth carrying over from an earlier QSO. */
 export const WORKED_COPY_FIELDS = ["NAME", "QTH", "GRIDSQUARE", "STATE", "CNTY", "QSL_VIA"] as const;
 
-interface Toggles { band: boolean; mode: boolean; unconfirmed: boolean }
+interface Toggles { band: boolean; mode: boolean; unconfirmed: boolean; full?: boolean }
 const PREF_KEY = "qrzero.worked";
 const NO_TOGGLES: Toggles = { band: false, mode: false, unconfirmed: false };
 const LIMIT = 10_000;
@@ -290,7 +290,7 @@ export default function WorkedPane({ logId, call, lookup, entry, refreshKey, sel
             <span><b>First QSO</b> {summary.first || "unknown"}</span>
             {error && <span className="err">{error}</span>}
           </div>
-        ) : (
+        ) : toggles.full && (
           <div className="wb-summary">
             <span><b>Bands</b> {summary.bands.join(" ") || "none"}</span>
             <span><b>Modes</b> {summary.modes.join(" ") || "none"}</span>
@@ -319,6 +319,8 @@ export default function WorkedPane({ logId, call, lookup, entry, refreshKey, sel
             title={entry.band ? `Only QSOs on ${entry.band}` : "No band in the entry"} onClick={() => setToggle("band")}>This band</button>}
           {!slot && <button type="button" className={`tiny${toggles.mode ? " on" : ""}`} aria-pressed={toggles.mode} disabled={!entry.mode}
             title={entry.mode ? `Only QSOs in ${entry.mode}` : "No mode in the entry"} onClick={() => setToggle("mode")}>This mode</button>}
+          {!slot && <button type="button" className={`tiny${toggles.full ? " on" : ""}`} aria-pressed={!!toggles.full}
+            title="Full view adds a summary under the list: bands, modes, first QSO and what is confirmed" onClick={() => setToggle("full")}>Full</button>}
           <button type="button" className={`tiny${toggles.unconfirmed ? " on" : ""}`} aria-pressed={toggles.unconfirmed}
             title="Only QSOs not confirmed by LoTW, card or eQSL" onClick={() => setToggle("unconfirmed")}>Unconfirmed</button>
         </span>
