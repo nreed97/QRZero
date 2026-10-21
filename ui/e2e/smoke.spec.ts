@@ -689,7 +689,23 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
     .toBe(true);
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  await expect(page.getByRole("button", { name: "Layout: Test layout" })).toBeVisible();
+  try {
+    await expect(page.getByRole("button", { name: "Layout: Test layout" })).toBeVisible();
+  } catch (e) {
+    // Say what the window and the database held, so a failure on a slow runner can be understood from its log.
+    const info = await page.evaluate(async () => {
+      const db = (await (await fetch("/api/prefs/ui.local", { headers: { "x-qrzero-token": "e2e" } })).json()) ?? {};
+      const keys = Object.keys(localStorage).filter((k) => k.startsWith("qrzero."));
+      return JSON.stringify({
+        layoutButton: [...document.querySelectorAll("button")].map((b) => b.textContent).find((t) => t?.startsWith("Layout")),
+        localKeys: keys.length,
+        localCurrent: localStorage.getItem("qrzero.layouts.current"),
+        dbKeys: Object.keys(db).length,
+        dbCurrent: db["qrzero.layouts.current"],
+      });
+    });
+    throw new Error(`${(e as Error).message}\n${info}`);
+  }
   await expect(page.locator(".ws-group", { has: page.getByRole("tab", { name: "Cluster" }) }).getByRole("tab")).toHaveCount(1);
 
   // A pane pops out into its own window and docks back when that window closes.
