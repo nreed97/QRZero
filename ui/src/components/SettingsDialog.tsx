@@ -14,6 +14,7 @@ import { confirmDelete } from "../display";
 import BackupsTab from "./BackupsTab";
 import AlertsTab from "./AlertsSettings";
 import KeyboardTab from "./KeyboardSettings";
+import ModesTab from "./ModesSettings";
 import { DISPLAY_DEFAULTS, beep, setDisplay, useDisplay } from "../display";
 import { UPDATES_CHANGED } from "./UpdateNotice";
 import { MODES } from "../modes";
@@ -44,13 +45,13 @@ interface Props {
   initialTab?: string;
 }
 
-type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "udp" | "startup" | "cluster" | "alerts" | "logs" | "lookup" | "awards" | "backups" | "keyboard" | "general";
+type Tab = "station" | "locations" | "equipment" | "fields" | "radios" | "udp" | "startup" | "cluster" | "alerts" | "logs" | "lookup" | "awards" | "backups" | "keyboard" | "modes" | "general";
 
 /** The sections down the left of Settings, grouped. */
 const GROUPS: { name: string; tabs: Tab[] }[] = [
   { name: "Program", tabs: ["general", "backups", "keyboard"] },
   { name: "Station", tabs: ["station", "locations", "equipment", "logs"] },
-  { name: "Logging", tabs: ["fields", "lookup", "awards"] },
+  { name: "Logging", tabs: ["fields", "modes", "lookup", "awards"] },
   { name: "Connections", tabs: ["radios", "udp", "cluster", "alerts", "startup"] },
 ];
 
@@ -69,6 +70,7 @@ const TAB_NAMES: Record<Tab, string> = {
   alerts: "Alerts",
   backups: "Backups",
   keyboard: "Keyboard",
+  modes: "Modes",
   general: "General",
 };
 
@@ -191,6 +193,7 @@ export default function SettingsDialog(props: Props) {
       {tab === "alerts" && <AlertsTab onClose={props.onClose} />}
       {tab === "backups" && <BackupsTab />}
       {tab === "keyboard" && <KeyboardTab />}
+      {tab === "modes" && <ModesTab onClose={props.onClose} />}
       {tab === "general" && <GeneralTab general={props.general} onGeneral={props.onGeneral} onWizard={props.onWizard} />}
       </div>
     </Modal>

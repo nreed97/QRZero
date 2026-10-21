@@ -493,13 +493,30 @@ fn state_index(code: &str) -> Option<usize> {
     US_STATES.binary_search_by(|(c, _)| c.as_bytes().cmp(&up[..])).ok()
 }
 
+static MODE_GROUPS: std::sync::RwLock<Vec<(String, &'static str)>> = std::sync::RwLock::new(Vec::new());
+static HAS_MODE_GROUPS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Sets the groups the user chose for the modes in their mode list ("CW", "PHONE" or "DIGITAL").
+/// They win over the built-in grouping, so a mode added in Settings counts in the right column.
+pub fn set_mode_groups(groups: Vec<(String, &'static str)>) {
+    HAS_MODE_GROUPS.store(!groups.is_empty(), std::sync::atomic::Ordering::Relaxed);
+    *MODE_GROUPS.write().unwrap_or_else(|p| p.into_inner()) = groups;
+}
+
 /// Groups an ADIF mode or submode into "CW", "PHONE" or "DIGITAL". Case-insensitive.
 pub fn mode_group(mode: &str) -> Option<&'static str> {
-    const PHONE: &[&str] = &["SSB", "USB", "LSB", "AM", "FM", "DIGITALVOICE", "C4FM", "DSTAR", "DMR"];
+    const PHONE: &[&str] = &["SSB", "USB", "LSB", "AM", "FM", "DIGITALVOICE", "C4FM", "DSTAR", "DMR", "FREEDV", "M17"];
     let mode = mode.trim();
     if mode.is_empty() {
-        None
-    } else if mode.eq_ignore_ascii_case("CW") {
+        return None;
+    }
+    if HAS_MODE_GROUPS.load(std::sync::atomic::Ordering::Relaxed) {
+        let set = MODE_GROUPS.read().unwrap_or_else(|p| p.into_inner());
+        if let Some((_, g)) = set.iter().find(|(m, _)| m.eq_ignore_ascii_case(mode)) {
+            return Some(g);
+        }
+    }
+    if mode.eq_ignore_ascii_case("CW") {
         Some("CW")
     } else if PHONE.iter().any(|p| p.eq_ignore_ascii_case(mode)) {
         Some("PHONE")
@@ -1434,6 +1451,16 @@ mod tests {
         for call in ["", "  ", "/", "K1-ABC", "123", "K", "ÄÖ1X"] {
             assert_eq!(wpx_prefix(call), None, "{call:?}");
         }
+    }
+
+    #[test]
+    fn chosen_mode_groups_win() {
+        assert_eq!(mode_group("ZZTEST"), Some("DIGITAL"));
+        set_mode_groups(vec![("ZZTEST".into(), "PHONE")]);
+        assert_eq!(mode_group("zztest"), Some("PHONE"));
+        assert_eq!(mode_group("CW"), Some("CW"));
+        set_mode_groups(Vec::new());
+        assert_eq!(mode_group("ZZTEST"), Some("DIGITAL"));
     }
 
     #[test]

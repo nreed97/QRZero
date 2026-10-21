@@ -2,7 +2,7 @@ import { useEffect, useReducer, useRef, useState, type MutableRefObject, type Po
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { api } from "../api";
 import { OQRS_ACTIONS, PAPER_ACTIONS } from "../paper";
-import { BANDS, MODES } from "../modes";
+import { BANDS, useModes } from "../modes";
 import { COLUMNS, DEFAULT_COLUMNS } from "../fields";
 import type { Location, Qso, QsoFilter, QslService } from "../types";
 import { qrzPageUrl } from "./QrzPageLink";
@@ -42,6 +42,7 @@ interface Props {
 const QSL_NAMES: Record<QslService, string> = { qrz: "QRZ Logbook", clublog: "Club Log", eqsl: "eQSL", lotw: "LoTW (TQSL)" };
 
 export default function LogGrid({ logId, refreshKey, filter, onFilter, selection, onSelection, onBrowse, onEdit, onDeleted, onExportSelected, columns, onColumns, widths, onWidths, locations, stepper, editingId }: Props) {
+  const modes = useModes();
   useDisplay(); // redraw when the date or frequency format changes
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
@@ -367,9 +368,10 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
         </select>
         <select value={filter.modes?.[0] ?? ""} onChange={(e) => onFilter({ ...filter, modes: one(e.target.value) })}>
           <option value="">All modes</option>
-          {MODES.map((m) => (
+          {modes.map((m) => (
             <option key={m.label}>{m.label}</option>
           ))}
+          {filter.modes?.[0] && !modes.some((m) => m.label === filter.modes![0]) && <option>{filter.modes[0]}</option>}
         </select>
         {(filter.dxcc !== undefined || (filter.fields && Object.keys(filter.fields).length > 0)) && (
           <button className="tiny chip" onClick={() => onFilter({ ...filter, dxcc: undefined, fields: undefined })} title="Show all QSOs again">

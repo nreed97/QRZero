@@ -398,6 +398,18 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "Launch now" }).click();
   await expect(page.locator("table.startup-apps")).toContainText("couldn't start");
 
+  // Modes: add one from the ADIF list, see it offered in the QSO panel, then take it out again.
+  await page.getByRole("button", { name: "Modes", exact: true }).click();
+  await page.getByLabel("ADIF mode").selectOption("JT65");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  const entryMode = page.locator("label.f", { has: page.locator("span", { hasText: /^Mode$/ }) }).locator("select");
+  await expect(entryMode.locator("option", { hasText: "JT65" })).toHaveCount(1);
+  await page.getByLabel("Award column for JT65").selectOption("digital");
+  await page.getByRole("button", { name: "Remove" }).last().click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(entryMode.locator("option", { hasText: "JT65" })).toHaveCount(0);
+
   // General: colours and text size apply at once; a changed report is used for the mode.
   await page.getByRole("button", { name: "General", exact: true }).click();
   await page.getByLabel("Colours").selectOption("light");

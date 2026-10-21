@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
-import { BANDS, MODES } from "../modes";
+import { BANDS, useModes } from "../modes";
 import type { Location, QsoFilter, StationCallsign } from "../types";
 import { dayEnd, dayStart, download } from "../util";
 import Modal from "./Modal";
@@ -22,12 +22,14 @@ function toggle<T>(list: T[], v: T): T[] {
 }
 
 export default function ExportDialog({ logId, logName, selection, gridFilter, callsigns, locations, onClose }: Props) {
+  const listed = useModes();
   const [scope, setScope] = useState<Scope>(selection.size ? "selected" : "custom");
   const [profile, setProfile] = useState<"standard" | "full">("standard");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [bands, setBands] = useState<string[]>([]);
   const [modes, setModes] = useState<string[]>([]);
+  const allModes = [...listed.map((m) => m.label), ...modes.filter((m) => !listed.some((l) => l.label === m))];
   const [stations, setStations] = useState<string[]>([]);
   const [locs, setLocs] = useState<number[]>([]);
   const [fieldName, setFieldName] = useState("");
@@ -101,8 +103,8 @@ export default function ExportDialog({ logId, logName, selection, gridFilter, ca
           </fieldset>
           <fieldset>
             <legend>Modes {modes.length ? `(${modes.length})` : "(all)"}</legend>
-            {MODES.map((m) => (
-              <label key={m.label} className="chip"><input type="checkbox" checked={modes.includes(m.label)} onChange={() => setModes(toggle(modes, m.label))} />{m.label}</label>
+            {allModes.map((m) => (
+              <label key={m} className="chip"><input type="checkbox" checked={modes.includes(m)} onChange={() => setModes(toggle(modes, m))} />{m}</label>
             ))}
           </fieldset>
           {callsigns.length > 1 && (

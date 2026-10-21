@@ -197,6 +197,9 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
     if cfg.launch_apps {
         startup.launch_all(saved_startup_apps(&hub));
     }
+    if let Ok(Some(raw)) = store.lock().unwrap_or_else(|p| p.into_inner()).get_setting("pref.modes") {
+        apply_mode_list(&raw);
+    }
     let state = Arc::new(AppState {
         store,
         hub,
@@ -604,11 +607,40 @@ async fn get_pref(State(s): State<Shared>, Path(key): Path<String>) -> ApiResult
     Ok(Json(raw.and_then(|r| serde_json::from_str(&r).ok()).unwrap_or(serde_json::Value::Null)))
 }
 
+/// The user's mode list (preference "modes"): tells the awards which column each mode counts in.
+/// Each entry is `{label, mode, submode?, group: "cw" | "phone" | "digital"}`.
+fn apply_mode_list(raw: &str) {
+    let list: Vec<serde_json::Value> = serde_json::from_str(raw).unwrap_or_default();
+    let mut groups: Vec<(String, &'static str)> = Vec::new();
+    for e in &list {
+        let text = |k: &str| e.get(k).and_then(|v| v.as_str()).map(str::trim).filter(|v| !v.is_empty());
+        let group = match e.get("group").and_then(|v| v.as_str()) {
+            Some("cw") => "CW",
+            Some("phone") => "PHONE",
+            Some("digital") => "DIGITAL",
+            _ => continue,
+        };
+        // A QSO's mode is its SUBMODE when it has one, else its MODE.
+        let name = text("submode").or_else(|| text("mode")).or_else(|| text("label"));
+        for n in [text("label"), name].into_iter().flatten() {
+            if !groups.iter().any(|(g, _)| g.eq_ignore_ascii_case(n)) {
+                groups.push((n.to_string(), group));
+            }
+        }
+    }
+    qrzero_core::awards::set_mode_groups(groups);
+}
+
 async fn put_pref(State(s): State<Shared>, Path(key): Path<String>, Json(v): Json<serde_json::Value>) -> ApiResult<()> {
     let key = pref_key(&key)?;
-    db(&s, move |st| if v.is_null() { st.delete_setting(&key) } else { st.set_setting(&key, &v.to_string()) })
-        .await
-        .map(Json)
+    let modes = (key == "pref.modes").then(|| v.to_string());
+    db(&s, move |st| if v.is_null() { st.delete_setting(&key) } else { st.set_setting(&key, &v.to_string()) }).await?;
+    if let Some(raw) = modes {
+        apply_mode_list(&raw);
+        // Counts made with the old groups are stale.
+        s.award_cache.lock().unwrap_or_else(|p| p.into_inner()).clear();
+    }
+    Ok(Json(()))
 }
 
 #[derive(Deserialize)]

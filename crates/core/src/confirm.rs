@@ -448,7 +448,7 @@ fn mode_group(f: &Fields) -> Option<&'static str> {
     Some(match m.as_str() {
         "CW" | "PCW" => "CW",
         "SSB" | "USB" | "LSB" | "AM" | "FM" | "PHONE" => "PHONE",
-        _ => "DIGITAL",
+        _ => crate::awards::mode_group(&m)?,
     })
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { beep, getDisplay, showButton, useDisplay } from "../display";
-import { BANDS, MODES, bandForFreq, choiceFor, modeGroup } from "../modes";
+import { BANDS, MODES, bandForFreq, choiceFor, modeGroup, useModes } from "../modes";
 import { antennaForBand, hasBands } from "../antennas";
 import { fieldDef, freshValues, type EntryLayout, type ModeLayouts } from "../fields";
 import { localGet, localSet } from "../prefs";
@@ -81,6 +81,7 @@ const PER_QSO = new Set(["SKCC", "COMMENT", "QSLMSG", "STX", "SRX", "STX_STRING"
 interface Gear { rig?: number; antenna?: number; amplifier?: number }
 
 export default function EntryPanel({ logId, stationCall, location, layout: baseLayout, modeLayouts, equipment, onLogged, onLookup, onContext, radios, radioKey, onRadio, prefill, copy }: Props) {
+  useModes();
   const prefs = useRef(localGet("qrzero.entry", { freq: "", band: "20m", mode: "CW", last: {} as Fields })).current;
   const [freq, setFreq] = useState(prefs.freq);
   // The receive frequency while the radio is in split; empty otherwise. `freq` is then the transmit frequency.
@@ -508,6 +509,7 @@ export default function EntryPanel({ logId, stationCall, location, layout: baseL
             <span>Mode</span>
             <select value={mode} onChange={(e) => pickMode(e.target.value)}>
               {MODES.map((m) => <option key={m.label}>{m.label}</option>)}
+              {mode && !MODES.some((m) => m.label === mode) && <option>{mode}</option>}
             </select>
           </label>
         </div>

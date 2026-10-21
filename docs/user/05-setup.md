@@ -4,7 +4,7 @@ Open **Settings…** from the **☰** menu at the right of the top bar. Its sect
 
 - **Program**: General (colours, text size, units, formats, reports, setup wizard), Backups, Keyboard
 - **Station**: Callsigns, Locations, Equipment, Logs
-- **Logging**: Entry fields, Callsign lookup, Awards
+- **Logging**: Entry fields, Modes, Callsign lookup, Awards
 - **Connections**: Radios and programs (WSJT-X, JTDX, N1MM, rotator), UDP connections, DX cluster, Startup programs
 
 Click a section to show it on the right. Settings opens on **General**.
@@ -12,6 +12,18 @@ Click a section to show it on the right. Settings opens on **General**.
 ### Searching settings
 
 Type in the **Search settings** box at the top left to find a setting by its name or a word about it, for example *rotor*, *backup*, *colours* or *QRZ*. Section names match too. The list shows each match with the section it is in. Click one (or press **Enter** for the first) and Settings jumps to that section, scrolls to the setting and outlines it for a moment. **Esc** or the **×** clears the search.
+
+## Modes
+
+**Settings, Modes** is the list of modes offered in the Mode box of the QSO panel, in the QSO editor and in the log's mode filter. It starts short: CW, SSB, AM, FM, FT8, FT4, RTTY and PSK31.
+
+- **Add a mode**: pick an ADIF mode, then a submode if it has one (for example mode HELL with submode FSKHELL for Feld Hell, JT65, or TOR with AMTORFEC). The list is the ADIF one, so what you log is valid ADIF for uploads and exports. *Shown as* is the name used in the pickers; leave it empty to use the submode (or mode) name.
+- **Report** is what the QSO panel fills in when you pick the mode (changeable here, or under *Reports filled in for each mode* in General).
+- **Counts for awards as** puts the mode in CW, Phone or Digital for DXCC, DX Marathon, WAS Triple Play and the other awards. A new mode starts with the usual column for its ADIF mode, and you can change it.
+- **Remove** only hides a mode from the pickers. QSOs already logged in it, and ADIF imports in it, stay in the log and still show; the QSO editor and the mode box still show a mode that is on the QSO being edited. Add the mode again to bring it back.
+- **Up** and **Down** set the order in the pickers. **Use the short default list** puts the starting list back.
+
+Press **Save** (or **Save and close**) to apply. Other open windows pick up the new list at once.
 
 ## Station callsigns
 
