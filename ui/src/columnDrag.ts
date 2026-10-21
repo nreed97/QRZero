@@ -4,6 +4,7 @@ import { localGet, localSet } from "./prefs";
 interface Saved {
   order: string[];
   widths: Record<string, number>;
+  hidden: string[];
 }
 
 /**
@@ -14,7 +15,7 @@ export function useColumnDrag(store: string, defaults: string[], head: RefObject
   const [saved, setSaved] = useState<Saved>(() => {
     const s = localGet<Partial<Saved>>(store, {});
     const known = (s.order ?? []).filter((k) => defaults.includes(k));
-    return { order: [...known, ...defaults.filter((k) => !known.includes(k))], widths: s.widths ?? {} };
+    return { order: [...known, ...defaults.filter((k) => !known.includes(k))], widths: s.widths ?? {}, hidden: (s.hidden ?? []).filter((k) => defaults.includes(k)) };
   });
   const [moving, setMoving] = useState<{ key: string; to: number } | null>(null);
   const live = useRef(saved);
@@ -53,13 +54,16 @@ export function useColumnDrag(store: string, defaults: string[], head: RefObject
     if (e.button !== 0) return;
     const startX = e.clientX;
     let to: number | null = null;
+    // Where the pointer is among the headers on show, as an index into the saved order (some columns may be hidden).
     const slot = (x: number) => {
       const cells = [...(head.current?.querySelectorAll<HTMLElement>(".col-head") ?? [])];
       const i = cells.findIndex((el) => {
         const r = el.getBoundingClientRect();
         return x < r.left + r.width / 2;
       });
-      return i < 0 ? cells.length : i;
+      const before = i < 0 ? undefined : cells[i].dataset.key;
+      const at = before ? live.current.order.indexOf(before) : -1;
+      return at < 0 ? (i < 0 ? live.current.order.length : i) : at;
     };
     const onMove = (ev: PointerEvent) => {
       if (to === null && Math.abs(ev.clientX - startX) < 5) return;
@@ -83,10 +87,15 @@ export function useColumnDrag(store: string, defaults: string[], head: RefObject
     window.addEventListener("pointerup", up);
   };
 
-  const reset = () => save({ order: defaults, widths: {} });
-  const changed = saved.order.some((k, i) => k !== defaults[i]) || Object.keys(saved.widths).length > 0;
+  const toggleHidden = (key: string) => {
+    const hidden = live.current.hidden.includes(key) ? live.current.hidden.filter((k) => k !== key) : [...live.current.hidden, key];
+    save({ ...live.current, hidden });
+  };
 
-  return { order: saved.order, widths: saved.widths, moving, resize, move, setWidth, reset, changed };
+  const reset = () => save({ order: defaults, widths: {}, hidden: [] });
+  const changed = saved.order.some((k, i) => k !== defaults[i]) || Object.keys(saved.widths).length > 0 || saved.hidden.length > 0;
+
+  return { order: saved.order, widths: saved.widths, hidden: saved.hidden, moving, resize, move, setWidth, toggleHidden, reset, changed };
 }
 
 /** A resizable column: its key, its usual grid track and the least width that track takes. */

@@ -86,7 +86,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("button", { name: "Clear selection" }).click();
 
   // Show the rig column; the QSO logged from the keyboard recorded the K3 and its power.
-  await page.getByRole("button", { name: "Columns", exact: true }).click();
+  await page.locator("button:not(.tiny)", { hasText: /^Columns$/ }).click();
   await page.locator(".column-picker label.chip", { hasText: /^Rig$/ }).locator("input").check();
   await page.getByRole("button", { name: "Done" }).click();
   await expect(page.locator(".grid-row", { hasText: "W1AW" })).toContainText("K3");
@@ -629,7 +629,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   // The layout also remembers the Log tab's columns: hide Rig, then load the layout to bring it back.
   const rigHead = page.locator(".grid .grid-head .col-head").filter({ hasText: /^Rig$/ });
   await expect(rigHead).toBeVisible();
-  await page.getByRole("button", { name: "Columns", exact: true }).click();
+  await page.locator("button:not(.tiny)", { hasText: /^Columns$/ }).click();
   await page.locator(".column-picker label.chip", { hasText: /^Rig$/ }).locator("input").uncheck();
   await page.getByRole("button", { name: "Done" }).click();
   await expect(rigHead).toHaveCount(0);
@@ -637,7 +637,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("menuitem", { name: "Test layout", exact: true }).click();
   await expect(rigHead).toBeVisible();
   // With more columns than fit, the Log scrolls sideways inside its own pane: the heading moves with the rows and the page doesn't.
-  await page.getByRole("button", { name: "Columns", exact: true }).click();
+  await page.locator("button:not(.tiny)", { hasText: /^Columns$/ }).click();
   for (const l of [/^Comment$/, /^Contest$/, /^Country$/, /^QTH$/, /^Name$/]) {
     const box = page.locator(".column-picker label.chip", { hasText: l }).locator("input");
     if (!(await box.isChecked())) await box.check();

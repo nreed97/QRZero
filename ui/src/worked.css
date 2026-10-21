@@ -91,3 +91,17 @@
 .wb-menu a.menu-link { color: inherit; text-decoration: none; padding: 3px 10px; border: 1px solid transparent; border-radius: 2px; }
 .wb-menu a.menu-link:hover, .wb-menu a.menu-link:focus-visible { background: var(--row-sel); outline: none; }
 .wb-menu hr { border: none; border-top: 1px solid var(--line); margin: 2px 0; }
+
+/* Columns: drag a header to move it, its right edge to resize. */
+.wb-table th.col-head { cursor: grab; user-select: none; touch-action: none; overflow: hidden; text-overflow: ellipsis; }
+.wb-table th.col-head.moving { opacity: 0.45; }
+.wb-table th.col-head.drop-before { box-shadow: inset 2px 0 0 var(--accent); }
+.wb-table th.col-head.drop-after { box-shadow: inset -2px 0 0 var(--accent); }
+.wb-table th .col-resize { position: absolute; top: 0; right: 0; bottom: 0; width: 8px; cursor: col-resize; box-shadow: inset -1px 0 0 var(--line); }
+.wb-table th .col-resize:hover { background: var(--line); }
+.wb-table[style*="fixed"] td { overflow: hidden; text-overflow: ellipsis; max-width: none; }
+.wb-table[style*="fixed"] td.wb-act { overflow: visible; }
+
+.wb-colwrap { position: relative; display: inline-flex; margin-right: 4px; }
+.wb-colmenu { position: fixed; z-index: 50; display: grid; grid-template-columns: repeat(3, auto); gap: 1px 12px; padding: 4px 6px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px; font: 12px var(--ui); white-space: nowrap; }
+.wb-colmenu button { grid-column: 1 / -1; justify-self: start; margin-top: 3px; }
