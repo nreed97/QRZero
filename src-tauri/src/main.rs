@@ -1,7 +1,9 @@
 // The desktop app: starts the QRZero server on 127.0.0.1 and opens a window on it.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::collections::HashSet;
+mod window_state;
+
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Mutex, OnceLock};
@@ -16,6 +18,9 @@ static FRAMELESS: AtomicBool = AtomicBool::new(true);
 const OS: &str = std::env::consts::OS;
 /// Windows currently maximized, so the page hears only when that changes.
 static MAXIMIZED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+type Geometry = (i32, i32, u32, u32);
+/// Where each window last stood while neither maximized nor minimized (x, y, width, height).
+static RESTORED: OnceLock<Mutex<HashMap<String, Geometry>>> = OnceLock::new();
 
 /// Present when the user turned frameless windows off.
 fn system_frame_marker() -> PathBuf {
@@ -138,10 +143,35 @@ fn popout_handler(app: AppHandle, home: String) -> impl Fn(tauri::Url, tauri::we
             .on_new_window(popout_handler(app.clone(), home.clone()));
         builder = builder.focused(true);
         match builder.build() {
-            Ok(window) => NewWindowResponse::Create { window },
+            Ok(window) => {
+                // The page remembers a pop-out's size and place; whether it was maximized is kept here.
+                if window_state::load(&format!("pane-{pane}")).is_some_and(|s| s.max) {
+                    let _ = window.maximize();
+                }
+                NewWindowResponse::Create { window }
+            }
             Err(_) => NewWindowResponse::Deny,
         }
     }
+}
+
+/// Saves a window's last restored geometry and whether it is maximized now.
+fn save_window(window: &tauri::Window) {
+    let label = window.label();
+    let key = match label.strip_prefix("pane-").and_then(|l| l.split_once('-')) {
+        Some((_, pane)) => format!("pane-{pane}"),
+        None => label.to_string(),
+    };
+    let max = window.is_maximized().unwrap_or(false) || MAXIMIZED.get_or_init(Default::default).lock().unwrap().contains(label);
+    let g = RESTORED.get_or_init(Default::default).lock().unwrap().get(label).copied();
+    let g = g.or_else(|| window.app_handle().get_webview_window(label).and_then(|w| window_state::current(&w)));
+    let prev = window_state::load(&key);
+    let (x, y, w, h) = match (g, prev) {
+        (Some(g), _) => g,
+        (None, Some(p)) => (p.x, p.y, p.w, p.h),
+        (None, None) => (0, 0, 0, 0),
+    };
+    window_state::save(&key, window_state::State { x, y, w, h, max });
 }
 
 fn main() {
@@ -169,6 +199,17 @@ fn main() {
                     }
                 }
             }
+            // Remember where the window stands, to save when it closes.
+            if matches!(event, tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_)) {
+                if let Some(w) = window.app_handle().get_webview_window(window.label()) {
+                    if let Some(g) = window_state::current(&w) {
+                        RESTORED.get_or_init(Default::default).lock().unwrap().insert(window.label().to_string(), g);
+                    }
+                }
+            }
+            if matches!(event, tauri::WindowEvent::CloseRequested { .. }) && window.label() == "main" {
+                save_window(window);
+            }
             // A pop-out closed with its own close button goes back into the main window.
             if let (Some(pane), tauri::WindowEvent::Destroyed) = (window.label().strip_prefix("pane-").and_then(|l| l.split_once('-')).map(|(_, p)| p), event) {
                 if let Some(main) = window.app_handle().get_webview_window("main") {
@@ -176,6 +217,9 @@ fn main() {
                 }
             }
             if matches!(event, tauri::WindowEvent::Destroyed) {
+                if window.label().starts_with("pane-") {
+                    save_window(window);
+                }
                 MAXIMIZED.get_or_init(Default::default).lock().unwrap().remove(window.label());
             }
             if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
@@ -194,7 +238,7 @@ fn main() {
                 .append_pair("desktop", if frameless() { "frameless" } else { "framed" })
                 .append_pair("os", OS);
             let home = url.origin().ascii_serialization();
-            with_frame(WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url)))
+            let main = with_frame(WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url)))
                 .title("QRZero")
                 .on_new_window(popout_handler(app.handle().clone(), home))
                 .on_document_title_changed(title_changed)
@@ -205,7 +249,13 @@ fn main() {
                 .disable_drag_drop_handler()
                 .inner_size(1440.0, 900.0)
                 .min_inner_size(960.0, 600.0)
+                .visible(false)
                 .build()?;
+            // Open where it was closed: the same size and place, or maximized (restore then goes back to that size).
+            if let Some(s) = window_state::load("main") {
+                window_state::apply(&main, s);
+            }
+            let _ = main.show();
             app.manage(running);
             Ok(())
         })
