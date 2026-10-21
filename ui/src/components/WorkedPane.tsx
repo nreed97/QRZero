@@ -306,6 +306,8 @@ export default function WorkedPane({ logId, call, lookup, entry, refreshKey, sel
     <section className="panel worked-pane">
       <div className="panel-title">
         <span className="wb-title">{title}</span>
+        {!slot && <button type="button" className={`tiny${toggles.full ? " on" : ""}`} aria-pressed={!!toggles.full}
+          title="Full view adds a summary under the list: bands, modes, first QSO and what is confirmed" onClick={() => setToggle("full")}>Full</button>}
         {slot && <span className="wb-slot" title="Every QSO in this DXCC slot, with any station">{slot.name} {slot.band} {slot.group}{loadedFor === target ? `, ${all.length} QSOs` : ""}</span>}
         {filtered && <span className="small muted">showing {shown.length}</span>}
         <span className="spacer" />
@@ -319,8 +321,6 @@ export default function WorkedPane({ logId, call, lookup, entry, refreshKey, sel
             title={entry.band ? `Only QSOs on ${entry.band}` : "No band in the entry"} onClick={() => setToggle("band")}>This band</button>}
           {!slot && <button type="button" className={`tiny${toggles.mode ? " on" : ""}`} aria-pressed={toggles.mode} disabled={!entry.mode}
             title={entry.mode ? `Only QSOs in ${entry.mode}` : "No mode in the entry"} onClick={() => setToggle("mode")}>This mode</button>}
-          {!slot && <button type="button" className={`tiny${toggles.full ? " on" : ""}`} aria-pressed={!!toggles.full}
-            title="Full view adds a summary under the list: bands, modes, first QSO and what is confirmed" onClick={() => setToggle("full")}>Full</button>}
           <button type="button" className={`tiny${toggles.unconfirmed ? " on" : ""}`} aria-pressed={toggles.unconfirmed}
             title="Only QSOs not confirmed by LoTW, card or eQSL" onClick={() => setToggle("unconfirmed")}>Unconfirmed</button>
         </span>
