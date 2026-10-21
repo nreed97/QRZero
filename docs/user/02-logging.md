@@ -84,7 +84,7 @@ Working with the rows:
 
 Columns work as in the log grid: drag a header to move it, drag its right edge to resize it (double-click the edge to reset one), and use **Columns** in the title bar to hide or show columns. **Reset columns** in that list puts back the usual order, widths and columns. QRZero remembers your choices.
 
-The list is plain by default. Click **Full** in the pane's title bar for a line under it that sums up the station: the bands and modes you have worked it on, the date of your first QSO, and which band and mode slots are confirmed. Click **Full** again to hide it. QRZero remembers the choice.
+The list is plain by default. Click **Full** in the pane's title bar for a line under it that sums up the station: the bands and modes you have worked it on (LSB and USB count as SSB), the date of your first QSO, and the bands where you have a confirmation. Click **Full** again to hide it. QRZero remembers the choice.
 
 ### Everyone in a DXCC slot
 

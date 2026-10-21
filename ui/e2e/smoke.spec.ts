@@ -50,6 +50,8 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(page.getByLabel("Their POTA")).toBeVisible();
   // Another spec may have left a different tab (such as Needed now) in front of the Log in the saved layout.
   await page.getByRole("tab", { name: "Log", exact: true }).click();
+  // The same goes for the Station pane, which shows the duplicate warning below.
+  await page.getByRole("tab", { name: "Station", exact: true }).click();
 
   // Log a QSO from the keyboard.
   const call = page.getByTestId("call");
@@ -663,10 +665,47 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   expect(await page.locator(".grid-head").evaluate((e) => e.getBoundingClientRect().left)).toBeLessThan(0);
   await page.setViewportSize({ width: 1280, height: 720 });
   // ...and even with the browser's storage wiped, as happens when the desktop app restarts on a new address.
-  await page.waitForTimeout(600); // the copy to the database is saved shortly after a change
+  // The copy to the database is saved shortly after a change: wait until it has everything in this browser's storage.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async () => {
+          // The server keeps object keys in its own order, so compare with the keys sorted.
+          const canon = (v: unknown): string =>
+            JSON.stringify(v, (_k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
+          const db = (await (await fetch("/api/prefs/ui.local", { headers: { "x-qrzero-token": "e2e" } })).json()) ?? {};
+          return Object.keys(localStorage)
+            .filter((k) => k.startsWith("qrzero."))
+            .every((k) => {
+              try {
+                return canon(db[k]) === canon(JSON.parse(localStorage.getItem(k) ?? "null"));
+              } catch {
+                return true;
+              }
+            });
+        }),
+      { timeout: 10_000 },
+    )
+    .toBe(true);
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  await expect(page.getByRole("button", { name: "Layout: Test layout" })).toBeVisible();
+  try {
+    await expect(page.getByRole("button", { name: "Layout: Test layout" })).toBeVisible();
+  } catch (e) {
+    // Say what the window and the database held, so a failure on a slow runner can be understood from its log.
+    const info = await page.evaluate(async () => {
+      const db = (await (await fetch("/api/prefs/ui.local", { headers: { "x-qrzero-token": "e2e" } })).json()) ?? {};
+      const keys = Object.keys(localStorage).filter((k) => k.startsWith("qrzero."));
+      return JSON.stringify({
+        layoutButton: [...document.querySelectorAll("button")].map((b) => b.textContent).find((t) => t?.startsWith("Layout")),
+        localKeys: keys.length,
+        localCurrent: localStorage.getItem("qrzero.layouts.current"),
+        dbKeys: Object.keys(db).length,
+        dbCurrent: db["qrzero.layouts.current"],
+      });
+    });
+    throw new Error(`${(e as Error).message}\n${info}`);
+  }
   await expect(page.locator(".ws-group", { has: page.getByRole("tab", { name: "Cluster" }) }).getByRole("tab")).toHaveCount(1);
 
   // A pane pops out into its own window and docks back when that window closes.

@@ -4,7 +4,9 @@ const qso = (id: number, date: string, band: string, mode: string, name: string)
   id, log_id: 1, location_id: null,
   fields: { CALL: "K1ABC", QSO_DATE: date, TIME_ON: "1200", BAND: band, MODE: mode, NAME: name },
 });
-const rows = [qso(901, "20240303", "40m", "SSB", "Ann"), qso(902, "20240106", "20m", "FT8", "Ann")];
+const usb = qso(903, "20240401", "15m", "USB", "Ann");
+usb.fields = { ...usb.fields, LOTW_QSL_RCVD: "Y" } as typeof usb.fields;
+const rows = [qso(901, "20240303", "40m", "SSB", "Ann"), qso(902, "20240106", "20m", "FT8", "Ann"), usb];
 
 // The entry panel needs a callsign, so finish the setup wizard when the data folder is still fresh.
 async function setup(page: Page) {
@@ -67,4 +69,12 @@ test("Worked before columns can be moved, resized and hidden, and are remembered
   await pane.getByRole("button", { name: "Reset columns" }).click();
   await expect(heads.nth(0)).toHaveText("Date");
   await expect(pane.locator("th.col-head", { hasText: "Name" })).toHaveCount(1);
+
+  // The Full summary: USB counts as SSB, and Confirmed lists bands only.
+  await pane.getByRole("button", { name: "Full", exact: true }).click();
+  const summary = pane.locator(".wb-summary");
+  await expect(summary).toContainText("Modes FT8 SSB");
+  await expect(summary).toContainText("Confirmed 15m");
+  await expect(summary).not.toContainText("USB");
+  await pane.getByRole("button", { name: "Full", exact: true }).click();
 });
