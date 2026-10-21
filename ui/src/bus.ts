@@ -1,7 +1,7 @@
 // Messages between the main window and panes popped out into their own windows.
 
 import { api } from "./api";
-import { frameParams, shell } from "./frame";
+import { frameParams, isMaximized, shell } from "./frame";
 import { localGet, localSet } from "./prefs";
 import type { DecodePick } from "./components/FtxMonitor";
 import type { EntryContext, Prefill } from "./components/EntryPanel";
