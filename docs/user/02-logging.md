@@ -80,6 +80,8 @@ Working with the rows:
 - Hover over a row for two quick buttons: **Edit** opens the QSO, and **Copy** puts the name, QTH, grid, state, county and QSL manager from that QSO into the entry panel. Useful when the lookup is off or found nothing.
 - Right-click a row for more: *Edit QSO*, *Copy name and QTH to entry*, *Show all with CALL in log* (filters the log grid to that call), *Mark card received* (sets the paper card as received today) and *Queue a card* (adds the QSO to the paper QSL queue, see the QSL chapter). Press <kbd>Esc</kbd> or click elsewhere to close the menu.
 
+Columns work as in the log grid: drag a header to move it, drag its right edge to resize it (double-click the edge to reset one), and use **Columns** in the title bar to hide or show columns. **Reset columns** in that list puts back the usual order, widths and columns. QRZero remembers your choices.
+
 The list is plain by default. Click **Full** in the pane's title bar for a line under it that sums up the station: the bands and modes you have worked it on, the date of your first QSO, and which band and mode slots are confirmed. Click **Full** again to hide it. QRZero remembers the choice.
 
 ### Everyone in a DXCC slot

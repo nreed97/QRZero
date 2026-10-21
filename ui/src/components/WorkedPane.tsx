@@ -5,6 +5,7 @@ import { localGet, localSet } from "../prefs";
 import type { Fields, LookupResult, Qso, SlotPick } from "../types";
 import { adifDateTime, fmtDate, fmtTime } from "../util";
 import type { EntryContext } from "./EntryPanel";
+import { useColumnDrag } from "../columnDrag";
 import { useDisplay } from "../display";
 import "../worked.css";
 
@@ -58,6 +59,23 @@ function QslCell({ v }: { v: Qsl }) {
   return <td className={v === "C" ? "wb-qsl wb-conf" : "wb-qsl"}>{v}</td>;
 }
 
+/** The list's columns in their usual order, with the width each takes once any column has been resized. */
+const COLS = [
+  { key: "call", label: "Call", w: 80 },
+  { key: "date", label: "Date", w: 92 },
+  { key: "utc", label: "UTC", w: 54 },
+  { key: "band", label: "Band", w: 50 },
+  { key: "mode", label: "Mode", w: 60 },
+  { key: "sent", label: "Sent", w: 50 },
+  { key: "rcvd", label: "Rcvd", w: 50 },
+  { key: "lotw", label: "LoTW", w: 52, cls: "wb-qsl" },
+  { key: "card", label: "Card", w: 52, cls: "wb-qsl" },
+  { key: "eqsl", label: "eQSL", w: 52, cls: "wb-qsl" },
+  { key: "name", label: "Name", w: 120 },
+  { key: "comment", label: "Comment", w: 260, cls: "wb-wide" },
+];
+const COL_KEYS = COLS.map((c) => c.key);
+
 interface Menu { x: number; y: number; q: Qso }
 
 export default function WorkedPane({ logId, call, lookup, entry, refreshKey, selectedId, slot, onSlotClear, onEdit, onCopy, onShowInLog }: WorkedPaneProps) {
@@ -73,6 +91,9 @@ export default function WorkedPane({ logId, call, lookup, entry, refreshKey, sel
   const [sel, setSel] = useState<number | null>(selectedId ?? null);
   const [menu, setMenu] = useState<Menu | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const head = useRef<HTMLTableRowElement>(null);
+  const colDrag = useColumnDrag("qrzero.workedCols", COL_KEYS, head);
+  const [picking, setPicking] = useState<{ x: number; y: number } | null>(null);
 
   // Load the whole history for the call; wait for typing to settle and drop stale answers.
   useEffect(() => {
@@ -154,6 +175,21 @@ export default function WorkedPane({ logId, call, lookup, entry, refreshKey, sel
     bodyRef.current?.querySelector<HTMLElement>(`tr[data-id="${sel}"]`)?.scrollIntoView({ block: "nearest" });
   }, [sel]);
 
+  // The column list closes on Esc or a click elsewhere.
+  useEffect(() => {
+    if (!picking) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setPicking(null);
+    const onDown = (e: MouseEvent) => {
+      if (!(e.target as Element).closest?.(".wb-colwrap")) setPicking(null);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [picking]);
+
   // The context menu closes on Esc, a click elsewhere, scrolling or resizing.
   useEffect(() => {
     if (!menu) return;
@@ -199,6 +235,36 @@ export default function WorkedPane({ logId, call, lookup, entry, refreshKey, sel
     }
   };
 
+  // The columns on show: in the saved order, minus the hidden ones (and Call, except in a slot's list).
+  const cols = colDrag.order
+    .filter((k) => !colDrag.hidden.includes(k) && (slot || k !== "call"))
+    .map((k) => COLS.find((c) => c.key === k)!);
+  const sized = Object.keys(colDrag.widths).length > 0;
+  const tableWidth = 56 + cols.reduce((n, c) => n + (colDrag.widths[c.key] ?? c.w), 0);
+  const cell = (key: string, q: Qso) => {
+    const f = q.fields;
+    switch (key) {
+      case "call": return <td key={key} className={f.CALL?.toUpperCase() === entryCall ? "wb-call wb-this" : "wb-call"}>{f.CALL}</td>;
+      case "date": return <td key={key}>{fmtDate(f)}</td>;
+      case "utc": return <td key={key}>{fmtTime(f)}</td>;
+      case "band": return <td key={key}>{f.BAND}</td>;
+      case "mode": return <td key={key}>{modeLabel(f)}</td>;
+      case "sent": return <td key={key}>{f.RST_SENT}</td>;
+      case "rcvd": return <td key={key}>{f.RST_RCVD}</td>;
+      case "lotw": return <QslCell key={key} v={lotw(f)} />;
+      case "card": return <QslCell key={key} v={card(f)} />;
+      case "eqsl": return <QslCell key={key} v={eqsl(f)} />;
+      case "name": return <td key={key} className="wb-text" title={f.NAME}>{f.NAME}</td>;
+      default:
+        return (
+          <td key={key} className="wb-text wb-wide" title={f.COMMENT}>
+            {!slot && f.CALL && f.CALL.toUpperCase() !== target && <span className="wb-as">as {f.CALL}</span>}
+            {f.COMMENT}
+          </td>
+        );
+    }
+  };
+
   const count = loadedFor === target ? ` (${all.length})` : "";
   const title = slot ? `Worked before: ${slot.name} ${slot.band} ${slot.group}${count}` : target ? `Worked before: ${target}${count}` : "Worked before";
   const filtered = shown.length !== all.length;
@@ -214,22 +280,23 @@ export default function WorkedPane({ logId, call, lookup, entry, refreshKey, sel
     body = (
       <>
         <div className="wb-scroll" ref={bodyRef} tabIndex={0} onKeyDown={onKeyDown} aria-label={slot ? `QSOs in ${slot.name} ${slot.band} ${slot.group}` : `QSOs with ${target}`}>
-          <table className="wb-table">
+          <table className="wb-table" style={sized ? { tableLayout: "fixed", width: tableWidth, minWidth: "100%" } : undefined}>
             <thead>
-              <tr>
-                {slot && <th>Call</th>}
-                <th>Date</th>
-                <th>UTC</th>
-                <th>Band</th>
-                <th>Mode</th>
-                <th>Sent</th>
-                <th>Rcvd</th>
-                <th className="wb-qsl">LoTW</th>
-                <th className="wb-qsl">Card</th>
-                <th className="wb-qsl">eQSL</th>
-                <th>Name</th>
-                <th className="wb-wide">Comment</th>
-                <th className="wb-act" aria-label="Actions" />
+              <tr ref={head}>
+                {cols.map((c) => {
+                  const m = colDrag.moving;
+                  const at = colDrag.order.indexOf(c.key);
+                  const last = c.key === cols[cols.length - 1].key;
+                  const cls = ["col-head", c.cls, m?.key === c.key && "moving", m && m.to === at && m.key !== c.key && "drop-before", m && m.to === colDrag.order.length && last && "drop-after"].filter(Boolean).join(" ");
+                  return (
+                    <th key={c.key} data-key={c.key} className={cls} style={sized ? { width: colDrag.widths[c.key] ?? c.w } : undefined}
+                      title="Drag to move this column, drag its right edge to resize" onPointerDown={(e) => colDrag.move(e, c.key)}>
+                      {c.label}
+                      <span className="col-resize" onPointerDown={(e) => colDrag.resize(e, c.key)} onDoubleClick={() => colDrag.setWidth(c.key, 0)} title="Drag to resize, double-click to reset" />
+                    </th>
+                  );
+                })}
+                <th className="wb-act" aria-label="Actions" style={sized ? { width: 56 } : undefined} />
               </tr>
             </thead>
             <tbody>
@@ -251,21 +318,7 @@ export default function WorkedPane({ logId, call, lookup, entry, refreshKey, sel
                       setMenu({ x: e.clientX, y: e.clientY, q });
                     }}
                   >
-                    {slot && <td className={f.CALL?.toUpperCase() === entryCall ? "wb-call wb-this" : "wb-call"}>{f.CALL}</td>}
-                    <td>{fmtDate(f)}</td>
-                    <td>{fmtTime(f)}</td>
-                    <td>{f.BAND}</td>
-                    <td>{modeLabel(f)}</td>
-                    <td>{f.RST_SENT}</td>
-                    <td>{f.RST_RCVD}</td>
-                    <QslCell v={lotw(f)} />
-                    <QslCell v={card(f)} />
-                    <QslCell v={eqsl(f)} />
-                    <td className="wb-text" title={f.NAME}>{f.NAME}</td>
-                    <td className="wb-text wb-wide" title={f.COMMENT}>
-                      {!slot && f.CALL && f.CALL.toUpperCase() !== target && <span className="wb-as">as {f.CALL}</span>}
-                      {f.COMMENT}
-                    </td>
+                    {cols.map((c) => cell(c.key, q))}
                     <td className="wb-act">
                       <span className="wb-btns">
                         <button type="button" className="tiny" onClick={(e) => { e.stopPropagation(); onEdit(q); }}>Edit</button>
@@ -277,7 +330,7 @@ export default function WorkedPane({ logId, call, lookup, entry, refreshKey, sel
               })}
               {!shown.length && (
                 <tr className="wb-none">
-                  <td colSpan={slot ? 13 : 12} className="muted">No QSOs match the filters.</td>
+                  <td colSpan={cols.length + 1} className="muted">No QSOs match the filters.</td>
                 </tr>
               )}
             </tbody>
@@ -306,6 +359,18 @@ export default function WorkedPane({ logId, call, lookup, entry, refreshKey, sel
     <section className="panel worked-pane">
       <div className="panel-title">
         <span className="wb-title">{title}</span>
+        <span className="wb-colwrap">
+          <button type="button" className={`tiny${picking ? " on" : ""}`} aria-pressed={!!picking} title="Show or hide columns"
+            onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setPicking(picking ? null : { x: r.left, y: r.bottom }); }}>Columns</button>
+          {picking && (
+            <div className="wb-colmenu" role="group" aria-label="Show columns" style={{ left: Math.min(picking.x, window.innerWidth - 330), top: picking.y }}>
+              {COLS.filter((c) => slot || c.key !== "call").map((c) => (
+                <label key={c.key}><input type="checkbox" checked={!colDrag.hidden.includes(c.key)} onChange={() => colDrag.toggleHidden(c.key)} /> {c.label}</label>
+              ))}
+              <button type="button" className="tiny" disabled={!colDrag.changed} onClick={colDrag.reset} title="Put the columns back in their usual order, widths and visibility">Reset columns</button>
+            </div>
+          )}
+        </span>
         {!slot && <button type="button" className={`tiny${toggles.full ? " on" : ""}`} aria-pressed={!!toggles.full}
           title="Full view adds a summary under the list: bands, modes, first QSO and what is confirmed" onClick={() => setToggle("full")}>Full</button>}
         {slot && <span className="wb-slot" title="Every QSO in this DXCC slot, with any station">{slot.name} {slot.band} {slot.group}{loadedFor === target ? `, ${all.length} QSOs` : ""}</span>}
