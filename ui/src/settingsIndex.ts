@@ -49,6 +49,8 @@ export const SETTING_ENTRIES: SettingEntry[] = [
   E("awards", "Spot flags", "needed spots cluster band map goals chase new band mode unconfirmed waz wpx iota zone prefix"),
   E("awards", "DX Marathon alerts", "marathon cq country zone this year spot flag alert"),
   ...AWARD_LIST.map((a) => E("awards", a.name, `award hide show ${a.what}`)),
+  E("modes", "Modes in the list", "mode add remove hide jt65 jt9 hell feld fsk psk rtty olivia submode adif digital phone cw"),
+  E("modes", "Add a mode", "adif submode jtty field hell feld"),
   E("backups", "Automatic backups", "backup keep newest copy"),
   E("backups", "Backups folder", "backup location path"),
   E("backups", "Restore", "backup restore file"),

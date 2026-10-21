@@ -1,31 +1,65 @@
+import { useSyncExternalStore } from "react";
+import { api } from "./api";
 import { getDisplay } from "./display";
-// Modes offered in the entry screen, mapped to ADIF MODE/SUBMODE.
-export interface ModeChoice { label: string; mode: string; submode?: string; rst: string }
+import { localSet } from "./prefs";
+import { adifGroup } from "./adifModes";
 
-export const MODES: ModeChoice[] = [
-  { label: "CW", mode: "CW", rst: "599" },
-  { label: "SSB", mode: "SSB", rst: "59" },
-  { label: "FT8", mode: "FT8", rst: "-10" },
-  { label: "FT4", mode: "MFSK", submode: "FT4", rst: "-10" },
-  { label: "RTTY", mode: "RTTY", rst: "599" },
-  { label: "PSK31", mode: "PSK", submode: "PSK31", rst: "599" },
-  { label: "JS8", mode: "MFSK", submode: "JS8", rst: "-10" },
-  { label: "Q65", mode: "MFSK", submode: "Q65", rst: "-10" },
-  { label: "JT65", mode: "JT65", rst: "-10" },
-  { label: "MSK144", mode: "MSK144", rst: "0" },
-  { label: "OLIVIA", mode: "OLIVIA", rst: "599" },
-  { label: "AM", mode: "AM", rst: "59" },
-  { label: "FM", mode: "FM", rst: "59" },
-  { label: "DIGITALVOICE", mode: "DIGITALVOICE", rst: "59" },
-  { label: "SSTV", mode: "SSTV", rst: "595" },
+export type ModeGroup = "cw" | "phone" | "digital";
+
+/** A mode in the user's list: the label shown in the pickers, how it is stored (ADIF MODE/SUBMODE) and where awards count it. */
+export interface ModeChoice { label: string; mode: string; submode?: string; rst: string; group: ModeGroup }
+
+/** The short list offered until the user changes it (Settings, Modes). */
+export const DEFAULT_MODES: ModeChoice[] = [
+  { label: "CW", mode: "CW", rst: "599", group: "cw" },
+  { label: "SSB", mode: "SSB", rst: "59", group: "phone" },
+  { label: "AM", mode: "AM", rst: "59", group: "phone" },
+  { label: "FM", mode: "FM", rst: "59", group: "phone" },
+  { label: "FT8", mode: "FT8", rst: "-10", group: "digital" },
+  { label: "FT4", mode: "MFSK", submode: "FT4", rst: "-10", group: "digital" },
+  { label: "RTTY", mode: "RTTY", rst: "599", group: "digital" },
+  { label: "PSK31", mode: "PSK", submode: "PSK31", rst: "599", group: "digital" },
 ];
+
+/** The modes offered for entering and editing QSOs. Changed in place by `setModes`, so a screen that shows it calls `useModes()` to redraw. */
+export const MODES: ModeChoice[] = [...DEFAULT_MODES];
+
+const PREF = "modes";
+const REV_KEY = "qrzero.modes.rev";
+const subs = new Set<() => void>();
+let rev = 0;
+
+function apply(list: ModeChoice[] | null) {
+  MODES.splice(0, MODES.length, ...(list && list.length ? list : DEFAULT_MODES));
+  rev++;
+  subs.forEach((f) => f());
+}
+
+/** Saves the list for every window (null goes back to the default list) and tells the other windows. */
+export async function setModes(list: ModeChoice[] | null): Promise<void> {
+  await api.setPref(PREF, list);
+  apply(list);
+  localSet(REV_KEY, Date.now());
+}
+
+function load() {
+  api.getPref<ModeChoice[]>(PREF).then((l) => Array.isArray(l) && apply(l)).catch(() => {});
+}
+load();
+window.addEventListener("storage", (e) => e.key === REV_KEY && load());
+
+/** Redraws the caller when the mode list changes. */
+export function useModes(): ModeChoice[] {
+  useSyncExternalStore((f) => { subs.add(f); return () => subs.delete(f); }, () => rev);
+  return MODES;
+}
 
 export function modeLabel(f: Record<string, string>): string {
   return f.SUBMODE || f.MODE || "";
 }
 
 export function choiceFor(label: string): ModeChoice {
-  const c = MODES.find((m) => m.label === label) ?? { label, mode: label, rst: "59" };
+  const c = MODES.find((m) => m.label === label) ?? { label, mode: label, rst: "59", group: adifGroup(label) };
   const own = getDisplay().rst[label]?.trim();
   return own ? { ...c, rst: own } : c;
 }
@@ -42,14 +76,14 @@ export function bandForFreq(mhz: number): string | undefined {
   return BANDS.find(([, lo, hi]) => mhz >= lo && mhz <= hi)?.[0];
 }
 
-export type ModeGroup = "cw" | "phone" | "digital";
-
 const DIGITAL = ["FT8", "FT4", "RTTY", "PSK31", "PSK", "JS8", "Q65", "MSK144", "SSTV", "JT65", "JT9", "FST4", "MFSK", "OLIVIA", "WSPR", "DATA", "DIGI"];
 const PHONE = ["SSB", "USB", "LSB", "AM", "FM", "PHONE", "DV"];
 
 /** CW, phone or digital, for filters and the colour of a spot; "" when the mode isn't known. */
 export function modeGroup(mode: string): ModeGroup | "" {
   const m = mode.toUpperCase();
+  const own = MODES.find((c) => c.label.toUpperCase() === m || (c.submode ?? c.mode).toUpperCase() === m);
+  if (own) return own.group;
   if (m === "CW") return "cw";
   if (PHONE.includes(m)) return "phone";
   if (DIGITAL.includes(m)) return "digital";
@@ -61,10 +95,13 @@ export const MODE_GROUP_NAME: Record<ModeGroup, string> = { cw: "CW", phone: "Ph
 /** The rows of an award slot grid, in order. */
 export const SLOT_GROUPS = ["CW", "Phone", "Digital"] as const;
 export type SlotGroup = (typeof SLOT_GROUPS)[number];
-const SLOT_PHONE = ["SSB", "USB", "LSB", "AM", "FM", "DIGITALVOICE", "C4FM", "DSTAR", "DMR"];
+const SLOT_PHONE = ["SSB", "USB", "LSB", "AM", "FM", "DIGITALVOICE", "C4FM", "DSTAR", "DMR", "FREEDV", "M17"];
 
 /** The award slot row a mode counts in, as the server groups it (every other mode is Digital); "" when there is no mode. */
 export function slotGroup(mode: string): SlotGroup | "" {
   const m = mode.trim().toUpperCase();
-  return !m ? "" : m === "CW" ? "CW" : SLOT_PHONE.includes(m) ? "Phone" : "Digital";
+  if (!m) return "";
+  const own = MODES.find((c) => c.label.toUpperCase() === m || (c.submode ?? c.mode).toUpperCase() === m);
+  if (own) return own.group === "cw" ? "CW" : own.group === "phone" ? "Phone" : "Digital";
+  return m === "CW" ? "CW" : SLOT_PHONE.includes(m) ? "Phone" : "Digital";
 }

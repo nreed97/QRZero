@@ -41,6 +41,8 @@ Typing a frequency in MHz sets the band for you. You can also just pick a band a
 
 Modes are saved the way the ADIF standard expects, so FT4 is stored as mode `MFSK` with submode `FT4`. The log grid and filters show the familiar name.
 
+The modes in the Mode box are your own short list. Add or take out modes in **Settings, Modes**; see *Modes* in Callsigns, locations and logs.
+
 ## Logging a QSO after the fact
 
 Tick **Enter time** to type the date and time (UTC) yourself, for example when copying a paper log.

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../api";
 import { CUSTOM_PREFIX, DEFAULT_LAYOUT, ENTRY_FIELDS, fieldDef, type EntryLayout, type ModeLayouts } from "../fields";
 import { CLUBLOG_RCVD, CLUBLOG_RDATE, confirmedText, OQRS, OQRS_DATE } from "../confirmations";
-import { BANDS, MODES, bandForFreq } from "../modes";
+import { BANDS, bandForFreq, useModes, type ModeChoice } from "../modes";
 import { usePref } from "../prefs";
 import type { Equipment, Fields, Location, Qso, StationCallsign } from "../types";
 import QrzPageLink from "./QrzPageLink";
@@ -119,8 +119,8 @@ const COVERED = new Set([
 ]);
 
 const BAND_LIST = [...BANDS].sort((a, b) => a[1] - b[1]).map(([b]) => b);
-const MODE_LIST = [...new Set(MODES.map((m) => m.mode))];
-const submodesFor = (mode: string) => MODES.filter((m) => m.mode === mode && m.submode).map((m) => m.submode!);
+const modeList = (modes: ModeChoice[]) => [...new Set(modes.map((m) => m.mode))];
+const submodesIn = (modes: ModeChoice[], mode: string) => modes.filter((m) => m.mode === mode && m.submode).map((m) => m.submode!);
 
 /** The list plus the current value when it is not in it, so odd values from imports still show. */
 function withCurrent(list: Opt[], v: string): Opt[] {
@@ -142,6 +142,7 @@ export default function QsoEditor({ qso, locations, equipment, callsigns, onClos
   const [newVal, setNewVal] = useState("");
   const [rawOpen, setRawOpen] = useState(false);
   const [notice, setNotice] = useState("");
+  const modes = useModes();
   const [layout] = usePref<EntryLayout>("entry_layout", DEFAULT_LAYOUT);
   const [modeLayouts] = usePref<ModeLayouts>("entry_layouts", {});
 
@@ -188,7 +189,7 @@ export default function QsoEditor({ qso, locations, equipment, callsigns, onClos
     const sub = get("SUBMODE");
     // A submode that does not belong to the new mode goes, unless it is the stored pair.
     const stored = v === base.fields.MODE && sub === base.fields.SUBMODE;
-    if (sub && !stored && !submodesFor(v).includes(sub)) patch.SUBMODE = "";
+    if (sub && !stored && !submodesIn(modes, v).includes(sub)) patch.SUBMODE = "";
     setMany(patch);
   };
 
@@ -437,8 +438,8 @@ export default function QsoEditor({ qso, locations, equipment, callsigns, onClos
           </label>
           {select("BAND", 2, opts(BAND_LIST))}
           {text("TX_PWR", 2, { mono: true })}
-          {select("MODE", 2, opts(MODE_LIST), setMode)}
-          {select("SUBMODE", 2, opts(submodesFor(get("MODE"))))}
+          {select("MODE", 2, opts(modeList(modes)), setMode)}
+          {select("SUBMODE", 2, opts(submodesIn(modes, get("MODE"))))}
           {text("RST_SENT", 1, { mono: true })}
           {text("RST_RCVD", 1, { mono: true })}
           {text("NAME", 2)}
