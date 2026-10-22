@@ -2,11 +2,12 @@ import { Fragment } from "react";
 import { usePopup } from "./usePopup";
 import { show, useOverrides, SHORTCUTS, bindingFor } from "../shortcuts";
 
-export type MenuAction = "import" | "export" | "qsl" | "qslqueue" | "stats" | "settings" | "help" | "about";
+export type MenuAction = "import" | "export" | "bulk" | "qsl" | "qslqueue" | "stats" | "settings" | "help" | "about";
 
 const ITEMS: { id: MenuAction; label: string }[] = [
   { id: "import", label: "Import ADIF…" },
   { id: "export", label: "Export ADIF…" },
+  { id: "bulk", label: "Bulk edit QSOs…" },
   { id: "qsl", label: "QSL: LoTW, QRZ, Club Log…" },
   { id: "qslqueue", label: "QSL Queue…" },
   { id: "stats", label: "Statistics…" },
@@ -25,14 +26,14 @@ export default function MainMenu({ onPick }: { onPick: (a: MenuAction) => void }
   };
   return (
     <div className="layout-menu" ref={box}>
-      <button className="burger" onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="menu" aria-label="Menu" title="Import, export, QSL, settings and help">
+      <button className="burger" onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="menu" aria-label="Menu" title="Import, export, bulk edit, QSL, settings and help">
         &#9776;
       </button>
       {open && (
         <div className="layout-pop" role="menu">
           {ITEMS.map((it, i) => (
             <Fragment key={it.id}>
-              {i === 5 && <hr />}
+              {i === 6 && <hr />}
               <button role="menuitem" className="item" onClick={() => { setOpen(false); onPick(it.id); }}>
                 {it.label}
                 {hintOf(it.id) && <span className="where">{hintOf(it.id)}</span>}

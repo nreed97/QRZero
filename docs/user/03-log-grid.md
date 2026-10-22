@@ -13,7 +13,7 @@ The grid shows every QSO in the open log, newest first. It stays fast with hundr
 - Click a row to select it. <kbd>Ctrl</kbd>+click adds or removes rows, <kbd>Shift</kbd>+click selects a range.
 - Or tick the box at the start of each row.
 
-With rows selected, the toolbar shows **Clear selection**, **Paper QSL…**, **Export selected** and **Delete**. Deleting asks first and can't be undone.
+With rows selected, the toolbar shows **Clear selection**, **Paper QSL…**, **Export selected**, **Bulk edit** and **Delete**. Deleting asks first and can't be undone.
 
 **Paper QSL…** sets the card fields on the selected QSOs: queue a card to send, card sent (bureau or direct), card received (bureau or direct; a card received also queues a card back to send, unless one was already sent), or not sending (takes it out of the queue), plus **Mark OQRS requested** and **Clear OQRS request** for Club Log OQRS. Sent and received also record today's date. See [QSL](10-qsl.md) for printing labels.
 
@@ -25,7 +25,7 @@ Right-click a row for a menu. It acts on the selected rows when you right-click 
 - **View CALL on QRZ.com** (one row only) opens that station's page on QRZ.com in your web browser. It needs no login.
 - **Send through UDP connections** sends the QSOs again to every **QSO logged** connection under Settings, **UDP connections**, just as if they had been logged now. Use it to push older contacts into another program. See [UDP connections](16-udp-and-startup.md).
 - **Upload to QRZ Logbook / Club Log / eQSL / LoTW (TQSL)** appears for each service that is set up under QSL. It uploads the chosen QSOs right away, even ones already sent, and updates their sent status. QSOs only go to a service for the station callsigns ticked there (and, for LoTW, the locations with a TQSL station location). See [QSL](10-qsl.md).
-- **Export** and **Delete** do the same as the buttons above the grid.
+- **Export**, **Bulk edit** and **Delete** do the same as the buttons above the grid.
 
 When you click a row in the **Awards** tab, the log shows only those QSOs and a button such as **DXCC 291 ×** appears above the grid. Click it to show all QSOs again.
 

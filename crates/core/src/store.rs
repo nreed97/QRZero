@@ -911,6 +911,63 @@ impl Store {
         Ok(())
     }
 
+    /// Sets (`set`) and clears (`clear`) optional fields on every QSO of the log
+    /// matching `filter`, in one transaction. Fields that identify the QSO or feed
+    /// the indexed columns, and QSL bookkeeping, are refused. With `dry_run` nothing
+    /// is written. Returns how many QSOs match (dry run) or changed.
+    pub fn bulk_edit(&mut self, log_id: i64, filter: &QsoFilter, set: &Fields, clear: &[String], dry_run: bool) -> Result<usize> {
+        let set = normalize(set);
+        let clear: Vec<String> = clear.iter().map(|k| k.trim().to_ascii_uppercase()).filter(|k| !k.is_empty()).collect();
+        if set.is_empty() && clear.is_empty() {
+            return Err(Error::Invalid("nothing to change".into()));
+        }
+        for k in set.keys().chain(clear.iter()) {
+            if BULK_PROTECTED.contains(&k.as_str()) || is_qsl_field(k) {
+                return Err(Error::Invalid(format!("{k} can't be changed in bulk")));
+            }
+            if !k.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                return Err(Error::Invalid(format!("bad field name {k}")));
+            }
+        }
+        let (where_sql, args) = build_where(log_id, filter);
+        if dry_run {
+            let n: i64 = self.conn.query_row(&format!("SELECT COUNT(*) FROM qsos WHERE {where_sql}"), params_from_iter(args.iter()), |r| r.get(0))?;
+            return Ok(n as usize);
+        }
+        let tx = self.conn.transaction()?;
+        let mut changed = 0;
+        {
+            let mut get = tx.prepare(&format!("SELECT id, fields FROM qsos WHERE {where_sql}"))?;
+            let rows: Vec<(i64, String)> = get
+                .query_map(params_from_iter(args.iter()), |r| Ok((r.get(0)?, r.get(1)?)))?
+                .collect::<rusqlite::Result<_>>()?;
+            let mut put = tx.prepare("UPDATE qsos SET fields = ?1, updated_at = ?2 WHERE id = ?3")?;
+            for (id, raw) in rows {
+                let old: Fields = serde_json::from_str(&raw)?;
+                let mut fields = old.clone();
+                for k in &clear {
+                    fields.remove(k);
+                }
+                fields.extend(set.iter().map(|(k, v)| (k.clone(), v.clone())));
+                if fields == old {
+                    continue;
+                }
+                // Like a single edit: a QSO already uploaded to QRZ or Club Log is marked for re-upload.
+                for key in MODIFIED_STATUS {
+                    if let Some(v) = fields.get_mut(key) {
+                        if v == "Y" {
+                            *v = "M".into();
+                        }
+                    }
+                }
+                put.execute(params![serde_json::to_string(&fields)?, now(), id])?;
+                changed += 1;
+            }
+        }
+        tx.commit()?;
+        Ok(changed)
+    }
+
     pub fn delete_qsos(&mut self, ids: &[i64]) -> Result<usize> {
         let tx = self.conn.transaction()?;
         let mut n = 0;
@@ -1379,6 +1436,10 @@ impl Store {
 }
 
 /// Upload statuses ADIF says become "M" when an uploaded QSO is modified.
+/// Fields a bulk edit never touches: they identify the QSO or feed the indexed columns.
+const BULK_PROTECTED: [&str; 12] = [
+    "CALL", "QSO_DATE", "TIME_ON", "BAND", "BAND_RX", "FREQ", "FREQ_RX", "MODE", "SUBMODE", "STATION_CALLSIGN", "DXCC", "TIME_OFF",
+];
 const MODIFIED_STATUS: [&str; 2] = ["QRZCOM_QSO_UPLOAD_STATUS", "CLUBLOG_QSO_UPLOAD_STATUS"];
 
 /// QSL and upload bookkeeping, as opposed to what happened on the air.
