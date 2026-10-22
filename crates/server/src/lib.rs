@@ -268,6 +268,7 @@ fn router(state: Shared, loopback_only: bool) -> Router {
         .route("/qsos/{id}", get(get_qso).put(update_qso))
         .route("/qsos/delete", post(delete_qsos))
         .route("/qsos/mark", post(mark_qsos))
+        .route("/logs/{id}/qsos/bulk", post(bulk_edit_qsos))
         .route("/label/printers", get(label_printers))
         .route("/label/print", post(label_print))
         .route("/qsos/lookup", post(lookup_qsos))
@@ -723,6 +724,29 @@ async fn mark_qsos(State(s): State<Shared>, Json(b): Json<MarkBody>) -> ApiResul
     db(&s, move |st| st.mark_qsos(&b.ids, &b.fields)).await?;
     s.hub.refresh_awards();
     s.hub.emit(json!({"type": "qso_logged", "log_id": null, "call": "", "source": "mark", "added": false}));
+    Ok(Json(n))
+}
+
+#[derive(Deserialize)]
+struct BulkBody {
+    filter: QsoFilter,
+    #[serde(default)]
+    set: Fields,
+    #[serde(default)]
+    clear: Vec<String>,
+    /// Only count the QSOs that would be edited.
+    #[serde(default)]
+    dry_run: bool,
+}
+
+/// Sets or clears optional fields on every QSO matching a filter, all or nothing.
+async fn bulk_edit_qsos(State(s): State<Shared>, Path(id): Path<i64>, Json(b): Json<BulkBody>) -> ApiResult<usize> {
+    let dry = b.dry_run;
+    let n = db(&s, move |st| st.bulk_edit(id, &b.filter, &b.set, &b.clear, b.dry_run)).await?;
+    if !dry && n > 0 {
+        s.hub.refresh_awards();
+        s.hub.emit(json!({"type": "qso_logged", "log_id": null, "call": "", "source": "bulk", "added": false}));
+    }
     Ok(Json(n))
 }
 

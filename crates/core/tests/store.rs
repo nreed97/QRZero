@@ -394,3 +394,36 @@ fn locations_and_gear_are_shared_by_every_log() {
     assert_eq!(st.list_equipment().unwrap().len(), 1);
     assert_eq!(st.get_qso(q.id).unwrap().location_id, Some(home.id));
 }
+
+#[test]
+fn bulk_edit_sets_and_clears_optional_fields() {
+    let (mut st, log) = setup();
+    let mk = |call: &str, extra: &[(&str, &str)]| {
+        let mut p = vec![("CALL", call), ("QSO_DATE", "20240101"), ("TIME_ON", "1200"), ("BAND", "20m"), ("MODE", "CW")];
+        p.extend_from_slice(extra);
+        st.insert_qso(log, None, &f(&p)).unwrap()
+    };
+    let a = mk("W1AW", &[("COMMENT", "old"), ("QRZCOM_QSO_UPLOAD_STATUS", "Y")]);
+    let b = mk("K1ABC", &[]);
+    let c = mk("N1XYZ", &[]);
+    let filter = QsoFilter { ids: Some(vec![a.id, b.id]), ..Default::default() };
+
+    // Dry run counts and writes nothing.
+    assert_eq!(st.bulk_edit(log, &filter, &f(&[("CONTEST_ID", "ARRL-DX-CW")]), &[], true).unwrap(), 2);
+    assert!(!st.get_qso(a.id).unwrap().fields.contains_key("CONTEST_ID"));
+
+    assert_eq!(st.bulk_edit(log, &filter, &f(&[("contest_id", " ARRL-DX-CW ")]), &["COMMENT".into()], false).unwrap(), 2);
+    let a = st.get_qso(a.id).unwrap();
+    assert_eq!(a.fields["CONTEST_ID"], "ARRL-DX-CW");
+    assert!(!a.fields.contains_key("COMMENT"));
+    assert_eq!(a.fields["QRZCOM_QSO_UPLOAD_STATUS"], "M");
+    assert_eq!(st.get_qso(b.id).unwrap().fields["CONTEST_ID"], "ARRL-DX-CW");
+    assert!(!st.get_qso(c.id).unwrap().fields.contains_key("CONTEST_ID"));
+
+    // Unchanged QSOs are not counted; identifying and QSL fields are refused.
+    assert_eq!(st.bulk_edit(log, &filter, &f(&[("CONTEST_ID", "ARRL-DX-CW")]), &[], false).unwrap(), 0);
+    assert!(st.bulk_edit(log, &filter, &f(&[("CALL", "X")]), &[], false).is_err());
+    assert!(st.bulk_edit(log, &filter, &Fields::new(), &["BAND".into()], false).is_err());
+    assert!(st.bulk_edit(log, &filter, &f(&[("QSL_SENT", "Y")]), &[], false).is_err());
+    assert!(st.bulk_edit(log, &filter, &Fields::new(), &[], false).is_err());
+}

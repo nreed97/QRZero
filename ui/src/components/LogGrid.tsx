@@ -27,6 +27,7 @@ interface Props {
   onEdit: (q: Qso) => void;
   onDeleted: () => void;
   onExportSelected: () => void;
+  onBulkEditSelected: () => void;
   columns: string[];
   onColumns: (c: string[]) => void;
   /** Widths the user dragged columns to, in pixels (kept by the app so saved layouts can carry them). */
@@ -41,7 +42,7 @@ interface Props {
 
 const QSL_NAMES: Record<QslService, string> = { qrz: "QRZ Logbook", clublog: "Club Log", eqsl: "eQSL", lotw: "LoTW (TQSL)" };
 
-export default function LogGrid({ logId, refreshKey, filter, onFilter, selection, onSelection, onBrowse, onEdit, onDeleted, onExportSelected, columns, onColumns, widths, onWidths, locations, stepper, editingId }: Props) {
+export default function LogGrid({ logId, refreshKey, filter, onFilter, selection, onSelection, onBrowse, onEdit, onDeleted, onExportSelected, onBulkEditSelected, columns, onColumns, widths, onWidths, locations, stepper, editingId }: Props) {
   const modes = useModes();
   useDisplay(); // redraw when the date or frequency format changes
   const [total, setTotal] = useState(0);
@@ -395,6 +396,7 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
               {OQRS_ACTIONS.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
             </select>
             <button onClick={onExportSelected}>Export selected</button>
+            <button onClick={onBulkEditSelected}>Bulk edit</button>
             <button className="danger" onClick={deleteSelected}>Delete</button>
           </>
         )}
@@ -512,6 +514,7 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
               <button role="menuitem" onClick={act(() => void markPaper("rcvd-b", ids))}>Card received, queue a reply ({what})</button>
               <hr />
               <button role="menuitem" onClick={act(onExportSelected)}>Export {what}…</button>
+              <button role="menuitem" onClick={act(onBulkEditSelected)}>Bulk edit {what}…</button>
               <button role="menuitem" onClick={act(() => void deleteSelected())}>Delete {what}…</button>
             </div>
           );

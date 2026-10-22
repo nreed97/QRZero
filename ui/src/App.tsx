@@ -30,12 +30,13 @@ const SettingsDialog = lazy(() => import("./components/SettingsDialog"));
 const QslDialog = lazy(() => import("./components/QslDialog"));
 const ImportDialog = lazy(() => import("./components/ImportDialog"));
 const ExportDialog = lazy(() => import("./components/ExportDialog"));
+const BulkEditDialog = lazy(() => import("./components/BulkEditDialog"));
 const HelpView = lazy(() => import("./components/HelpView"));
 const AboutDialog = lazy(() => import("./components/AboutDialog"));
 const StatsDialog = lazy(() => import("./components/StatsDialog"));
 const SetupWizard = lazy(() => import("./components/SetupWizard"));
 
-type Dialog = "import" | "export" | "settings" | "help" | "wizard" | "qsl" | "qslqueue" | "stats" | "about" | null;
+type Dialog = "import" | "export" | "bulk" | "settings" | "help" | "wizard" | "qsl" | "qslqueue" | "stats" | "about" | null;
 
 /** Where a pane goes back to when its window closes. */
 const HOME: Partial<Record<PaneId, [PaneId, Zone]>> = {
@@ -634,6 +635,7 @@ export default function App() {
                 onEdit={openEditor}
                 onDeleted={refreshGrid}
                 onExportSelected={() => setDialog("export")}
+                onBulkEditSelected={() => setDialog("bulk")}
                 columns={columns}
                 onColumns={setColumns}
                 widths={colWidths}
@@ -683,6 +685,17 @@ export default function App() {
             callsigns={callsigns}
             locations={locations}
             onClose={() => setDialog(null)}
+          />
+        )}
+        {dialog === "bulk" && (
+          <BulkEditDialog
+            logId={logId}
+            selection={selection}
+            gridFilter={filter}
+            callsigns={callsigns}
+            locations={locations}
+            onClose={() => setDialog(null)}
+            onDone={refreshGrid}
           />
         )}
         {dialog === "settings" && (

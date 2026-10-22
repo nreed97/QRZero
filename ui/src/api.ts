@@ -108,6 +108,9 @@ export const api = {
     const q = new URLSearchParams(Object.entries(o).map(([k, v]) => [k, String(v)]));
     return json<SlotGrid>("GET", `/logs/${logId}/dxcc-slots?${q}`);
   },
+  /** Sets and clears optional fields on every QSO matching the filter, all or nothing. `dryRun` only counts. */
+  bulkEdit: (logId: number, filter: QsoFilter, set: Fields, clear: string[], dryRun = false) =>
+    json<number>("POST", `/logs/${logId}/qsos/bulk`, { filter, set, clear, dry_run: dryRun }),
   paperQueue: (logId: number) => json<Qso[]>("GET", `/logs/${logId}/paper-queue`),
   search: (logId: number, filter: QsoFilter, offset: number, limit: number, sort = "newest") =>
     json<{ total: number; rows: Qso[] }>("POST", `/logs/${logId}/qsos/search`, { filter, offset, limit, sort }),

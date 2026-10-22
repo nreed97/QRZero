@@ -162,6 +162,25 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   expect(text).toContain("<MY_GRIDSQUARE:4>EN34");
   expect(text).not.toContain("W1AW");
 
+  // Bulk edit: set a comment on the 40m QSOs only, then see it in an export.
+  page.once("dialog", (d) => void d.accept());
+  await fromMenu(page, "Bulk edit QSOs…");
+  await page.getByLabel("Choose filters").check();
+  await page.locator("label.chip", { hasText: /^40m$/ }).locator("input").check();
+  await page.getByRole("combobox", { name: "ADIF field" }).fill("COMMENT");
+  await page.getByRole("textbox", { name: "Value", exact: true }).fill("bulk note");
+  await expect(page.getByText("2 QSOs will be edited")).toBeVisible();
+  await page.getByRole("button", { name: "Edit QSOs" }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await fromMenu(page, "Export ADIF…");
+  await page.getByLabel("Choose filters").check();
+  const [bulkDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("dialog").getByRole("button", { name: "Export" }).click(),
+  ]);
+  const bulkText = readFileSync((await bulkDownload.path())!, "utf8");
+  expect(bulkText.match(/<COMMENT:9>bulk note/g)).toHaveLength(2);
+
   // The FTx monitor waits for WSJT-X, and the integrations are set up in Settings.
   await page.getByRole("tab", { name: "FTx monitor" }).click();
   await expect(page.getByText("Waiting for WSJT-X or JTDX")).toBeVisible();

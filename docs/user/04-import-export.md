@@ -35,3 +35,13 @@ The dialog shows how many QSOs will be exported before you start.
 - **Full** writes every field stored with each QSO, including fields from other programs (`APP_…`). Use it for backups or moving to another QRZero install.
 
 The file is saved to your Downloads folder, named after the log and the date.
+
+## Bulk edit
+
+To set the same optional field on many QSOs at once (a contest ID, a comment, a POTA reference), choose **Bulk edit QSOs…** from the **☰** menu, or select rows in the grid and choose **Bulk edit**.
+
+Pick the QSOs the same way as for an export: the selected rows, what the grid shows now, or filters. Then list the changes. Each line is an ADIF field name and either **Set to** a value or **Clear**. Lines left empty are ignored, and only the fields you list are written.
+
+Call, date, time, band, mode, station callsign, DXCC and the QSL and upload status fields can't be changed this way. A QSO already uploaded to QRZ or Club Log is marked for re-upload, as when you edit it by hand.
+
+The dialog shows how many QSOs will be edited and asks you to confirm. The edit is all or nothing, and it can't be undone, so check the count first.
