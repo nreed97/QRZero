@@ -366,6 +366,13 @@ impl Store {
         Ok(())
     }
 
+    /// Every callsign of the user's that isn't archived, in any log.
+    pub fn own_callsigns(&self) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare("SELECT DISTINCT callsign FROM station_callsigns WHERE archived = 0")?;
+        let rows = stmt.query_map([], |r| r.get(0))?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
     /// Callsigns archived in every log that has them, for leaving them out of uploads.
     pub fn archived_callsigns(&self) -> Result<Vec<String>> {
         let mut stmt = self.conn.prepare(

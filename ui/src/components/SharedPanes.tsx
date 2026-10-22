@@ -18,6 +18,7 @@ import NeededPaneView from "./NeededPane";
 import PropagationPane from "./PropagationPane";
 import RotatorPane from "./RotatorPane";
 import NotesPane from "./NotesPane";
+import SpottedMePane from "./SpottedMePane";
 import ClubsPaneView from "./ClubsPane";
 import EntryHost from "./EntryHost";
 
@@ -130,6 +131,8 @@ export default function SharedPane({ id, ctx, act }: { id: PaneId; ctx: PopConte
       return <RotatorPane ctx={ctx} act={act} />;
     case "notes":
       return <NotesPane ctx={ctx} act={act} />;
+    case "spottedme":
+      return <SpottedMePane onSettings={clusterSettings} />;
     case "clubs":
       return <ClubsPane />;
     default:

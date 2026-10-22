@@ -332,6 +332,7 @@ fn router(state: Shared, loopback_only: bool) -> Router {
         .route("/award-goals", get(goals_get).put(goals_put))
         .route("/alerts", get(alerts_get).put(alerts_put))
         .route("/alerts/test", post(alerts_test))
+        .route("/cluster/mine", get(cluster_mine))
         .route("/cluster/connect", post(cluster_connect))
         .route("/cluster/send", post(cluster_send))
         .route("/cluster/spot", post(cluster_spot))
@@ -1985,6 +1986,10 @@ async fn watch_hits(State(s): State<Shared>) -> ApiResult<Vec<watch::WatchHit>> 
 
 async fn cluster_get(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
     Ok(Json(s.cluster.snapshot()))
+}
+
+async fn cluster_mine(State(s): State<Shared>) -> ApiResult<Vec<cluster::SpotInfo>> {
+    Ok(Json(s.cluster.mine()))
 }
 
 async fn cluster_put(State(s): State<Shared>, Json(cfg): Json<ClusterConfig>) -> ApiResult<serde_json::Value> {

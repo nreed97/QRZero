@@ -1,6 +1,6 @@
 // The docked pane layout: a tree of splits whose leaves are tab groups.
 
-export type PaneId = "entry" | "lookup" | "slots" | "worked" | "map" | "log" | "ftx" | "cluster" | "awards" | "bandmap" | "watch" | "dxped" | "needed" | "contests" | "propagation" | "rotator" | "notes" | "clubs";
+export type PaneId = "entry" | "lookup" | "slots" | "worked" | "map" | "log" | "ftx" | "cluster" | "awards" | "bandmap" | "watch" | "dxped" | "needed" | "contests" | "propagation" | "rotator" | "notes" | "clubs" | "spottedme";
 
 export const PANES: { id: PaneId; title: string; popout: boolean }[] = [
   { id: "entry", title: "New QSO", popout: true },
@@ -21,6 +21,7 @@ export const PANES: { id: PaneId; title: string; popout: boolean }[] = [
   { id: "rotator", title: "Rotator", popout: true },
   { id: "notes", title: "Notes", popout: true },
   { id: "clubs", title: "MyClubs", popout: true },
+  { id: "spottedme", title: "Spotted me", popout: true },
 ];
 
 export const paneTitle = (id: PaneId) => PANES.find((p) => p.id === id)?.title ?? id;
