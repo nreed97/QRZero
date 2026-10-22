@@ -36,7 +36,7 @@ The desktop app draws its own title bar: the top bar of the main window, and the
 
 The main window reopens the way you closed it: at the same size and place, or maximized if you closed it maximized. Restoring it from maximized takes it back to the last smaller size. Maximizing is not the same as full screen; both keep working as before. If the saved place is no longer on a connected screen, the window opens on the main screen instead.
 
-To go back to the system frame, untick **Frameless windows** in **Settings**, **General** (or in the **☰** menu). On Windows and Linux every open window changes at once; on macOS the change applies the next time QRZero starts. Either way it is remembered. A browser tab always has the browser's own frame, so the option is not shown there.
+To go back to the system frame, untick **Frameless windows** in **Settings**, **General**. On Windows and Linux every open window changes at once; on macOS the change applies the next time QRZero starts. Either way it is remembered. A browser tab always has the browser's own frame, so the option is not shown there.
 
 ## Saved layouts
 
