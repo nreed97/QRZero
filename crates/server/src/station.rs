@@ -770,6 +770,8 @@ impl Hub {
                 idx.add(f.get("CALL").map_or("", |c| c.as_str()), dxcc, f.get("BAND").map(|s| s.as_str()), mode.map(|s| s.as_str()));
             }
         }
+        // The cluster flags its kept spots again.
+        self.emit(json!({"type": "qso_noted"}));
     }
 
     /// Tells the UDP connections about a newly logged QSO.
