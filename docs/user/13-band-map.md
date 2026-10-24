@@ -16,7 +16,7 @@ With no radio, pick the band from the list (20m to start with), then scroll up a
 
 ## Spots
 
-Each spot shows the call, how long ago it was spotted, and what it would be new for, in the same colour as the Cluster pane: **DXCC**, **band** or **mode**. Calls you've already worked on the band are shown in grey. When you log a QSO, spots already on the map are checked again at once: a station you just worked turns grey and loses the flags that QSO covered (new mode, DXCC, award goals, Marathon). The spot stays on the map, since you may work the station again later. Hover over a spot for the exact frequency, mode, country, spotter and comment.
+Each spot shows the call, how long ago it was spotted, and what it would be new for, in the same colour as the Cluster pane: **DXCC**, **band** or **mode**. Calls you've already worked on the band are shown in grey. When you log a QSO, spots already on the map are checked again at once: a station you just worked turns grey and loses the flags that QSO covered (new mode, DXCC, award goals, Marathon). The same happens when you switch to another log: spots (and FT8 decodes) are flagged again against that log. The spot stays on the map, since you may work the station again later. Hover over a spot for the exact frequency, mode, country, spotter and comment.
 
 Spots never sit on top of each other. When several are close together they stack in a column, and when a column fills up they move to the next one. A thin line runs from each spot back to its frequency on the scale.
 
