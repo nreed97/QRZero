@@ -3,6 +3,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, Weak};
+use std::time::{Duration, Instant};
 
 use qrzero_core::band::band_for_freq;
 use qrzero_core::cty::Entity;
@@ -16,6 +17,10 @@ use crate::station::Hub;
 
 const MAX_SPOTS: usize = 500;
 const MAX_LINES: usize = 300;
+/// Spots of the user's own callsigns kept for the Spotted me pane (they would scroll out of `spots` on a busy node).
+const MAX_MINE: usize = 200;
+/// How long the list of own callsigns is reused before the log is asked again.
+const OWN_CALLS_TTL: Duration = Duration::from_secs(60);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -69,6 +74,9 @@ struct Inner {
     /// "disconnected", "connecting to X", "connected to X".
     state: String,
     spots: VecDeque<SpotInfo>,
+    mine: VecDeque<SpotInfo>,
+    own_calls: Vec<String>,
+    own_calls_at: Option<Instant>,
     lines: VecDeque<String>,
     seq: u64,
 }
@@ -153,6 +161,25 @@ impl Cluster {
             "spots": inner.spots,
             "lines": inner.lines,
         })
+    }
+
+    /// Spots of the user's own callsigns, oldest first.
+    pub fn mine(&self) -> Vec<SpotInfo> {
+        self.lock().mine.iter().cloned().collect()
+    }
+
+    /// Whether `call` is one of the user's callsigns, possibly with a prefix or suffix (W0NY/P, VP9/W0NY).
+    fn is_mine(&self, hub: &Hub, call: &str) -> bool {
+        let mut inner = self.lock();
+        if inner.own_calls_at.is_none_or(|t| t.elapsed() > OWN_CALLS_TTL) {
+            drop(inner);
+            let calls = hub.with_store(|st| st.own_callsigns()).unwrap_or_default();
+            inner = self.lock();
+            inner.own_calls = calls.into_iter().map(|c| c.to_uppercase()).collect();
+            inner.own_calls_at = Some(Instant::now());
+        }
+        let call = call.to_uppercase();
+        call.split('/').any(|part| inner.own_calls.iter().any(|c| c == part))
     }
 
     pub fn save_config(self: &Arc<Self>, config: ClusterConfig) -> Result<(), String> {
@@ -292,6 +319,7 @@ impl Cluster {
                 let watched = hub.watch.check(&sighting);
                 let hit = watched.and_then(|id| hub.watch.record(id, &sighting, chrono::Utc::now().timestamp()));
                 hub.dxped_spot(&sighting, entity.as_ref().and_then(|e| e.dxcc));
+                let mine = self.is_mine(&hub, &s.call);
                 let spot = {
                     let mut inner = self.lock();
                     inner.seq += 1;
@@ -317,9 +345,18 @@ impl Cluster {
                     while inner.spots.len() > MAX_SPOTS {
                         inner.spots.pop_front();
                     }
+                    if mine {
+                        inner.mine.push_back(spot.clone());
+                        while inner.mine.len() > MAX_MINE {
+                            inner.mine.pop_front();
+                        }
+                    }
                     spot
                 };
                 hub.emit(json!({"type": "spot", "spot": spot}));
+                if mine {
+                    hub.emit(json!({"type": "spot_mine", "spot": spot}));
+                }
                 hub.notify.spot(&spot, spot.received);
                 if let Some(hit) = hit {
                     hub.alert_watch(&hit);

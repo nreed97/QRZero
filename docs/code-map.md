@@ -38,7 +38,7 @@ Search tip: each Rust module starts with a `//!` doc comment saying what it is, 
 
 - API routes, app state and settings: `lib.rs`. Binary entry point: `main.rs`.
 - The live station (rig connections, WSJT-X/N1MM/Pst over UDP, event stream): `station.rs`.
-- Cluster connection and spot flagging: `cluster.rs`. Watch list: `watch.rs`.
+- Cluster connection and spot flagging (and the Spotted me list of the user's own calls): `cluster.rs`. Watch list: `watch.rs`.
 - Online uploads and QSL queues: `qsl.rs`. Label printing: `label.rs`.
 - Push alerts through ntfy (needed spots, watch list, DXpeditions): `notify.rs`.
 - Custom UDP connections and relay: `udp_out.rs`. Programs started with QRZero: `startup.rs`.
@@ -50,7 +50,7 @@ Search tip: each Rust module starts with a `//!` doc comment saying what it is, 
 
 - App shell, docked and pop-out layout: `App.tsx`, `components/Workspace.tsx`, `components/Popout.tsx`, `workspace.ts`.
 - Frameless windows (QRZero's own title bar, and the title commands it sends the desktop shell): `frame.ts`, `components/WindowControls.tsx`.
-- Panes and dialogs: `components/*.tsx`, named for what they show (for example `LogGrid`, `ClusterPane`, `BandMapPane`, `AwardsPane`, `QslDialog`, `StatsDialog`, `SettingsDialog`; `ScopePicker` is the shared "which QSOs" chooser of the export and bulk edit dialogs). Header and radio readout: `MainMenu.tsx`, `VfoBar.tsx`.
+- Panes and dialogs: `components/*.tsx`, named for what they show (for example `LogGrid`, `ClusterPane`, `SpottedMePane`, `BandMapPane`, `AwardsPane`, `QslDialog`, `StatsDialog`, `SettingsDialog`; `ScopePicker` is the shared "which QSOs" chooser of the export and bulk edit dialogs). Header and radio readout: `MainMenu.tsx`, `VfoBar.tsx`.
 - Server calls: `api.ts` (everything goes over `/api`). Live events: `live.ts`. Shared types: `types.ts`. The user's mode list (`modes.ts`, ADIF mode table in `adifModes.ts`, edited in `components/ModesSettings.tsx`; its CW/Phone/Digital choices reach the server's `awards::mode_group` through the `modes` preference).
 - Per-feature helpers and saved preferences sit beside the components as `*.ts` and `*.css`. Settings search index: `settingsIndex.ts`. Keyboard shortcuts: `shortcuts.ts`, `shortcutKeys.ts`.
 - End-to-end tests: `ui/e2e/*.spec.ts` (Playwright; `smoke.spec.ts` is the broad one, config in `ui/playwright.config.ts`).

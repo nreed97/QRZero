@@ -57,6 +57,12 @@ To tell the cluster you worked someone, click **Spot…** in the QSO panel, or r
 
 Spotting is switched off, with the reason shown, when the cluster isn't connected or the QSO is too old. To keep an old contact from being spotted by mistake, only QSOs from the last 10 minutes can be spotted; change the limit in **Settings**, **DX cluster**, **Only spot a QSO made within the last … minutes**. The comment from the right-click menu starts as the one set in **Settings**, **DX cluster**, **Comment for spots sent from the log's right-click menu** (**spotted with QRZero** to start with). Besides plain text it can hold `{call}`, `{mode}`, `{band}`, `{freq}`, `{rst_sent}`, `{rst_rcvd}`, `{name}` and `{my_grid}`, which are filled in from the QSO, so `{mode} {rst_rcvd} via QRZero` becomes `CW 579 via QRZero`. Clusters keep only the first 30 characters, so longer comments are cut. The QSO panel's **Spot…** starts with the mode. For a QSO logged in split, the spot is at the frequency you listened on, where the DX transmits.
 
+## Spotted me
+
+The **Spotted me** pane (turn it on from **Layout**) lists the spots of your own callsigns that the cluster passes on, so you can see who is hearing you and where. Any callsign you have set up in QRZero counts, except archived ones, and so does one with a prefix or suffix, such as W0NY/P. Each row shows the time, the callsign spotted, the frequency, band and mode, the spotter, the spotter's country and the comment. A spotter ending in **-#** is a skimmer, not a person; whether you see skimmer spots depends on the cluster node you connect to, as QRZero doesn't connect to any skimmer network itself.
+
+It uses the cluster connection of the Cluster pane, so connect there first (the pane has a **Connect** button too). The newest spot is on top and the last 200 are kept while QRZero runs; they are not saved when you quit. Choose a band or an age to narrow the list. Drag a column heading to move it or its right edge to resize it, and double-click the edge to put the width back; the choices are remembered.
+
 ## Console
 
 **Console** shows what the node sends and lets you type commands, for example `sh/dx 20` for the last 20 spots or `dx 14025 K1ABC tnx qso` to spot a station.

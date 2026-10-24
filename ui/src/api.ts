@@ -1,4 +1,4 @@
-import type { LogStats, UpdateInfo, ContestList, DxpedList, MostWanted, DxpedPlanned, PropagationReport } from "./types";
+import type { Spot, LogStats, UpdateInfo, ContestList, DxpedList, MostWanted, DxpedPlanned, PropagationReport } from "./types";
 import type { ClubAwards, Goals, Marathon, NtfyConfig, NtfyView, QslQueue, QslService, QslDownload, AwardHint, SlotGrid, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
@@ -199,6 +199,7 @@ export const api = {
 
   cluster: () => json<ClusterSnapshot>("GET", "/cluster"),
   saveCluster: (c: ClusterConfig) => json<ClusterSnapshot>("PUT", "/cluster", c),
+  clusterMine: () => json<Spot[]>("GET", "/cluster/mine"),
   clusterConnect: (connect: boolean) => json<null>("POST", "/cluster/connect", { connect }),
   clusterSend: (line: string) => json<null>("POST", "/cluster/send", { line }),
   clusterSpot: (b: { call: string; freq_khz: number; comment: string; qso_utc: number }) => json<{ line: string }>("POST", "/cluster/spot", b),

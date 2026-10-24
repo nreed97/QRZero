@@ -594,7 +594,7 @@ impl Hub {
         self.inner.lock().unwrap_or_else(|p| p.into_inner())
     }
 
-    fn with_store<T>(&self, f: impl FnOnce(&mut Store) -> qrzero_core::Result<T>) -> qrzero_core::Result<T> {
+    pub(crate) fn with_store<T>(&self, f: impl FnOnce(&mut Store) -> qrzero_core::Result<T>) -> qrzero_core::Result<T> {
         let mut st = self.store.lock().unwrap_or_else(|p| p.into_inner());
         f(&mut st)
     }
