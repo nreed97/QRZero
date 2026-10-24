@@ -20,6 +20,7 @@ export type LiveEvent =
   | { type: "cluster_state"; state: string; connected: boolean }
   | { type: "spot_mine"; spot: Spot }
   | { type: "spots_reflagged" }
+  | { type: "decodes_reflagged" }
   | { type: "qsl"; service: QslService; run: QslRun }
   | { type: "qsl_log"; service: QslService; line: QslLogLine }
   | { type: "qsl_download"; service: QslService; run: QslDownload }
