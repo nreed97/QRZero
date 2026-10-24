@@ -111,6 +111,9 @@ export const api = {
   /** Sets and clears optional fields on every QSO matching the filter, all or nothing. `dryRun` only counts. */
   bulkEdit: (logId: number, filter: QsoFilter, set: Fields, clear: string[], dryRun = false) =>
     json<number>("POST", `/logs/${logId}/qsos/bulk`, { filter, set, clear, dry_run: dryRun }),
+  /** Moves every QSO matching the filter into another log, or a new one named `new_log`. */
+  moveQsos: (logId: number, filter: QsoFilter, target: { log_id: number } | { new_log: string }) =>
+    json<number>("POST", `/logs/${logId}/qsos/move`, { filter, ...target }),
   paperQueue: (logId: number) => json<Qso[]>("GET", `/logs/${logId}/paper-queue`),
   search: (logId: number, filter: QsoFilter, offset: number, limit: number, sort = "newest") =>
     json<{ total: number; rows: Qso[] }>("POST", `/logs/${logId}/qsos/search`, { filter, offset, limit, sort }),

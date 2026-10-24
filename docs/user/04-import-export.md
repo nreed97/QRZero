@@ -44,4 +44,6 @@ Pick the QSOs the same way as for an export: the selected rows, what the grid sh
 
 Call, date, time, band, mode, station callsign, DXCC and the QSL and upload status fields can't be changed this way. A QSO already uploaded to QRZ or Club Log is marked for re-upload, as when you edit it by hand.
 
+**Move to another log** sends the chosen QSOs, with their station callsigns, to another log or to a new one. Use it to clean up after an import put a call in the wrong log, or when you logged under the wrong log for a while. To find the QSOs, choose filters: tick the station callsign, or narrow by dates, band, mode or an ADIF field. A move can be combined with field changes (the changes are made first). Awards, Worked before and the log grid are per log, so moved QSOs stop counting in the log they left. It can't be undone, but moving them back with the same filters works.
+
 The dialog shows how many QSOs will be edited and asks you to confirm. The edit is all or nothing, and it can't be undone, so check the count first.
