@@ -2,13 +2,13 @@
 
 A fast, reliable amateur radio logger for Windows, macOS (Apple Silicon) and Linux.
 
-QRZero keeps your log in one SQLite file, stays quick with hundreds of thousands of QSOs, and talks to the programs and radios in a ham shack: WSJT-X, JTDX, N1MM Logger+, Hamlib, TCI, serial CAT, rotators, the DX cluster, QRZ.com, LoTW, Club Log and eQSL. It is built with DX chasing and CW in mind: spots that would be new for you raise an alert, awards from DXCC to the CW club awards are tracked as you log, and QSL cards, labels and online uploads are handled in one window, and a statistics window sums up your log.
+QRZero keeps your log in one SQLite file, stays quick with hundreds of thousands of QSOs, and talks to the programs and radios in a ham shack: WSJT-X, JTDX, N1MM Logger+, Hamlib, TCI, serial CAT, rotators, the DX cluster, QRZ.com, LoTW, Club Log and eQSL. It is built with DX chasing and CW in mind: spots that would be new for you raise an alert, awards from DXCC to the CW club awards are tracked as you log, and QSL cards, labels and online uploads are handled in one window, and a statistics window sums up your log. Alerts for needed stations can also go to your phone.
 
 ![QRZero main window](docs/screenshots/main-window.png)
 
 *Every screenshot in this file uses a made-up demo log for the placeholder call N0CALL. The country list, spots, contest calendar, decodes and confirmations are sample data.*
 
-**Contents:** [Install](#install) · [First run](#first-run) · [Logging](#logging-qsos) · [Radios and rotator](#radios-and-rotator) · [WSJT-X, JTDX and N1MM](#wsjt-x-jtdx-and-n1mm) · [DX cluster and band map](#dx-cluster-band-map-and-watch-list) · [Awards](#awards) · [QSL and online services](#qsl-and-online-services) · [Statistics](#statistics) · [ADIF](#adif-import-and-export) · [UDP connections](#udp-connections-and-startup-programs) · [Layout](#arranging-the-window) · [Settings, shortcuts and backups](#settings-keyboard-shortcuts-and-backups) · [Browser mode](#using-a-browser) · [Build from source](#building-from-source) · [Status](#status)
+**Contents:** [Install](#install) · [First run](#first-run) · [Logging](#logging-qsos) · [Radios and rotator](#radios-and-rotator) · [WSJT-X, JTDX and N1MM](#wsjt-x-jtdx-and-n1mm) · [DX cluster and band map](#dx-cluster-band-map-and-watch-list) · [Awards](#awards) · [Alerts on your phone](#alerts-on-your-phone) · [QSL and online services](#qsl-and-online-services) · [Statistics](#statistics) · [ADIF](#adif-import-and-export) · [UDP connections](#udp-connections-and-startup-programs) · [Layout](#arranging-the-window) · [Settings, shortcuts and backups](#settings-keyboard-shortcuts-and-backups) · [Browser mode](#using-a-browser) · [Build from source](#building-from-source) · [Status](#status)
 
 ## Why QRZero
 
@@ -21,14 +21,14 @@ QRZero keeps your log in one SQLite file, stays quick with hundreds of thousands
 
 ## What it does
 
-- **Logging.** One-key entry with QRZ.com and HamQTH lookups, customisable entry fields per mode, worked-before list, duplicate warnings, a Station pane that says what a contact is worth for every award, notes per callsign, a map with grey line and beam headings, and a fast log grid with a full QSO editor.
+- **Logging.** One-key entry with QRZ.com and HamQTH lookups, customisable entry fields per mode, worked-before list (simple, or with a summary line), duplicate warnings, a Station pane that says what a contact is worth for every award, notes per callsign, a map with grey line and beam headings, DXCC slot grids for the entity you are working, and a fast log grid with a full QSO editor and bulk editing.
 - **Radios.** Hamlib, TCI, Kenwood/Elecraft/Flex, Yaesu and Icom CI-V control with split, several radios at once (SO2R, Flex slices) and rotator control.
 - **Digital and contest programs.** WSJT-X, JTDX and N1MM Logger+ over UDP, with an FTx monitor that flags every decode against your log.
-- **Chasing DX.** DX cluster with filters, a **Needed now** list ranked by Club Log's Most Wanted list with sound and popup alerts, band map, watch list, DXpedition calendar, contest calendar, propagation and a band forecast.
-- **Awards.** DXCC (with Challenge, 5BDXCC and optional verified credit), WAS, WAZ, WPX, WAC, ITU zones, VUCC, IOTA, US counties, and SKCC, CWops, NAQCC and FISTS with CWT medals.
+- **Chasing DX.** DX cluster with filters, a **Needed now** list ranked by Club Log's Most Wanted list with sound and popup alerts (also as phone notifications through ntfy), a **Spotted me** list, band map, watch list, DXpedition calendar, contest calendar, propagation and a band forecast.
+- **Awards.** DXCC (with Challenge, 5BDXCC, Honor Roll and optional verified credit), WAS (5BWAS, Triple Play), WAZ (5BWAZ), WPX, WAC, ITU zones, VUCC, IOTA, US counties, the CQ DX Marathon, and SKCC, CWops, NAQCC and FISTS with CWT medals. 60 m is tracked like any other band.
 - **QSLs.** LoTW, QRZ Logbook, Club Log and eQSL uploads and confirmation downloads, plus a paper-card queue with label printing for bureau and direct mailings.
 - **Your data.** ADIF import and export with every field kept, several logs and callsigns, archived callsigns, locations and equipment shared between logs, daily backups, and a **Statistics** summary.
-- **Your window.** Dockable, tabbed, pop-out panes (with Always on top) saved as named layouts, light and dark, remappable keys, and a settings search.
+- **Your window.** Dockable, tabbed, pop-out panes (with Always on top) saved as named layouts, windows that reopen at the size and place you left them, light and dark, an optional system window frame, remappable keys, and a settings search.
 - **Elsewhere.** The same screens run in a web browser, and UDP connections feed anything else in the shack.
 
 ## Install
@@ -74,6 +74,9 @@ Type the call, press <kbd>Tab</kbd> or <kbd>Space</kbd>, and QRZero looks it up 
 
 - **Lookups** use QRZ.com XML when you have a login (results are cached for 30 days) or fall back to your own earlier QSOs and the country file. **Fill from QRZ** and **View on QRZ.com** buttons sit next to Clear.
 - **Frequency, band and mode** follow each other: type a frequency and the band is set; pick a mode and the usual report is filled in (all of those defaults are yours to change). FT4 is stored the way ADIF wants it, as `MFSK`/`FT4`, and shown as FT4.
+- **Your own mode list.** The Mode box offers a short list (CW, SSB, AM, FM, FT8, FT4, RTTY, PSK31). **Settings → Modes** adds any ADIF mode or submode, says whether it counts as CW, Phone or Digital for the awards, and removing one only hides it, so logged QSOs stay as they are.
+
+  ![Modes settings](docs/screenshots/settings-modes.png)
 - **Entry fields** are yours: pick a starting layout and add, remove, rename, resize or give defaults to any ADIF field, or invent your own. Tick *keep* to hold a value from one QSO to the next. CW, Phone and Digital can each have a layout of their own, so CW can show club numbers while SSB shows something else.
 
   ![Entry fields settings](docs/screenshots/settings-entry-fields.png)
@@ -94,7 +97,7 @@ As soon as you type a call, the side panes tell you what you need to know.
 | | |
 | --- | --- |
 | ![Worked before](docs/screenshots/worked-before.png) | ![Station pane](docs/screenshots/station-panel.png) |
-| **Worked before** lists every earlier QSO with the station (portable forms such as `/P` included) with QSL status, a duplicate marker, and quick filters for this band, this mode and unconfirmed. | The **Station** pane shows the station's details, your note, duplicate warnings, what the QSO would be worth for each award, and a band-by-mode grid of the entity's DXCC slots (**W** worked, **C** confirmed, blank still needed). |
+| **Worked before** lists every earlier QSO with the station (portable forms such as `/P` included) with QSL status, a duplicate marker, and quick filters for this band, this mode and unconfirmed. **Full** in its title bar adds a line with the bands and modes worked, the date of the first QSO and the bands confirmed; its columns can be moved, resized and hidden. | The **Station** pane shows the station's details, your note, duplicate warnings, what the QSO would be worth for each award, and a band-by-mode grid of the entity's DXCC slots (**W** worked, **C** confirmed, blank still needed). Click a cell to list every QSO in that slot, and show the grid as a **DXCC slots** pane of its own if you like. |
 
 A call that would be new for you says so plainly:
 
@@ -118,7 +121,7 @@ The log grid stays fast at any size. Search by call (with `*` wildcards), narrow
 
 ![Log grid right-click menu](docs/screenshots/log-menu.png)
 
-The right-click menu acts on the selected rows: edit, fill from QRZ, view on QRZ.com, spot to the cluster, send through your UDP connections, mark OQRS and card status, queue a card or answer one that arrived, export and delete. Double-click a QSO to edit it in its own window, grouped as Contact, Their location, My station, QSL (a table for LoTW, card, eQSL, QRZ and Club Log) and Other fields. **All ADIF fields** at the bottom edits everything stored with the QSO.
+The right-click menu acts on the selected rows: edit, fill from QRZ, view on QRZ.com, spot to the cluster, send through your UDP connections, mark OQRS and card status, queue a card or answer one that arrived, export and delete. Double-click a QSO to edit it in its own window, grouped as Contact, Their location, My station, QSL (a table for LoTW, card, eQSL, QRZ and Club Log) and Other fields. **All ADIF fields** at the bottom edits everything stored with the QSO. To set the same optional field on many QSOs at once (a contest ID, a comment, a POTA reference), select them and choose **Bulk edit**.
 
 ![QSO editor](docs/screenshots/qso-editor.png)
 
@@ -180,6 +183,12 @@ Add nodes under **Settings → DX cluster**; QRZero connects to the first and mo
 
 ![Cluster](docs/screenshots/cluster.png)
 
+### Spotted me
+
+The **Spotted me** pane lists the cluster spots of your own callsigns (portable forms such as W0NY/P included, archived calls left out): the time, frequency, band and mode, who spotted you, the spotter's country and the comment. A spotter ending in `-#` is a skimmer.
+
+![Spotted me](docs/screenshots/spotted-me.png)
+
 ### Needed now
 
 The **Needed now** pane lists only the spots on the air that would be new for your log, best first: a **new entity**, then a **new band** for an entity you have worked, then a **new mode**. Within each group the most wanted entity comes first: a **Wanted** column shows the entity's rank on Club Log's public Most Wanted list (fetched at most once a day, no Club Log login needed). It uses the same flags as the Cluster pane, lists each call, band and mode once however many people spot it, ranks CW, phone and digital together and drops spots after the time you choose (30 minutes to start with). Click a spot to fill in the QSO panel and tune the radio.
@@ -224,11 +233,15 @@ Once you type a call or pick an entity, the pane ends with a **Band forecast**: 
 
 ## Awards
 
-The **Awards** pane tracks **DXCC**, **WAS**, **WAZ**, **WPX**, **WAC**, **ITU zones**, **VUCC** (grids on 6 m and up), **IOTA** and **US counties**, with the **DXCC Challenge** and **5BDXCC** (counted band by band, 100 needed on each of 80, 40, 20, 15 and 10 m), plus the CW club awards below. Each row shows Mixed, CW, Phone and Digital plus every band from 160 m to 70 cm, a green **C** for confirmed and an amber **W** for worked. You choose what counts as confirmed (LoTW, cards, eQSL), can limit it to one callsign, hide what is already confirmed, and click a row to see its QSOs in the log. An optional **V** (verified) marks DXCC cells where LoTW has granted award credit; turn it on in **Settings → Awards** and run **Download verified credit** once on the LoTW page. When LoTW confirms a QSO, its DXCC entity replaces the one stored or taken from the country file. The QSO panel shows what the call you are typing would be worth for each award, and a download of confirmations lists what it newly confirmed (see [QSL and online services](#qsl-and-online-services)).
+The **Awards** pane tracks **DXCC**, **WAS**, **WAZ**, **WPX**, **WAC**, **ITU zones**, **VUCC** (grids on 6 m and up), **IOTA**, **US counties** and the **CQ DX Marathon**, with the **DXCC Challenge**, **5BDXCC** (counted band by band, 100 needed on each of 80, 40, 20, 15 and 10 m), the **Honor Roll**, **5BWAS**, **Triple Play** and **5BWAZ**, plus the CW club awards below. Each row shows Mixed, CW, Phone and Digital plus every band from 160 m to 70 cm (60 m included, and the columns you don't chase can be hidden), a green **C** for confirmed and an amber **W** for worked. You choose what counts as confirmed (LoTW, cards, eQSL), can limit it to one callsign, hide what is already confirmed, and click a row to see its QSOs in the log. An optional **V** (verified) marks DXCC cells where LoTW has granted award credit; turn it on in **Settings → Awards** and run **Download verified credit** once on the LoTW page. When LoTW confirms a QSO, its DXCC entity replaces the one stored or taken from the country file. The QSO panel shows what the call you are typing would be worth for each award, and a download of confirmations lists what it newly confirmed (see [QSL and online services](#qsl-and-online-services)).
 
 ![Awards](docs/screenshots/awards.png)
 
-Awards you don't chase can be switched off in **Settings → Awards**. They disappear from the pane and from the award lines in the QSO panel, your log is untouched, and ticking one again brings it back as it was. Any award added in a later version starts switched on.
+The **Marathon** button counts the countries and CQ zones worked in one calendar year, for all modes together or for CW, Phone or Digital alone. Deleted entities that come in with an imported log are counted and marked.
+
+![DX Marathon](docs/screenshots/awards-marathon.png)
+
+Awards you don't chase can be switched off in **Settings → Awards**. They disappear from the pane and from the award lines in the QSO panel, your log is untouched, and ticking one again brings it back as it was. Any award added in a later version starts switched on. **Spot flags** on the same page choose which awards, bands and modes make a cluster spot count as needed.
 
 ![Settings, Awards](docs/screenshots/settings-awards.png)
 
@@ -245,6 +258,12 @@ The **SKCC**, **CWops**, **NAQCC** and **FISTS** buttons count from the club num
 | --- | --- |
 | ![SKCC](docs/screenshots/awards-skcc.png) | ![CWops](docs/screenshots/awards-cwops.png) |
 | ![NAQCC](docs/screenshots/awards-naqcc.png) | ![FISTS](docs/screenshots/awards-fists.png) |
+
+## Alerts on your phone
+
+QRZero can send its alerts to your phone or another computer through **ntfy**, a free push service with no account needed: a needed station on the cluster, a watch list hit or a DXpedition you still need. Turn it on in **Settings → Alerts**, subscribe to the topic QRZero makes up in the ntfy app, and click **Send test**. Alerts go out only while QRZero is running and connected to the cluster.
+
+![Alerts settings](docs/screenshots/settings-alerts.png)
 
 ## QSL and online services
 
@@ -304,17 +323,17 @@ For everything QRZero does not know by name (an antenna switch, a band decoder, 
 
 ## Arranging the window
 
-Everything is a pane: New QSO, Station, Worked before, Map, Log, FTx monitor, Cluster, Needed now, Awards, Band map, Watch list, DXpeditions, Contests, Propagation, Rotator, Notes and MyClubs. Some start as tabs behind others (Needed now beside Cluster, Contests beside DXpeditions); open or hide any of them from the **Layout** menu. Drag a tab to dock a pane beside another or stack it as a tab, drag the bars to resize, hide panes you don't use, and pop any pane except New QSO and the Log out to its own window for a second screen (in the desktop app a pop-out can be kept **Always on top**). Save arrangements by name (a laptop layout, a two-screen shack layout, an FT8 evening) and switch between them; **Lock panes** stops accidents. Layouts live in the log database, so they survive restarts and come back with a restored backup.
+Everything is a pane: New QSO, Station, Worked before, DXCC slots, Map, Log, FTx monitor, Cluster, Needed now, Awards, Band map, Watch list, DXpeditions, Contests, Propagation, Rotator, Spotted me, Notes and MyClubs. Some start as tabs behind others (Needed now beside Cluster, Contests beside DXpeditions); open or hide any of them from the **Layout** menu. Drag a tab to dock a pane beside another or stack it as a tab, drag the bars to resize, hide panes you don't use, and pop any pane except New QSO and the Log out to its own window for a second screen (in the desktop app a pop-out can be kept **Always on top**). Save arrangements by name (a laptop layout, a two-screen shack layout, an FT8 evening) and switch between them; **Lock panes** stops accidents. Layouts live in the log database, so they survive restarts and come back with a restored backup.
 
 | | |
 | --- | --- |
 | ![Layout menu](docs/screenshots/layout-menu.png) | ![Dark mode](docs/screenshots/main-window-dark.png) |
 
-Colours can follow Windows or be always light or dark, and text size runs from 11 to 18 px.
+The main window and every pop-out reopen at the size and place you left them, maximized if that is how you closed them. In the desktop app QRZero draws its own title bar; untick **Frameless windows** in **Settings → General** to get the system frame back. Colours can follow Windows or be always light or dark, and text size runs from 11 to 18 px.
 
 ## Settings, keyboard shortcuts and backups
 
-**Settings** (☰ menu) opens on **General** and groups its sections down the left: Program (General, Backups, Keyboard), Station (Callsigns, Locations, Equipment, Logs), Logging (Entry fields, Callsign lookup, Awards) and Connections (Radios and programs, UDP connections, DX cluster, Startup programs).
+**Settings** (☰ menu) opens on **General** and groups its sections down the left: Program (General, Backups, Keyboard), Station (Callsigns, Locations, Equipment, Logs), Logging (Entry fields, Modes, Callsign lookup, Awards) and Connections (Radios and programs, UDP connections, DX cluster, Alerts, Startup programs).
 
 ![Settings General](docs/screenshots/settings-general.png)
 
@@ -363,6 +382,7 @@ The full user guide is in [docs/user](docs/user/01-getting-started.md) and is bu
 17. [DXpeditions](docs/user/17-dxpeditions.md)
 18. [Contests](docs/user/18-contests.md)
 19. [Statistics](docs/user/19-statistics.md)
+20. [Push alerts (ntfy)](docs/user/20-alerts.md)
 
 | | |
 | --- | --- |
@@ -420,7 +440,7 @@ Pushing a tag builds the Windows, macOS and Linux packages and attaches them to 
 
 ## Status
 
-QRZero is in active development and its versions are alpha releases. Most integrations are built from the protocol documentation and checked against stand-ins in the test suite. The Mac build has only been built and tested in CI so far, not on a real Mac. Real-station testing so far covers WSJT-X, N1MM Logger+, AetherSDR over TCI and a WRC rotator controller over GS-232; the rest (Hamlib, serial CAT, CI-V, the other online services, QL-700 label printing, the contest calendar and the NAQCC and FISTS award rules) is less proven, so reports and bug reports are welcome. Keep your own ADIF export and the automatic backups until you trust it.
+QRZero is in active development and its versions are alpha releases. Most integrations are built from the protocol documentation and checked against stand-ins in the test suite. The Mac build is built and tested in CI and has been started on an Apple Silicon Mac, but has had little everyday use. Real-station testing so far covers WSJT-X, N1MM Logger+, AetherSDR over TCI, a WRC rotator controller over GS-232 (including turning from the map), split spots, pop-out windows and Club Log bulk upload; the rest (Hamlib, serial CAT, CI-V, the other online services, QL-700 label printing, the contest calendar and the NAQCC and FISTS award rules) is less proven, so reports and bug reports are welcome. Keep your own ADIF export and the automatic backups until you trust it.
 
 ## License
 
