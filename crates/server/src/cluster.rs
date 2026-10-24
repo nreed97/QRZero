@@ -92,7 +92,29 @@ impl Cluster {
         if auto {
             c.connect();
         }
+        c.watch_log(hub);
         c
+    }
+
+    /// Flags the kept spots again whenever a QSO is added, so a spot for a station just
+    /// logged stops showing what that QSO covered. The spots themselves stay.
+    fn watch_log(self: &Arc<Self>, hub: &Arc<Hub>) {
+        if tokio::runtime::Handle::try_current().is_err() {
+            return;
+        }
+        let (_, mut rx) = hub.subscribe();
+        let me = Arc::downgrade(self);
+        tokio::spawn(async move {
+            loop {
+                match rx.recv().await {
+                    Ok(m) if m.contains("\"qso_noted\"") => {}
+                    Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(_) => break,
+                }
+                let Some(c) = me.upgrade() else { break };
+                let _ = tokio::task::spawn_blocking(move || c.reflag()).await;
+            }
+        });
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, Inner> {
@@ -106,11 +128,15 @@ impl Cluster {
         let spots: Vec<SpotInfo> = self.lock().spots.iter().cloned().collect();
         let flags: HashMap<u64, _> = spots
             .iter()
-            .map(|s| (s.seq, hub.spot_needs(&s.call, s.entity.as_ref(), s.band.as_deref(), &s.mode, &s.comment)))
+            .map(|s| {
+                let mode = Some(s.mode.as_str()).filter(|m| !m.is_empty());
+                let needed = hub.needed(&s.call, s.entity.as_ref().and_then(|e| e.dxcc), s.band.as_deref(), mode);
+                (s.seq, (needed, hub.spot_needs(&s.call, s.entity.as_ref(), s.band.as_deref(), &s.mode, &s.comment)))
+            })
             .collect();
         for s in self.lock().spots.iter_mut() {
-            if let Some((goals, marathon)) = flags.get(&s.seq) {
-                (s.goals, s.marathon) = (goals.clone(), *marathon);
+            if let Some((needed, (goals, marathon))) = flags.get(&s.seq) {
+                (s.needed, s.goals, s.marathon) = (*needed, goals.clone(), *marathon);
             }
         }
         hub.emit(json!({"type": "spots_reflagged"}));
