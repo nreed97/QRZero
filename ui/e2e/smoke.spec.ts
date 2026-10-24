@@ -542,7 +542,11 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
 
   // OQRS: mark from the right-click menu, then see it in the editor.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click({ button: "right" });
-  await page.getByRole("menuitem", { name: /Mark OQRS requested/ }).click();
+  // The editor reads the QSO when it opens, so let the mark finish first.
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes("/api/qsos/mark") && r.request().method() === "POST"),
+    page.getByRole("menuitem", { name: /Mark OQRS requested/ }).click(),
+  ]);
   const oqrsWin = await openEditorWindow(page, "K1ABC");
   const oqrs = oqrsWin.locator(".qso-editor");
   await expect(oqrs.getByLabel("Club Log OQRS")).toHaveValue("Y");
