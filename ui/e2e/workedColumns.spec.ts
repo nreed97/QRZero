@@ -24,15 +24,24 @@ async function setup(page: Page) {
   await wizard.getByRole("button", { name: "Start logging" }).click();
 }
 
+// Earlier specs share this server's saved layout, so Worked before may sit behind another tab.
+async function showWorked(page: Page) {
+  const tab = page.getByRole("tab", { name: "Worked before", exact: true });
+  if (await tab.count()) await tab.click();
+}
+
 test("Worked before columns can be moved, resized and hidden, and are remembered", async ({ page }) => {
   await page.route("**/api/logs/*/qsos/search", (r) => r.fulfill({ json: { total: rows.length, rows } }));
   await page.goto("/?token=e2e");
   await setup(page);
   await page.getByRole("tab", { name: "Log", exact: true }).click();
   await page.getByTestId("call").fill("K1ABC");
+  await showWorked(page);
   const pane = page.locator(".worked-pane");
   const heads = pane.locator("th.col-head");
   await expect(heads.nth(0)).toHaveText("Date", { timeout: 5000 });
+  // The drag needs the third header on screen, not just the first.
+  await expect(heads.nth(2)).toBeVisible();
 
   // Drag Band onto the left half of Date.
   const from = (await heads.nth(2).boundingBox())!;
@@ -63,6 +72,7 @@ test("Worked before columns can be moved, resized and hidden, and are remembered
   await setup(page);
   await page.getByRole("tab", { name: "Log", exact: true }).click();
   await page.getByTestId("call").fill("K1ABC");
+  await showWorked(page);
   await expect(heads.nth(0)).toHaveText("Band");
   await expect(pane.locator("th.col-head", { hasText: "Name" })).toHaveCount(0);
   await pane.getByRole("button", { name: "Columns", exact: true }).click();
