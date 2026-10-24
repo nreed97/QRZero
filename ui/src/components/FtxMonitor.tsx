@@ -156,8 +156,10 @@ export default function FtxMonitor({ onPick, mycall }: { onPick: (p: DecodePick)
   const label = (i: FtxInstance) => (instances.some((o) => o !== i && o.source === i.source) ? `${i.source} (${i.id})` : i.source);
 
   useEffect(() => {
-    api.ftx().then((r) => setDecodes(r.decodes.slice(-KEEP).reduce(insertByTime, [] as FtxDecode[]))).catch(() => {});
+    const load = () => api.ftx().then((r) => setDecodes(r.decodes.slice(-KEEP).reduce(insertByTime, [] as FtxDecode[]))).catch(() => {});
+    load();
     return onLive((e) => {
+      if (e.type === "decodes_reflagged") load();
       if (e.type === "decode" || e.type === "ftx_tx") setDecodes((list) => insertByTime(list, e.decode).slice(0, KEEP));
       if (e.type === "ftx_clear") setDecodes((list) => list.filter((d) => d.instance !== e.instance));
     });

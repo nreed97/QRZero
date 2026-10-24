@@ -634,6 +634,10 @@ impl Hub {
             changes
         };
         if log_changed {
+            // The old log's index must not flag anything for the new one while it is counted.
+            self.lock().worked = None;
+            self.reflag_decodes();
+            self.emit(json!({"type": "qso_noted"}));
             self.rebuild_worked();
         }
         if loc_changed {
@@ -660,20 +664,41 @@ impl Hub {
         let Some(log_id) = self.lock().active.log_id else { return };
         let hub = self.clone();
         let cty = hub.cty.read().unwrap_or_else(|p| p.into_inner()).clone();
-        tokio::task::spawn_blocking(move || match hub.with_store(|st| st.worked_index(log_id, |call| cty.as_ref()?.lookup(call)?.dxcc)) {
-            Ok(idx) => {
-                let mut inner = hub.lock();
-                if inner.active.log_id == Some(log_id) {
-                    inner.worked = Some((log_id, idx));
+        tokio::task::spawn_blocking(move || {
+            match hub.with_store(|st| st.worked_index(log_id, |call| cty.as_ref()?.lookup(call)?.dxcc)) {
+                Ok(idx) => {
+                    let mut inner = hub.lock();
+                    if inner.active.log_id == Some(log_id) {
+                        inner.worked = Some((log_id, idx));
+                    }
                 }
+                Err(e) => tracing::warn!("worked index: {e}"),
             }
-            Err(e) => tracing::warn!("worked index: {e}"),
+            if let Err(e) = hub.build_award_cells(log_id) {
+                tracing::warn!("award index: {e}");
+            }
+            if hub.lock().goals.marathon {
+                hub.build_marathon();
+            }
+            // Spots and decodes were flagged against the log as it was: flag them again.
+            hub.reflag_decodes();
+            hub.emit(json!({"type": "qso_noted"}));
         });
-        self.refresh_awards();
-        if self.lock().goals.marathon {
-            let hub = self.clone();
-            tokio::task::spawn_blocking(move || hub.build_marathon());
+    }
+
+    /// Flags the listed FTx decodes again against the active log, and tells the UI to reload them.
+    fn reflag_decodes(&self) {
+        {
+            let mut inner = self.lock();
+            let Inner { decodes, worked, .. } = &mut *inner;
+            for d in decodes.iter_mut() {
+                d.needed = match (worked.as_ref(), &d.call) {
+                    (Some((_, idx)), Some(call)) => Some(idx.needed_in(call, d.entity.as_ref().and_then(|e| e.dxcc), d.band.as_deref(), Some(&d.mode), d.grid.as_deref())),
+                    _ => None,
+                };
+            }
         }
+        self.emit(json!({"type": "decodes_reflagged"}));
     }
 
     /// Recounts the active log's award cells in the background, after QSL

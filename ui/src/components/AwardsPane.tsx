@@ -94,6 +94,11 @@ export default function AwardsPane({ logId, callsigns, onShowQsos }: { logId: nu
     localSet("qrzero.awards", next);
   };
 
+  // Another log may not have the callsign this pane was narrowed to: show all of that log's calls.
+  useEffect(() => {
+    if (opts.call && callsigns.length > 0 && !callsigns.some((c) => c.callsign === opts.call)) set({ call: "" });
+  }, [callsigns]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (none || !isTable(current)) return;
     const kind = current;
