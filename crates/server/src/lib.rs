@@ -260,6 +260,7 @@ fn router(state: Shared, loopback_only: bool) -> Router {
         .route("/callsigns/{id}", axum::routing::delete(delete_callsign))
         .route("/callsigns/{id}/default", post(default_callsign))
         .route("/callsigns/{id}/archive", post(archive_callsign))
+        .route("/callsigns/{id}/move", post(move_callsign))
         .route("/logs/{id}/locations", get(list_locations).post(create_location))
         .route("/locations/{id}", put(update_location).delete(delete_location))
         .route("/locations/{id}/default", post(default_location))
@@ -514,6 +515,27 @@ struct ArchiveBody {
 
 async fn archive_callsign(State(s): State<Shared>, Path(id): Path<i64>, Json(b): Json<ArchiveBody>) -> ApiResult<()> {
     db(&s, move |st| st.set_callsign_archived(id, b.archived)).await.map(Json)
+}
+
+#[derive(Deserialize)]
+struct MoveCallsignBody {
+    /// Existing log to move into; when absent, a log named `new_log` is created.
+    log_id: Option<i64>,
+    new_log: Option<String>,
+}
+
+/// Moves a callsign and its QSOs to another log; answers how many QSOs moved.
+async fn move_callsign(State(s): State<Shared>, Path(id): Path<i64>, Json(b): Json<MoveCallsignBody>) -> ApiResult<usize> {
+    db(&s, move |st| {
+        let target = match (b.log_id, b.new_log) {
+            (Some(t), _) => t,
+            (None, Some(name)) => st.create_log(&name)?.id,
+            (None, None) => return Err(qrzero_core::Error::Invalid("choose a log".into())),
+        };
+        st.move_callsign(id, target)
+    })
+    .await
+    .map(Json)
 }
 
 async fn default_callsign(State(s): State<Shared>, Path(id): Path<i64>) -> ApiResult<()> {

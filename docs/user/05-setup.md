@@ -31,6 +31,8 @@ Each log can hold several callsigns, for example your current call and the calls
 
 **Archive** a callsign you no longer hold. An archived call is no longer offered in the top bar, the QSO editor or the QSL pages, and nothing is uploaded under it automatically, but every QSO logged with it stays in the log, and its awards and confirmations still count. It also stays in the Awards and Export lists, so you can still pick it there. Tick **Show archived** under the list to see archived calls, and **Unarchive** brings one back. Archiving the default callsign passes the default to the next one in use. **Remove** is different: it only forgets the call in this list, so use Archive to retire one.
 
+**Move to log...** sends a callsign and all the QSOs logged under it to another log, or to a new log it creates for you (named after the call by default). Use it when a call was imported into the wrong log, for example a club call that should have its own. The call leaves this log's list and joins the other log's. Awards, Worked before and the log grid are per log, so the moved QSOs stop counting in this log.
+
 ## Locations
 
 A location is somewhere you operate from: home, a holiday QTH, a park. Locations (and the equipment under them) are shared by every log. Each has a name and the details that describe it:

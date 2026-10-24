@@ -51,6 +51,7 @@ export const api = {
   callsigns: (logId: number) => json<StationCallsign[]>("GET", `/logs/${logId}/callsigns`),
   addCallsign: (logId: number, callsign: string) => json<StationCallsign>("POST", `/logs/${logId}/callsigns`, { callsign }),
   deleteCallsign: (id: number) => json<null>("DELETE", `/callsigns/${id}`),
+  moveCallsign: (id: number, target: { log_id: number } | { new_log: string }) => json<number>("POST", `/callsigns/${id}/move`, target),
   archiveCallsign: (id: number, archived: boolean) => json<null>("POST", `/callsigns/${id}/archive`, { archived }),
   defaultCallsign: (id: number) => json<null>("POST", `/callsigns/${id}/default`),
 
