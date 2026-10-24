@@ -27,7 +27,7 @@
 <div class="hero">
 <div class="readout">14.0250 MHz &nbsp;CW &nbsp;599</div>
 <h1>The logger that <em>keeps up</em> with the pileup.</h1>
-<p class="lead">QRZero is a fast, reliable logbook for DX chasers and CW operators. It talks to your radio, WSJT-X, N1MM+ and the cluster, watches your awards as you log, and sends your QSLs on their way.</p>
+<p class="lead">QRZero is a fast, reliable logbook for DX chasers and CW operators. It talks to your radio, WSJT-X, N1MM+ and the cluster, watches your awards as you log, tells your phone when a needed station is spotted, and sends your QSLs on their way.</p>
 <div class="cta"><a class="btn" href="download.html">Download <span data-version></span></a><a class="btn ghost" href="guide.html">How to use it</a></div>
 <div class="sub">Windows &middot; macOS (Apple Silicon) &middot; Linux &middot; free &middot; alpha</div>
 <figure class="shot">
@@ -48,7 +48,7 @@
 <div class="card"><h3>Local first</h3><p>Your log lives on your computer. QRZero only goes online for services you switch on. Passwords go in the system keychain, never in the log file.</p></div>
 <div class="card"><h3>DX chaser friendly</h3><p>A <b>Needed now</b> list with sound and popup alerts, split-aware spots, band-by-mode slot grids and new-one flags the moment you type a call.</p></div>
 <div class="card"><h3>Know your log</h3><p>A Statistics window sums up DXCC progress by year, confirmation rates for every service and your most worked entities and calls, on demand and with nothing running in the background.</p></div>
-<div class="card"><h3>Your window, your way</h3><p>Dock, tab, resize and pop out any pane, save named layouts for each shack setup, and remap every key. Search the settings instead of hunting for them.</p></div>
+<div class="card"><h3>Your window, your way</h3><p>Dock, tab, resize and pop out any pane, save named layouts for each shack setup, and remap every key. Windows reopen where you left them. Search the settings instead of hunting for them.</p></div>
 <div class="card"><h3>Open in a browser</h3><p>The same screens run in any web browser, so a second computer in the shack can use your log. UDP connections feed anything else.</p></div>
 <div class="card"><h3>Plain and classic</h3><p>A dense desktop-logger layout. No account, no cloud, no wizard to fight. Light and dark themes.</p></div>
 </div>
@@ -67,8 +67,8 @@
 <p class="intro">A few of the things QRZero does. The <a href="guide.html">how-to guide</a> covers the rest.</p>
 
 <div class="feature">
-<div class="text"><div class="tag">Logging</div><h3>Type the call. The rest fills itself.</h3><p>Press Tab or Space and QRZero looks the call up and fills in name, QTH, grid, country and DXCC. Press Enter to log. Anything you type wins over a lookup.</p><ul><li>Station pane shows what the contact is worth for each award</li><li>Worked-before list with duplicate markers and quick filters</li><li>Entry fields are yours: add, rename or give defaults to any ADIF field</li></ul></div>
-<div class="pic"><img src="img/station-panel.webp" alt="Station pane showing a new DXCC" loading="lazy" width="314" height="455"></div>
+<div class="text"><div class="tag">Logging</div><h3>Type the call. The rest fills itself.</h3><p>Press Tab or Space and QRZero looks the call up and fills in name, QTH, grid, country and DXCC. Press Enter to log. Anything you type wins over a lookup.</p><ul><li>Station pane shows what the contact is worth for each award</li><li>Worked-before list with duplicate markers and quick filters</li><li>Entry fields and the mode list are yours: add, rename or give defaults to any ADIF field or ADIF mode</li><li>Bulk edit sets one field on many QSOs at once</li></ul></div>
+<div class="pic"><img src="img/station-panel.webp" alt="Station pane showing a new DXCC" loading="lazy" width="314" height="453"></div>
 </div>
 <div class="feature flip">
 <div class="text"><div class="tag">Radio control</div><h3>Your radio follows the log, and the log follows your radio.</h3><p>Frequency, mode, split and PTT are read from the rig and can be set from the log. Clicking a spot or a decode tunes the radio, including split for <code>UP 5</code> style spots.</p><ul><li>Hamlib, TCI, Kenwood/Elecraft/Flex CAT, Yaesu and Icom CI-V</li><li>Several radios for SO2R and Flex slices</li><li>Rotator control with a compass dial and a map behind it</li></ul></div>
@@ -79,12 +79,12 @@
 <div class="pic"><img src="img/ftx-monitor.webp" alt="FTx monitor with decodes" loading="lazy" width="1600" height="400"></div>
 </div>
 <div class="feature flip">
-<div class="text"><div class="tag">DX cluster</div><h3>Spots, a band map and a watch list.</h3><p>Connect to a cluster, filter what you see, and let QRZero flag the spots that would be new for you. The band map and watch list keep the interesting ones in front of you.</p><ul><li>Click a spot to QSY the radio</li><li>Spot a station you just worked, with a preview of the exact line sent</li><li>Needed now ranks new entities by Club Log's Most Wanted list</li><li>DXpeditions, contest calendar and propagation panes</li></ul></div>
-<div class="pic"><img src="img/cluster.webp" alt="DX cluster pane" loading="lazy" width="1600" height="410"></div>
+<div class="text"><div class="tag">DX cluster</div><h3>Spots, a band map and a watch list.</h3><p>Connect to a cluster, filter what you see, and let QRZero flag the spots that would be new for you. The band map and watch list keep the interesting ones in front of you.</p><ul><li>Click a spot to QSY the radio</li><li>Spot a station you just worked, with a preview of the exact line sent</li><li>Needed now ranks new entities by Club Log's Most Wanted list</li><li>A Spotted me list shows who is hearing you</li><li>Alerts for needed stations can go to your phone through ntfy</li><li>DXpeditions, contest calendar and propagation panes</li></ul></div>
+<div class="pic"><img src="img/cluster.webp" alt="DX cluster pane" loading="lazy" width="1600" height="203"></div>
 </div>
 <div class="feature">
-<div class="text"><div class="tag">Awards</div><h3>Watch your awards fill in as you log.</h3><p>DXCC, WAS, WAZ, WPX and more, plus the CW club awards: SKCC, CWops, NAQCC and FISTS, with CWT medals. QRZero shows what is worked, confirmed and, for DXCC, verified by LoTW.</p><ul><li>Band-by-mode slot grids, DXCC Challenge and 5BDXCC</li><li>Club numbers filled from your last QSO with the call</li><li>Hide the awards you do not chase</li></ul></div>
-<div class="pic"><img src="img/awards.webp" alt="Awards pane" loading="lazy" width="1600" height="503"></div>
+<div class="text"><div class="tag">Awards</div><h3>Watch your awards fill in as you log.</h3><p>DXCC, WAS, WAZ, WPX and more, the CQ DX Marathon, and the CW club awards: SKCC, CWops, NAQCC and FISTS, with CWT medals. QRZero shows what is worked, confirmed and, for DXCC, verified by LoTW.</p><ul><li>Band-by-mode slot grids, DXCC Challenge, 5BDXCC, Honor Roll, 5BWAS, Triple Play and 5BWAZ</li><li>Club numbers filled from your last QSO with the call</li><li>Hide the awards you do not chase</li></ul></div>
+<div class="pic"><img src="img/awards.webp" alt="Awards pane" loading="lazy" width="1600" height="501"></div>
 </div>
 <div class="feature flip">
 <div class="text"><div class="tag">QSLs</div><h3>LoTW, Club Log, QRZ.com, eQSL and paper in one window.</h3><p>Uploads can run automatically a couple of minutes after you log, or in bulk by date range with a preview. Confirmations download back. Paper QSL has a queue and label printing.</p><ul><li>Bulk paper QSL mailings and Brother QL label printing</li><li>LoTW station location override for portable operating</li><li>Per-service activity logs</li></ul></div>
