@@ -427,25 +427,3 @@ fn bulk_edit_sets_and_clears_optional_fields() {
     assert!(st.bulk_edit(log, &filter, &f(&[("QSL_SENT", "Y")]), &[], false).is_err());
     assert!(st.bulk_edit(log, &filter, &Fields::new(), &[], false).is_err());
 }
-
-#[test]
-fn move_callsign_takes_its_qsos_to_another_log() {
-    let (mut st, log) = setup();
-    let other = st.create_log("Club").unwrap().id;
-    let home = st.add_callsign(log, "W0NY").unwrap();
-    let club = st.add_callsign(log, "W1QBL").unwrap();
-    for (call, mine) in [("K1AA", "W0NY"), ("K2BB", "W1QBL"), ("K3CC", "W1QBL")] {
-        st.insert_qso(log, None, &f(&[("CALL", call), ("STATION_CALLSIGN", mine), ("QSO_DATE", "20240101"), ("TIME_ON", "1200"), ("FREQ", "14.025"), ("MODE", "CW")]))
-            .unwrap();
-    }
-    assert_eq!(st.move_callsign(club.id, other).unwrap(), 2);
-    let logs = st.list_logs().unwrap();
-    assert_eq!(logs.iter().find(|l| l.id == log).unwrap().qso_count, 1);
-    assert_eq!(logs.iter().find(|l| l.id == other).unwrap().qso_count, 2);
-    let moved = st.list_callsigns(other).unwrap();
-    assert_eq!(moved.len(), 1);
-    assert!(moved[0].is_default);
-    let left = st.list_callsigns(log).unwrap();
-    assert_eq!(left.len(), 1);
-    assert_eq!(left[0].id, home.id);
-}

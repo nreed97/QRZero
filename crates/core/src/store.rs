@@ -383,51 +383,6 @@ impl Store {
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
 
-    /// Moves a callsign and every QSO logged under it to another log (`log_id` of the target).
-    /// If the target already lists the callsign, the entries are merged. Returns the QSOs moved.
-    pub fn move_callsign(&mut self, id: i64, target: i64) -> Result<usize> {
-        let tx = self.conn.transaction()?;
-        let (log_id, callsign, was_default, archived): (i64, String, bool, bool) = tx
-            .query_row(
-                "SELECT log_id, callsign, is_default, archived FROM station_callsigns WHERE id = ?1",
-                [id],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
-            )
-            .optional()?
-            .ok_or_else(|| Error::NotFound(format!("callsign {id}")))?;
-        if log_id == target {
-            return Ok(0);
-        }
-        let known: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM logs WHERE id = ?1)", [target], |r| r.get(0))?;
-        if !known {
-            return Err(Error::NotFound(format!("log {target}")));
-        }
-        let moved = tx.execute(
-            "UPDATE qsos SET log_id = ?1 WHERE log_id = ?2 AND station_callsign = ?3",
-            params![target, log_id, callsign],
-        )?;
-        tx.execute("DELETE FROM station_callsigns WHERE id = ?1", [id])?;
-        let has_default: bool = tx.query_row(
-            "SELECT EXISTS(SELECT 1 FROM station_callsigns WHERE log_id = ?1 AND is_default = 1)",
-            [target],
-            |r| r.get(0),
-        )?;
-        tx.execute(
-            "INSERT INTO station_callsigns (log_id, callsign, is_default, archived) VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT (log_id, callsign) DO NOTHING",
-            params![target, callsign, !has_default && !archived, archived],
-        )?;
-        if was_default {
-            tx.execute(
-                "UPDATE station_callsigns SET is_default = 1 WHERE id = (
-                     SELECT id FROM station_callsigns WHERE log_id = ?1 AND archived = 0 ORDER BY callsign LIMIT 1)",
-                [log_id],
-            )?;
-        }
-        tx.commit()?;
-        Ok(moved)
-    }
-
     pub fn delete_callsign(&self, id: i64) -> Result<()> {
         self.expect_changed(
             self.conn.execute("DELETE FROM station_callsigns WHERE id = ?1", [id])?,

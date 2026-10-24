@@ -202,17 +202,14 @@ export default function SettingsDialog(props: Props) {
 
 type Guard = (fn: () => Promise<unknown>) => () => Promise<void>;
 
-function StationTab({ logId, logs, callsigns, guard }: Props & { guard: Guard }) {
+function StationTab({ logId, callsigns, guard }: Props & { guard: Guard }) {
   const [call, setCall] = useState("");
   const [showArchived, setShowArchived] = useState(false);
-  const [moving, setMoving] = useState<number | null>(null);
-  const [target, setTarget] = useState("new");
-  const [newLog, setNewLog] = useState("");
   const archivedCount = callsigns.filter((c) => c.archived).length;
   const shown = callsigns.filter((c) => showArchived || !c.archived);
   return (
     <div>
-      <p className="muted">Callsigns you operate under in this log. Add your old calls too, so imported QSOs are labelled correctly. Archive a call you no longer hold: it is no longer offered for new QSOs or uploaded, and its QSOs, awards and confirmations stay as they are. Move to log... takes a call and its QSOs out of this log into another one (see the Logs tab).</p>
+      <p className="muted">Callsigns you operate under in this log. Add your old calls too, so imported QSOs are labelled correctly. Archive a call you no longer hold: it is no longer offered for new QSOs or uploaded, and its QSOs, awards and confirmations stay as they are.</p>
       <table className="list">
         <tbody>
           {shown.map((c) => (
@@ -224,35 +221,11 @@ function StationTab({ logId, logs, callsigns, guard }: Props & { guard: Guard })
                   : <button onClick={guard(() => api.defaultCallsign(c.id))}>Make default</button>}
               </td>
               <td><button onClick={guard(() => api.archiveCallsign(c.id, !c.archived))}>{c.archived ? "Unarchive" : "Archive"}</button></td>
-              <td><button onClick={() => { setMoving(c.id); setNewLog(c.callsign); }}>Move to log...</button></td>
               <td><button className="danger" onClick={guard(() => api.deleteCallsign(c.id))}>Remove</button></td>
             </tr>
           ))}
         </tbody>
       </table>
-      {moving !== null && (() => {
-        const c = callsigns.find((x) => x.id === moving);
-        if (!c) return null;
-        const others = logs.filter((l) => l.id !== logId);
-        return (
-          <div className="row">
-            <label className="f"><span>Move {c.callsign} and its QSOs to</span>
-              <select value={target} onChange={(e) => setTarget(e.target.value)}>
-                <option value="new">A new log</option>
-                {others.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-              </select>
-            </label>
-            {target === "new" && <label className="f"><span>New log name</span><input value={newLog} onChange={(e) => setNewLog(e.target.value.toUpperCase())} /></label>}
-            <div className="actions">
-              <button disabled={target === "new" && !newLog.trim()} onClick={guard(async () => {
-                await api.moveCallsign(c.id, target === "new" ? { new_log: newLog } : { log_id: Number(target) });
-                setMoving(null);
-              })}>Move</button>
-              <button onClick={() => setMoving(null)}>Cancel</button>
-            </div>
-          </div>
-        );
-      })()}
       {archivedCount > 0 && (
         <label className="check"><input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> Show archived ({archivedCount})</label>
       )}
