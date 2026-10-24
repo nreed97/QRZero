@@ -269,6 +269,7 @@ fn router(state: Shared, loopback_only: bool) -> Router {
         .route("/qsos/delete", post(delete_qsos))
         .route("/qsos/mark", post(mark_qsos))
         .route("/logs/{id}/qsos/bulk", post(bulk_edit_qsos))
+        .route("/logs/{id}/qsos/move", post(move_qsos))
         .route("/label/printers", get(label_printers))
         .route("/label/print", post(label_print))
         .route("/qsos/lookup", post(lookup_qsos))
@@ -745,6 +746,32 @@ async fn bulk_edit_qsos(State(s): State<Shared>, Path(id): Path<i64>, Json(b): J
     let dry = b.dry_run;
     let n = db(&s, move |st| st.bulk_edit(id, &b.filter, &b.set, &b.clear, b.dry_run)).await?;
     if !dry && n > 0 {
+        s.hub.refresh_awards();
+        s.hub.emit(json!({"type": "qso_logged", "log_id": null, "call": "", "source": "bulk", "added": false}));
+    }
+    Ok(Json(n))
+}
+
+#[derive(Deserialize)]
+struct MoveQsosBody {
+    filter: QsoFilter,
+    /// Existing log to move into; when absent, a log named `new_log` is created.
+    log_id: Option<i64>,
+    new_log: Option<String>,
+}
+
+/// Moves the QSOs matching a filter into another log (or a new one), all or nothing.
+async fn move_qsos(State(s): State<Shared>, Path(id): Path<i64>, Json(b): Json<MoveQsosBody>) -> ApiResult<usize> {
+    let n = db(&s, move |st| {
+        let target = match (b.log_id, b.new_log.as_deref().map(str::trim).filter(|n| !n.is_empty())) {
+            (Some(t), _) => t,
+            (None, Some(name)) => st.create_log(name)?.id,
+            (None, None) => return Err(qrzero_core::Error::Invalid("choose a log".into())),
+        };
+        st.move_qsos(id, &b.filter, target)
+    })
+    .await?;
+    if n > 0 {
         s.hub.refresh_awards();
         s.hub.emit(json!({"type": "qso_logged", "log_id": null, "call": "", "source": "bulk", "added": false}));
     }

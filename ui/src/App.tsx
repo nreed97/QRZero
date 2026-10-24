@@ -690,6 +690,7 @@ export default function App() {
         {dialog === "bulk" && (
           <BulkEditDialog
             logId={logId}
+            logs={logs}
             selection={selection}
             gridFilter={filter}
             callsigns={callsigns}

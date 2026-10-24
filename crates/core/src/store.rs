@@ -1023,6 +1023,42 @@ impl Store {
         Ok((total, rows.collect::<std::result::Result<_, _>>()?))
     }
 
+    /// Moves every QSO matching the filter from one log to another, all or nothing. Station
+    /// callsigns the target doesn't list yet are added to it.
+    pub fn move_qsos(&mut self, log_id: i64, filter: &QsoFilter, target: i64) -> Result<usize> {
+        if log_id == target {
+            return Err(Error::Invalid("choose a different log".into()));
+        }
+        let known: bool = self.conn.query_row("SELECT EXISTS(SELECT 1 FROM logs WHERE id = ?1)", [target], |r| r.get(0))?;
+        if !known {
+            return Err(Error::NotFound(format!("log {target}")));
+        }
+        let (where_sql, args) = build_where(log_id, filter);
+        let tx = self.conn.transaction()?;
+        let calls: Vec<String> = {
+            let mut stmt = tx.prepare(&format!("SELECT DISTINCT station_callsign FROM qsos WHERE {where_sql} AND station_callsign IS NOT NULL AND station_callsign <> ''"))?;
+            let rows = stmt.query_map(params_from_iter(args.iter()), |r| r.get(0))?;
+            rows.collect::<rusqlite::Result<_>>()?
+        };
+        let mut all = vec![Value::Integer(target)];
+        all.extend(args);
+        let moved = tx.execute(&format!("UPDATE qsos SET log_id = ? WHERE {where_sql}"), params_from_iter(all.iter()))?;
+        for call in calls {
+            let has_default: bool = tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM station_callsigns WHERE log_id = ?1 AND is_default = 1)",
+                [target],
+                |r| r.get(0),
+            )?;
+            tx.execute(
+                "INSERT INTO station_callsigns (log_id, callsign, is_default) VALUES (?1, ?2, ?3)
+                 ON CONFLICT (log_id, callsign) DO NOTHING",
+                params![target, call, !has_default],
+            )?;
+        }
+        tx.commit()?;
+        Ok(moved)
+    }
+
     pub fn worked_before(&self, log_id: i64, call: &str, dxcc: Option<i64>) -> Result<WorkedBefore> {
         let call = call.trim().to_ascii_uppercase();
         let mut wb = WorkedBefore { dxcc, ..Default::default() };
