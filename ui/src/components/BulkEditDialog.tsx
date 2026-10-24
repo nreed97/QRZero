@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import type { Fields, Location, QsoFilter, StationCallsign } from "../types";
+import type { Fields, Location, Log, QsoFilter, StationCallsign } from "../types";
 import Modal from "./Modal";
 import ScopePicker from "./ScopePicker";
 
 interface Props {
   logId: number;
+  logs: Log[];
   selection: Set<number>;
   gridFilter: QsoFilter;
   callsigns: StationCallsign[];
@@ -26,10 +27,13 @@ const SUGGESTED = [
   "MY_SIG", "MY_SIG_INFO", "MY_POTA_REF", "MY_SOTA_REF", "SIG", "SIG_INFO", "POTA_REF", "SOTA_REF", "SKCC", "PROP_MODE", "SAT_NAME",
 ];
 
-export default function BulkEditDialog({ logId, selection, gridFilter, callsigns, locations, onClose, onDone }: Props) {
+export default function BulkEditDialog({ logId, logs, selection, gridFilter, callsigns, locations, onClose, onDone }: Props) {
   const [filter, setFilter] = useState<QsoFilter>({});
   const [rows, setRows] = useState<Row[]>([{ field: "CONTEST_ID", clear: false, value: "" }]);
   const [count, setCount] = useState<number | null>(null);
+  // "" leaves the QSOs where they are; "new" creates a log.
+  const [moveTo, setMoveTo] = useState("");
+  const [newLog, setNewLog] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -55,13 +59,20 @@ export default function BulkEditDialog({ logId, selection, gridFilter, callsigns
     };
   }, [logId, filter]);
 
+  const moveName = moveTo === "new" ? newLog.trim() : logs.find((l) => String(l.id) === moveTo)?.name ?? "";
+  const moving = moveTo !== "" && !!moveName;
   const run = async () => {
-    const what = [...Object.entries(set).map(([k, v]) => `set ${k} to "${v}"`), ...clear.map((k) => `clear ${k}`)].join(", ");
-    if (!window.confirm(`Edit ${count?.toLocaleString()} QSO${count === 1 ? "" : "s"}: ${what}?\n\nThis can't be undone.`)) return;
+    const what = [
+      ...Object.entries(set).map(([k, v]) => `set ${k} to "${v}"`),
+      ...clear.map((k) => `clear ${k}`),
+      ...(moving ? [`move to the log "${moveName}"`] : []),
+    ].join(", ");
+    if (!window.confirm(`${moving && !active.length ? "Change" : "Edit"} ${count?.toLocaleString()} QSO${count === 1 ? "" : "s"}: ${what}?\n\nThis can't be undone.`)) return;
     setBusy(true);
     setError("");
     try {
-      await api.bulkEdit(logId, filter, set, clear);
+      if (active.length) await api.bulkEdit(logId, filter, set, clear);
+      if (moving) await api.moveQsos(logId, filter, moveTo === "new" ? { new_log: moveName } : { log_id: Number(moveTo) });
       onDone();
       onClose();
     } catch (e) {
@@ -96,11 +107,27 @@ export default function BulkEditDialog({ logId, selection, gridFilter, callsigns
         <p className="muted">Only the fields listed here are written. Call, date, time, band, mode and QSL status fields can't be changed. QSOs already uploaded to QRZ or Club Log are marked for re-upload.</p>
       </fieldset>
 
+      <fieldset>
+        <legend>Move to another log</legend>
+        <div className="row">
+          <label className="f">
+            <span>Log</span>
+            <select value={moveTo} onChange={(e) => setMoveTo(e.target.value)}>
+              <option value="">Leave in this log</option>
+              {logs.filter((l) => l.id !== logId).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+              <option value="new">A new log...</option>
+            </select>
+          </label>
+          {moveTo === "new" && <label className="f"><span>New log name</span><input value={newLog} onChange={(e) => setNewLog(e.target.value)} /></label>}
+        </div>
+        <p className="muted">Moves the QSOs chosen above, with their station callsigns, into that log. Any field changes above are made first.</p>
+      </fieldset>
+
       {error && <p className="err">{error}</p>}
       <div className="buttons">
-        <span className="muted">{count === null ? "Counting…" : `${count.toLocaleString()} QSOs will be edited`}</span>
+        <span className="muted">{count === null ? "Counting…" : `${count.toLocaleString()} QSOs will be ${moving && !active.length ? "moved" : "edited"}`}</span>
         <button onClick={onClose}>Cancel</button>
-        <button className="primary" disabled={busy || !count || !active.length} onClick={run}>{busy ? "Editing…" : "Edit QSOs"}</button>
+        <button className="primary" disabled={busy || !count || !(active.length || moving)} onClick={run}>{busy ? "Working…" : moving && !active.length ? "Move QSOs" : "Edit QSOs"}</button>
       </div>
     </Modal>
   );

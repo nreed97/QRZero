@@ -427,3 +427,23 @@ fn bulk_edit_sets_and_clears_optional_fields() {
     assert!(st.bulk_edit(log, &filter, &f(&[("QSL_SENT", "Y")]), &[], false).is_err());
     assert!(st.bulk_edit(log, &filter, &Fields::new(), &[], false).is_err());
 }
+
+#[test]
+fn move_qsos_takes_the_chosen_qsos_to_another_log() {
+    let (mut st, log) = setup();
+    let other = st.create_log("Club").unwrap().id;
+    for (call, mine) in [("K1AA", "W0NY"), ("K2BB", "W1QBL"), ("K3CC", "W1QBL")] {
+        st.insert_qso(log, None, &f(&[("CALL", call), ("STATION_CALLSIGN", mine), ("QSO_DATE", "20240101"), ("TIME_ON", "1200"), ("FREQ", "14.025"), ("MODE", "CW")]))
+            .unwrap();
+    }
+    let filter = QsoFilter { station_callsigns: vec!["W1QBL".into()], ..Default::default() };
+    assert!(st.move_qsos(log, &filter, log).is_err());
+    assert_eq!(st.move_qsos(log, &filter, other).unwrap(), 2);
+    let logs = st.list_logs().unwrap();
+    assert_eq!(logs.iter().find(|l| l.id == log).unwrap().qso_count, 1);
+    assert_eq!(logs.iter().find(|l| l.id == other).unwrap().qso_count, 2);
+    let calls = st.list_callsigns(other).unwrap();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].callsign, "W1QBL");
+    assert!(calls[0].is_default);
+}
