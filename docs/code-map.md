@@ -14,8 +14,9 @@ Search tip: each Rust module starts with a `//!` doc comment saying what it is, 
 | `src-tauri` | Thin desktop shell (window, installer) around the server. |
 | `ui` | React + Vite front end. The same UI runs in the app and in a browser. |
 | `docs/user` | In-app Help, bundled by `ui/src/components/HelpView.tsx`. |
+| `scripts` | Developer scripts that are not part of the app (`site-clips.mjs` records the website's demo clips). |
 | `.github/workflows` | `ci.yml` (tests and builds), `release.yml` (installers on tag) and `pages.yml` (publishes `site/`). |
-| `site` | The public website (plain HTML/CSS, no build step), deployed to GitHub Pages. Screenshots in `site/img` are copies of `docs/screenshots`. |
+| `site` | The public website (plain HTML/CSS, no build step), deployed to GitHub Pages. Screenshots in `site/img` are copies of `docs/screenshots`; the demo clips in `site/clips` are recorded by `scripts/site-clips.mjs`. |
 
 ## Core (`crates/core/src`)
 
