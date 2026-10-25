@@ -97,6 +97,7 @@ h2 small { display: block; font: 600 13px var(--mono); color: var(--amber); lett
 .feature p { color: var(--dim); margin: 0 0 12px; }
 .feature ul { color: var(--dim); padding-left: 20px; margin: 0; }
 .feature .tag { font: 600 12px var(--mono); color: var(--amber); letter-spacing: 2px; text-transform: uppercase; }
+.clip { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #05090b; }
 .feature .pic { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); box-shadow: 0 18px 50px rgba(0,0,0,.5); }
 
 .integr { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
