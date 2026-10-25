@@ -65,7 +65,12 @@ nav .btn { padding: 6px 14px; font-size: 14px; box-shadow: none; color: #1a1100;
 /* band strip */
 .bands { margin: 56px 0 8px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; font: 13px var(--mono); }
 .bands span { border: 1px solid var(--line); background: var(--bg2); color: var(--dim); padding: 3px 10px; border-radius: 4px; }
-.bands span.hot { color: var(--amber); border-color: var(--amber-d); }
+.bands span { animation: tune 7.8s ease-in-out infinite; animation-delay: calc(var(--i) * .6s); }
+@keyframes tune {
+  0%, 12%, 100% { color: var(--dim); border-color: var(--line); text-shadow: none; }
+  4% { color: var(--amber); border-color: var(--amber-d); text-shadow: 0 0 10px rgba(255,176,46,.6); }
+}
+@media (prefers-reduced-motion: reduce) { .bands span { animation: none; } }
 
 /* sections */
 section { padding: 64px 0; }
