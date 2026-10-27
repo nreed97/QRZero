@@ -342,6 +342,7 @@ fn router(state: Shared, loopback_only: bool) -> Router {
         .route("/qsl/qrz/test", post(qsl_test_qrz))
         .route("/qsl/upload/{service}", post(qsl_upload))
         .route("/qsl/upload/{service}/qsos", post(qsl_upload_qsos))
+        .route("/qsl/clublog/lotw-confirmed", post(qsl_clublog_lotw_confirmed))
         .route("/qsl/targets", get(qsl_targets))
         .route("/qsl/queue/{service}", get(qsl_queue))
         .route("/qsl/queue/{service}/upload", post(qsl_queue_upload))
@@ -2206,6 +2207,11 @@ async fn qsl_queue_remove(State(s): State<Shared>, Path(service): Path<String>, 
 
 async fn qsl_targets(State(s): State<Shared>) -> Json<Vec<&'static str>> {
     Json(s.qsl.targets())
+}
+
+/// Sends the QSOs LoTW has confirmed to Club Log.
+async fn qsl_clublog_lotw_confirmed(State(s): State<Shared>) -> Json<qsl::Run> {
+    Json(s.qsl.upload_lotw_confirmed_to_clublog().await)
 }
 
 /// Uploads the QSOs picked in the log to one service.

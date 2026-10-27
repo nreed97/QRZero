@@ -210,6 +210,7 @@ export const api = {
   saveQsl: (config: QslConfig, secrets: QslSecrets) => json<QslOverview>("PUT", "/qsl", { config, secrets }),
   testQrzLogbook: (callsign: string) => json<{ callsign: string }>("POST", "/qsl/qrz/test", { callsign }),
   qslUpload: (service: QslService, location = "") => json<QslRun>("POST", `/qsl/upload/${service}`, { location }),
+  qslClublogLotwConfirmed: () => json<QslRun>("POST", "/qsl/clublog/lotw-confirmed"),
   qslTargets: () => json<QslService[]>("GET", "/qsl/targets"),
   qslUploadQsos: (service: QslService, ids: number[]) => json<QslRun>("POST", `/qsl/upload/${service}/qsos`, { ids }),
   qslQueue: (service: QslService, from: string, to: string) => json<QslQueue>("GET", `/qsl/queue/${service}?from=${from}&to=${to}`),

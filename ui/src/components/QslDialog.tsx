@@ -206,6 +206,20 @@ function Online({ callsigns, locations, onClose }: Props) {
     }
   };
 
+  const sendLotwConfirmed = async () => {
+    setBusy("clublog-lotw");
+    setMsg(null);
+    try {
+      await save();
+      await api.qslClublogLotwConfirmed();
+      await load();
+    } catch (e) {
+      setMsg({ text: (e as Error).message, ok: false });
+    } finally {
+      setBusy("");
+    }
+  };
+
   const testKey = async (call: string) => {
     try {
       await save();
@@ -385,6 +399,10 @@ function Online({ callsigns, locations, onClose }: Props) {
             <label className="f w-m"><span>QSOs from</span><input type="date" value={cfg.clublog_since} onChange={(e) => set({ clublog_since: e.target.value })} /></label>
             <button disabled={!!busy || !cfg.clublog_calls.length} onClick={() => upload("clublog")}>{busy === "clublog" ? "Uploading…" : `Upload ${o.pending.clublog} now`}</button>
             <RunLine run={o.runs.clublog} />
+          </div>
+          <div className="row">
+            <button disabled={!!busy || !cfg.clublog_calls.length} onClick={sendLotwConfirmed}>{busy === "clublog-lotw" ? "Sending…" : "Send LoTW confirmed QSOs"}</button>
+            <span className="muted small">sends every QSO LoTW has confirmed, so Club Log shows it as confirmed</span>
           </div>
           <details className="more">
             <summary>Upload by date range</summary>

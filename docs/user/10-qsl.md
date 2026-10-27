@@ -86,6 +86,8 @@ Enter your Club Log email and password (an application password works if you use
 
 Club Log shows your LoTW confirmations from the QSOs you upload, so when a LoTW download confirms a QSO that is already on Club Log, its Club Log status changes from Y to **M** (modified) and it goes up again: with the automatic upload on, at the next 15-minute sweep; otherwise with **Upload now**. Editing an uploaded QSO does the same.
 
+**Send LoTW confirmed QSOs** sends Club Log every QSO that LoTW has confirmed (LoTW R is Y or V), for the callsigns ticked above, whatever their upload status. Club Log learns about LoTW confirmations only from the LoTW R field of the ADIF it is sent; it updates QSOs it already has and skips identical ones. Use it after **Download confirmations** on the LoTW page, or once to bring Club Log up to date with confirmations that came in before QRZero tracked them. It uses the same batch upload as above, so large logs go up in files of up to 2000 QSOs. Club Log processes the file a little after it arrives.
+
 **Download matches** gets the QSOs Club Log has matched against the other station's log (both of you uploaded the QSO) and sets **Club Log R** on the matching QSOs, as the editor's Club Log line shows. Matches work like LoTW's, within 15 minutes. Club Log asks for an **application password** here (Club Log, Settings, App Passwords), not your login password; if the download says the login was refused, that is the usual reason. The next download only asks for matches made since the last one. Matches with no mode, or for a QSO that isn't in your log, are counted but change nothing.
 
 ## eQSL

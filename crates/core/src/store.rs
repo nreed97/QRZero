@@ -526,6 +526,24 @@ impl Store {
         self.pending_uploads_between(log_id, status_key, callsigns, location_id, since, i64::MAX, limit)
     }
 
+    /// Ids of QSOs in `log_id` logged as one of `callsigns` that LoTW has confirmed
+    /// (`LOTW_QSL_RCVD` Y or V), except those whose `status_key` upload status is I (ignored).
+    pub fn lotw_confirmed_ids(&self, log_id: i64, status_key: &str, callsigns: &[String]) -> Result<Vec<i64>> {
+        if !status_key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            return Err(Error::Invalid(format!("bad field name {status_key}")));
+        }
+        let mut args: Vec<Value> = vec![log_id.into()];
+        args.extend(callsigns.iter().map(|c| Value::from(c.to_ascii_uppercase())));
+        let marks = vec!["?"; callsigns.len()].join(", ");
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT id FROM qsos WHERE log_id = ? AND station_callsign IN ({marks})
+             AND json_extract(fields, '$.LOTW_QSL_RCVD') IN ('Y', 'V')
+             AND IFNULL(json_extract(fields, '$.{status_key}'), '') != 'I' ORDER BY time_on"
+        ))?;
+        let rows = stmt.query_map(params_from_iter(args), |r| r.get(0))?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
     /// Like `pending_uploads`, but only QSOs before `until` (Unix seconds, exclusive).
     #[allow(clippy::too_many_arguments)]
     pub fn pending_uploads_between(&self, log_id: i64, status_key: &str, callsigns: &[String], location_id: Option<i64>, since: i64, until: i64, limit: i64) -> Result<Vec<Qso>> {

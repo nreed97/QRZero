@@ -662,6 +662,26 @@ impl Qsl {
         self.upload_picked(name, None, None).await
     }
 
+    /// Sends every QSO LoTW has confirmed to Club Log, whatever its upload status, so Club Log
+    /// picks up the confirmation (it reads `LOTW_QSL_RCVD` from the ADIF it is sent and updates
+    /// QSOs it already has).
+    pub async fn upload_lotw_confirmed_to_clublog(&self) -> Run {
+        let cfg = self.upload_config();
+        let ids = self
+            .db(|st| {
+                let mut ids = Vec::new();
+                for log in st.list_logs()? {
+                    ids.extend(st.lotw_confirmed_ids(log.id, CLUBLOG.status_key, &cfg.clublog_calls)?);
+                }
+                Ok(ids)
+            })
+            .unwrap_or_default();
+        if ids.is_empty() {
+            return Run { at: Utc::now().timestamp(), ..Run::default() };
+        }
+        self.upload_picked("clublog", Some(&ids), None).await
+    }
+
     /// Uploads the given QSOs (whatever their sent status) to a configured service.
     pub async fn upload_ids(&self, name: &str, ids: &[i64]) -> Run {
         if name == "lotw" {
