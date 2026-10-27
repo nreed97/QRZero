@@ -401,8 +401,8 @@ function Online({ callsigns, locations, onClose }: Props) {
             <RunLine run={o.runs.clublog} />
           </div>
           <div className="row">
-            <button disabled={!!busy || !cfg.clublog_calls.length} onClick={sendLotwConfirmed}>{busy === "clublog-lotw" ? "Sending…" : "Send LoTW confirmed QSOs"}</button>
-            <span className="muted small">sends every QSO LoTW has confirmed, so Club Log shows it as confirmed</span>
+            <button disabled={!!busy || !cfg.clublog_calls.length} onClick={sendLotwConfirmed}>{busy === "clublog-lotw" ? "Sending…" : "Send new LoTW confirmations"}</button>
+            <span className="muted small">sends Club Log the LoTW confirmations it hasn't had yet, so it shows those QSOs as confirmed</span>
           </div>
           <details className="more">
             <summary>Upload by date range</summary>

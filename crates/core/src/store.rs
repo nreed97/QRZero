@@ -527,8 +527,9 @@ impl Store {
     }
 
     /// Ids of QSOs in `log_id` logged as one of `callsigns` that LoTW has confirmed
-    /// (`LOTW_QSL_RCVD` Y or V), except those whose `status_key` upload status is I (ignored).
-    pub fn lotw_confirmed_ids(&self, log_id: i64, status_key: &str, callsigns: &[String]) -> Result<Vec<i64>> {
+    /// (`LOTW_QSL_RCVD` Y or V) and whose confirmation hasn't gone to Club Log yet
+    /// (no `CLUBLOG_LOTW_SENT` mark), except those whose `status_key` upload status is I (ignored).
+    pub fn lotw_confirmed_unsent_ids(&self, log_id: i64, status_key: &str, callsigns: &[String]) -> Result<Vec<i64>> {
         if !status_key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
             return Err(Error::Invalid(format!("bad field name {status_key}")));
         }
@@ -538,7 +539,9 @@ impl Store {
         let mut stmt = self.conn.prepare(&format!(
             "SELECT id FROM qsos WHERE log_id = ? AND station_callsign IN ({marks})
              AND json_extract(fields, '$.LOTW_QSL_RCVD') IN ('Y', 'V')
-             AND IFNULL(json_extract(fields, '$.{status_key}'), '') != 'I' ORDER BY time_on"
+             AND IFNULL(json_extract(fields, '$.{sent}'), '') != 'Y'
+             AND IFNULL(json_extract(fields, '$.{status_key}'), '') != 'I' ORDER BY time_on",
+            sent = crate::qsl::CLUBLOG_LOTW_SENT
         ))?;
         let rows = stmt.query_map(params_from_iter(args), |r| r.get(0))?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
