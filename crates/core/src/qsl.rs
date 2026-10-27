@@ -18,6 +18,9 @@ use crate::adif::{is_standard_field, write_record, Fields};
 pub const QRZ_LOGBOOK_ENDPOINT: &str = "https://logbook.qrz.com/api";
 /// Production Club Log realtime upload endpoint.
 pub const CLUBLOG_ENDPOINT: &str = "https://clublog.org/realtime.php";
+/// Our own mark on a QSO whose LoTW confirmation has been sent to Club Log (Club Log has no ADIF field for it).
+pub const CLUBLOG_LOTW_SENT: &str = "APP_QRZERO_CLUBLOG_LOTW_QSL";
+
 /// Production Club Log batch (ADIF file) upload endpoint.
 pub const CLUBLOG_BATCH_ENDPOINT: &str = "https://clublog.org/putlogs.php";
 /// User-Agent sent to QSL services.

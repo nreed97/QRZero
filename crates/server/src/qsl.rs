@@ -662,6 +662,23 @@ impl Qsl {
         self.upload_picked(name, None, None).await
     }
 
+    /// Sends Club Log the LoTW confirmations it hasn't had yet: QSOs LoTW has confirmed and that
+    /// weren't uploaded since (whatever their upload status). Club Log reads `LOTW_QSL_RCVD` from the
+    /// ADIF it is sent and updates QSOs it already has. Every upload of a confirmed QSO counts.
+    pub async fn upload_lotw_confirmed_to_clublog(&self) -> Run {
+        let cfg = self.upload_config();
+        let ids = self
+            .db(|st| {
+                let mut ids = Vec::new();
+                for log in st.list_logs()? {
+                    ids.extend(st.lotw_confirmed_unsent_ids(log.id, CLUBLOG.status_key, &cfg.clublog_calls)?);
+                }
+                Ok(ids)
+            })
+            .unwrap_or_default();
+        self.upload_picked("clublog", Some(&ids), None).await
+    }
+
     /// Uploads the given QSOs (whatever their sent status) to a configured service.
     pub async fn upload_ids(&self, name: &str, ids: &[i64]) -> Run {
         if name == "lotw" {
@@ -808,9 +825,14 @@ impl Qsl {
                         match c.upload_batch(&fields).await {
                             Ok(()) => {
                                 self.log(svc.name, format!("{call}: batch of {} QSO(s) accepted by Club Log", chunk.len()));
-                                let ids: Vec<i64> = chunk.iter().map(|q| q.id).collect();
                                 let set: Fields = [(svc.status_key.to_string(), "Y".to_string()), (svc.date_key.to_string(), today())].into();
-                                if let Err(e) = self.db(|st| st.mark_qsos(&ids, &set)) {
+                                let (confirmed, plain): (Vec<_>, Vec<_>) = chunk.iter().partition(|q| lotw_confirmed(&q.fields));
+                                let (confirmed, plain): (Vec<i64>, Vec<i64>) = (confirmed.iter().map(|q| q.id).collect(), plain.iter().map(|q| q.id).collect());
+                                let marked = self.db(|st| {
+                                    st.mark_qsos(&plain, &set)?;
+                                    st.mark_qsos(&confirmed, &with_lotw_sent(svc, &set))
+                                });
+                                if let Err(e) = marked {
                                     run.error = Some(e.to_string());
                                     return run;
                                 }
@@ -850,7 +872,10 @@ impl Qsl {
                         } else {
                             run.duplicates += 1;
                         }
-                        let set: Fields = [(svc.status_key.to_string(), "Y".to_string()), (svc.date_key.to_string(), today())].into();
+                        let mut set: Fields = [(svc.status_key.to_string(), "Y".to_string()), (svc.date_key.to_string(), today())].into();
+                        if lotw_confirmed(&qso.fields) {
+                            set = with_lotw_sent(svc, &set);
+                        }
                         if let Err(e) = self.db(|st| st.mark_qsos(&[qso.id], &set)) {
                             run.error = Some(e.to_string());
                             return run;
@@ -1242,6 +1267,20 @@ pub struct SecretsUpdate {
     pub clublog_app_key: Option<String>,
     pub lotw_password: Option<String>,
     pub eqsl_password: Option<String>,
+}
+
+/// True when LoTW has confirmed the QSO, which is what Club Log reads from an upload.
+fn lotw_confirmed(f: &Fields) -> bool {
+    f.get("LOTW_QSL_RCVD").is_some_and(|v| v == "Y" || v == "V")
+}
+
+/// `set` plus the mark that a confirmed QSO's LoTW confirmation reached Club Log (Club Log only).
+fn with_lotw_sent(svc: &Service, set: &Fields) -> Fields {
+    let mut out = set.clone();
+    if svc.name == "clublog" {
+        out.insert(qsl::CLUBLOG_LOTW_SENT.to_string(), "Y".to_string());
+    }
+    out
 }
 
 #[cfg(test)]

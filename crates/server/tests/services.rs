@@ -320,6 +320,26 @@ async fn qrz_and_clublog_uploads() {
     assert_eq!(run["uploaded"].as_u64().unwrap() + run["duplicates"].as_u64().unwrap(), 1, "{run}");
     assert_eq!(seen.lock().unwrap().len(), before + 1);
 
+    // New LoTW confirmations go to Club Log whatever the QSO's upload status; unconfirmed QSOs stay out.
+    let mut f = api.fields(log, "JA1XYZ").await;
+    f["LOTW_QSL_RCVD"] = json!("Y");
+    api.put(&format!("/qsos/{id}"), json!({"location_id": loc, "fields": f})).await;
+    let before = seen.lock().unwrap().len();
+    let run = api.post("/qsl/clublog/lotw-confirmed", json!(null)).await;
+    assert_eq!(run["uploaded"].as_u64().unwrap() + run["duplicates"].as_u64().unwrap(), 1, "{run}");
+    let (count, adif) = {
+        let sent = seen.lock().unwrap();
+        (sent.len(), sent.last().unwrap()["adif"].clone())
+    };
+    assert_eq!(count, before + 1);
+    assert!(adif.contains("<LOTW_QSL_RCVD:1>Y"));
+    assert_eq!(api.fields(log, "JA1XYZ").await["APP_QRZERO_CLUBLOG_LOTW_QSL"], "Y");
+    assert!(!adif.contains("APP_QRZERO_CLUBLOG_LOTW_QSL"), "our own mark isn't sent");
+    // Only new confirmations go: a second click sends nothing.
+    let run = api.post("/qsl/clublog/lotw-confirmed", json!(null)).await;
+    assert_eq!(run["uploaded"].as_u64().unwrap() + run["duplicates"].as_u64().unwrap(), 0, "{run}");
+    assert_eq!(seen.lock().unwrap().len(), count);
+
     // A bad key stops the run with a clear error.
     api.put("/qsl", json!({"config": cfg, "secrets": {"qrz_keys": {"N0CALL": "BAD"}}})).await;
     api.qso(log, loc, "K5ABC").await;
