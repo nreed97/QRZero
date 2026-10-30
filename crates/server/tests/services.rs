@@ -37,6 +37,8 @@ impl Api {
         cfg.qsl_endpoints.qrz = qrz;
         cfg.qsl_endpoints.clublog_batch = format!("{clublog}-batch");
         cfg.qsl_endpoints.clublog = clublog;
+        cfg.qsl_endpoints.clublog_file_max = 3;
+        cfg.qsl_endpoints.clublog_file_pause = std::time::Duration::ZERO;
         let running = start(cfg).await.unwrap();
         Api { base: format!("http://{}/api", running.addr), token: running.token, http: reqwest::Client::new(), dir }
     }
@@ -369,12 +371,12 @@ async fn clublog_large_uploads_use_the_batch_endpoint() {
         let seen = seen.lock().unwrap();
         (seen.len(), seen[0]["batch"].clone())
     };
-    assert_eq!(count, 1, "one file, not eight single uploads");
+    assert_eq!(count, 3, "files of at most 3 QSOs, not eight single uploads");
     assert!(body.contains("name=\"file\"") && body.contains("name=\"api\""), "multipart upload");
-    assert_eq!(body.matches("<EOR>").count(), 8);
+    assert_eq!(body.matches("<EOR>").count(), 3);
     assert_eq!(api.get("/qsl").await["pending"]["clublog"], 0);
     let log = api.get("/qsl").await["logs"]["clublog"].to_string();
-    assert!(log.contains("batch of 8 QSO(s) accepted") && log.contains("Finished: 8 uploaded"), "{log}");
+    assert!(log.contains("batch of 2 QSO(s) accepted") && log.contains("waiting 0 s before file 3 of 3") && log.contains("Finished: 8 uploaded"), "{log}");
 }
 
 #[tokio::test]
