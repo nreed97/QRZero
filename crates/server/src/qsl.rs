@@ -20,8 +20,10 @@ use crate::station::{cty_facts, Hub};
 const BATCH: i64 = 500;
 /// Club Log's realtime endpoint is for single, just-logged QSOs; this many or more go as one ADIF file.
 const CLUBLOG_BATCH_MIN: usize = 5;
-/// QSOs per Club Log file.
-const CLUBLOG_FILE_MAX: usize = 2000;
+/// QSOs per Club Log file: few big files, since Club Log blocks rapid uploads of many files.
+const CLUBLOG_FILE_MAX: usize = 10_000;
+/// Seconds between Club Log files.
+const CLUBLOG_FILE_PAUSE: u64 = 60;
 /// Shortest wait (minutes) before a live upload, so a burst of edits goes up once.
 const LIVE_MIN: u32 = 1;
 /// Minutes between sweeps of everything not yet uploaded, for services set to upload automatically.
@@ -213,6 +215,9 @@ pub struct Endpoints {
     pub clublog: String,
     pub clublog_batch: String,
     pub clublog_matches: String,
+    /// QSOs per Club Log batch file, and the pause between files.
+    pub clublog_file_max: usize,
+    pub clublog_file_pause: std::time::Duration,
     pub eqsl_upload: String,
     pub eqsl_inbox: String,
     pub lotw_report: String,
@@ -225,6 +230,8 @@ impl Default for Endpoints {
             clublog: qsl::CLUBLOG_ENDPOINT.into(),
             clublog_batch: qsl::CLUBLOG_BATCH_ENDPOINT.into(),
             clublog_matches: confirm::CLUBLOG_MATCHES_ENDPOINT.into(),
+            clublog_file_max: CLUBLOG_FILE_MAX,
+            clublog_file_pause: std::time::Duration::from_secs(CLUBLOG_FILE_PAUSE),
             eqsl_upload: confirm::EQSL_UPLOAD_ENDPOINT.into(),
             eqsl_inbox: confirm::EQSL_INBOX_ENDPOINT.into(),
             lotw_report: confirm::LOTW_REPORT_ENDPOINT.into(),
@@ -820,7 +827,13 @@ impl Qsl {
                     if only.is_none() {
                         pending.retain(|q| !refused.contains(&(svc.name, q.id)));
                     }
-                    for chunk in pending.chunks(CLUBLOG_FILE_MAX) {
+                    let files = pending.len().div_ceil(self.endpoints.clublog_file_max.max(1));
+                    for (n, chunk) in pending.chunks(self.endpoints.clublog_file_max.max(1)).enumerate() {
+                        if n > 0 {
+                            // Club Log throttles and blocks rapid uploads, so the files go up a minute apart.
+                            self.log(svc.name, format!("{call}: waiting {} s before file {} of {files}", self.endpoints.clublog_file_pause.as_secs(), n + 1));
+                            tokio::time::sleep(self.endpoints.clublog_file_pause).await;
+                        }
                         let fields: Vec<&Fields> = chunk.iter().map(|q| &q.fields).collect();
                         match c.upload_batch(&fields).await {
                             Ok(()) => {

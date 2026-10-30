@@ -281,7 +281,7 @@ impl ClubLog {
                 Ok(Upload::Duplicate)
             }
             400 => Ok(Upload::Rejected(if text.is_empty() { "rejected by Club Log".into() } else { text })),
-            403 => Err(QslError::Auth(if text.is_empty() { "Club Log refused the login".into() } else { text })),
+            403 => Err(clublog_forbidden(text)),
             _ => Err(QslError::Service(format!("Club Log HTTP {status}: {text}"))),
         }
     }
@@ -324,9 +324,19 @@ impl ClubLog {
         let text = text.trim().to_string();
         match status {
             200..=299 => Ok(()),
-            403 => Err(QslError::Auth(if text.is_empty() { "Club Log refused the login".into() } else { text })),
+            403 => Err(clublog_forbidden(text)),
             _ => Err(QslError::Service(format!("Club Log HTTP {status}: {text}"))),
         }
+    }
+}
+
+/// What a Club Log 403 means. A plain answer is Club Log refusing the login or an already uploaded log.
+/// A bare web server page (HTML, no Club Log message) is its rate limiter blocking too many uploads in a short time.
+fn clublog_forbidden(text: String) -> QslError {
+    if text.contains("<html") || text.contains("<HTML") {
+        QslError::Service("Club Log's web server blocked the upload (403 Forbidden), probably because too many files arrived too quickly. Wait a while before trying again; QRZero carries on with the QSOs not yet sent".into())
+    } else {
+        QslError::Auth(if text.is_empty() { "Club Log refused the login".into() } else { text })
     }
 }
 
@@ -586,6 +596,14 @@ mod tests {
         let r = upload_record(&q);
         assert!(r.contains("<CALL:4>W1AW") && r.contains("<MODE:2>CW") && r.ends_with("<EOR>\n"));
         assert!(!r.contains("APP_QRZERO_ID") && !r.contains("MY_PRIVATE") && !r.contains("<EOH>"));
+    }
+
+    #[test]
+    fn clublog_403_pages_are_not_login_errors() {
+        let page = "<html> <head><title>403 Forbidden</title></head> <body><center><h1>403 Forbidden</h1></center><hr><center>nginx</center></body></html>";
+        assert!(matches!(clublog_forbidden(page.into()), QslError::Service(m) if m.contains("too many files")));
+        assert!(matches!(clublog_forbidden("Invalid login".into()), QslError::Auth(_)));
+        assert!(matches!(clublog_forbidden(String::new()), QslError::Auth(_)));
     }
 
     #[test]
