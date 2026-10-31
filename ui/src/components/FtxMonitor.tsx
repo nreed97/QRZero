@@ -22,6 +22,8 @@ export interface DecodePick {
   tx_freq_hz?: number;
   /** Set for FTx decodes: the picked radio is never retuned, only chosen. */
   ftx?: { rig_key: string | null };
+  /** From a POTA spot: the park reference of the activator, filled in fresh. */
+  pota_ref?: string;
   /** Double-click: also tune the radio. A single click only fills in the entry form. */
   qsy?: boolean;
 }

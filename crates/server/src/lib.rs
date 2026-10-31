@@ -38,6 +38,7 @@ mod contests;
 mod updates;
 mod dxped;
 mod mostwanted;
+mod pota;
 mod watch;
 
 pub use qsl::Endpoints as QslEndpoints;
@@ -75,6 +76,8 @@ pub struct Config {
     pub contests_url: String,
     /// Club Log's Most Wanted list (tests point this at a stand-in).
     pub mostwanted_url: String,
+    /// The POTA activator spot list (tests point this at a stand-in).
+    pub pota_url: String,
     /// GitHub releases list for the update check (tests point this at a stand-in).
     pub updates_url: String,
     /// Start the programs listed under Settings, Startup programs.
@@ -96,6 +99,7 @@ impl Config {
             dxped_url: dxped::DEFAULT_URL.to_string(),
             contests_url: contests::DEFAULT_URL.to_string(),
             mostwanted_url: mostwanted::DEFAULT_URL.to_string(),
+            pota_url: pota::DEFAULT_URL.to_string(),
             updates_url: updates::DEFAULT_URL.to_string(),
             launch_apps: true,
         }
@@ -175,6 +179,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
     hub.dxped.set_url(cfg.dxped_url);
     hub.contests.set_url(cfg.contests_url);
     hub.mostwanted.set_url(cfg.mostwanted_url);
+    hub.pota.set_url(cfg.pota_url);
     hub.updates.set_url(cfg.updates_url);
     if cfg.update_cty {
         updates::spawn(&hub);
@@ -324,6 +329,7 @@ fn router(state: Shared, loopback_only: bool) -> Router {
         .route("/watch/hits", get(watch_hits))
         .route("/dxpeditions", get(dxped_get).put(dxped_put))
         .route("/dxpeditions/refresh", post(dxped_refresh))
+        .route("/pota", get(pota_get))
         .route("/mostwanted", get(mostwanted_get))
         .route("/mostwanted/refresh", post(mostwanted_refresh))
         .route("/updates", get(updates_get).put(updates_put))
@@ -1990,6 +1996,11 @@ async fn dxped_get(State(s): State<Shared>) -> ApiResult<serde_json::Value> {
 async fn dxped_put(State(s): State<Shared>, Json(list): Json<Vec<dxped::Planned>>) -> ApiResult<serde_json::Value> {
     dxped::save_manual(&s.hub, list).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))?;
     Ok(Json(dxped_view(&s)))
+}
+
+async fn pota_get(State(s): State<Shared>, Query(q): Query<std::collections::HashMap<String, String>>) -> Json<serde_json::Value> {
+    s.hub.pota.refresh(q.contains_key("force")).await;
+    Json(s.hub.pota.view(&s.hub))
 }
 
 async fn mostwanted_get(State(s): State<Shared>) -> Json<serde_json::Value> {

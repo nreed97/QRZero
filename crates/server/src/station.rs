@@ -421,6 +421,8 @@ pub struct Hub {
     pub(crate) dxped: crate::dxped::Dxped,
     /// Club Log's Most Wanted ranking of entities.
     pub(crate) mostwanted: crate::mostwanted::MostWanted,
+    /// POTA activator spots, read when a pane asks.
+    pub(crate) pota: crate::pota::Pota,
     /// Contests from the WA7BNM calendar feed.
     pub(crate) contests: crate::contests::Contests,
     pub(crate) updates: crate::updates::Updates,
@@ -465,7 +467,7 @@ impl Hub {
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
         let notify = Arc::new(crate::notify::Notify::new(ntfy));
-        let hub = Arc::new(Hub { store, data_dir, events, inner: Mutex::default(), cty: RwLock::default(), watch, dxped, mostwanted, contests, updates: crate::updates::Updates::new(), udp, notify, auto_lookup: Mutex::default() });
+        let hub = Arc::new(Hub { store, data_dir, events, inner: Mutex::default(), cty: RwLock::default(), watch, dxped, mostwanted, pota: crate::pota::Pota::new(), contests, updates: crate::updates::Updates::new(), udp, notify, auto_lookup: Mutex::default() });
         if let Err(e) = hub.load_cty_file() {
             tracing::info!("no country file yet: {e}");
         }

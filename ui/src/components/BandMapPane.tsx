@@ -4,6 +4,8 @@ import type { PopContext } from "../bus";
 import { onLive, useInstances, useRadios } from "../live";
 import { BANDS, MODE_GROUP_NAME, bandForFreq, modeGroup } from "../modes";
 import { needLabel, needRank } from "../needed";
+import { usePota, potaNeeds } from "../pota";
+import { potaPick } from "./PotaPane";
 import { localGet, localSet } from "../prefs";
 import type { FtxDecode, Spot } from "../types";
 import type { PaneActions } from "./SharedPanes";
@@ -65,7 +67,7 @@ const PLANS: Record<"us" | "r1", Record<string, Seg[]>> = {
 };
 const SEG_NAME: Record<SegKind, string> = { cw: "CW only", data: "CW and data", phone: "Phone (and all modes)", all: "All modes", beacon: "Beacons" };
 
-interface Prefs { band: string; zoom: Record<string, number>; plan: Plan; needed: boolean; follow: boolean }
+interface Prefs { band: string; zoom: Record<string, number>; plan: Plan; needed: boolean; follow: boolean; pota?: boolean }
 const PREFS_KEY = "qrzero.bandmap";
 const defaultZoom = (band: string) => (["6m", "4m", "2m"].includes(band) ? 1 : 0.2);
 
@@ -116,6 +118,7 @@ export default function BandMapPane({ ctx, act }: { ctx: PopContext; act: PaneAc
   const instances = useInstances();
   const [prefs, setPrefs] = useState<Prefs>(() => localGet<Prefs>(PREFS_KEY, { band: "20m", zoom: {}, plan: "us", needed: false, follow: true }));
   const [spots, setSpots] = useState<Spot[]>([]);
+  const pota = usePota(!!prefs.pota);
   const [decodes, setDecodes] = useState<StampedDecode[]>([]);
   const [now, setNow] = useState(Date.now() / 1000);
   const [size, setSize] = useState({ w: 600, h: 400 });
@@ -272,6 +275,33 @@ export default function BandMapPane({ ctx, act }: { ctx: PopContext; act: PaneAc
       ),
     });
   }
+  for (const s of prefs.pota ? pota.list?.spots ?? [] : []) {
+    const khz = s.freq_hz / 1000;
+    if (!(s.band === band || (khz >= lo && khz <= hi))) continue;
+    const needs = potaNeeds(s.needed);
+    if (prefs.needed && !needs.length) continue;
+    const worked = !!s.needed && !s.needed.new_call_band;
+    const group = modeGroup(s.mode);
+    items.push({
+      key: `p${s.id || s.call + s.freq_hz}`,
+      khz,
+      h: ROW_H,
+      node: (style) => (
+        <div
+          key={`p${s.id || s.call + s.freq_hz}`}
+          className={`bm-label pota ${group ? `mode-${group}` : ""} ${worked ? "worked" : ""}`}
+          style={style}
+          onClick={() => act.onPick(potaPick(s))}
+          onDoubleClick={() => act.onPick(potaPick(s, true))}
+          title={`${s.call}  ${khz.toFixed(1)} kHz  ${s.mode}\nPOTA ${s.reference} ${s.park}\n${s.entity?.name ?? ""}${s.comment ? `\n${s.comment}` : ""}\nClick to fill in; double-click to fill in and tune`}
+        >
+          <span className="call">{s.call}</span>
+          <span className="pota-ref">{s.reference}</span>
+          {needs[0] && <span className="need">{needs[0].replace(/^New /, "")}</span>}
+        </div>
+      ),
+    });
+  }
   for (const { inst, list } of groups) {
     const shown = list.slice(0, ftxShow);
     const rows = Math.max(1, Math.ceil(shown.length / 2));
@@ -372,6 +402,7 @@ export default function BandMapPane({ ctx, act }: { ctx: PopContext; act: PaneAc
         <button className="bm-btn" onClick={() => setZoom(1)} title="Zoom out (Ctrl+wheel)">-</button>
         <span className="muted small mono bm-zoom" title="Kilohertz per pixel">{zoom < 0.1 ? zoom * 1000 + " Hz" : zoom + " kHz"}/px</span>
         <label className="check"><input type="checkbox" checked={prefs.needed} onChange={(e) => save({ needed: e.target.checked })} /> Needed only</label>
+        <label className="check" title="Also show POTA activators from the POTA spot list (read once a minute)"><input type="checkbox" checked={!!prefs.pota} onChange={(e) => save({ pota: e.target.checked })} /> POTA</label>
         <select value={prefs.plan} onChange={(e) => save({ plan: e.target.value as Plan })} aria-label="Band plan" title="Band plan strip down the scale">
           <option value="us">US plan</option>
           <option value="r1">IARU R1 plan</option>
