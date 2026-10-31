@@ -156,6 +156,8 @@ mod tests {
     #[test]
     fn versions_compare_by_number() {
         assert_eq!(tag_version("QRZero-Alpha-v0.14"), Some(vec![0, 14]));
+        assert_eq!(tag_version("QRZero-v1.0"), Some(vec![1, 0]));
+        assert!(newer(&[1, 0], &[0, 31, 0]));
         assert_eq!(tag_version("Alpha-Release"), None);
         assert!(newer(&[0, 14], &[0, 13, 0]));
         assert!(newer(&[0, 10], &[0, 9]));

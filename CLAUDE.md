@@ -24,4 +24,4 @@
 
 ## Releases
 
-Pushing a tag builds the installers, and the app version comes from the tag's number (`QRZero-Alpha-v0.20` becomes 0.20.0), so every release needs a new number. Cloud sessions cannot push tags; Nick creates them.
+Pushing a tag builds the installers, and the app version comes from the tag's number (`QRZero-v1.0` becomes 1.0.0; the update check needs the `v` before the number), so every release needs a new number. Cloud sessions cannot push tags; Nick creates them.
