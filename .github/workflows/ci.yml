@@ -87,7 +87,7 @@ jobs:
 
   macos:
     name: macOS (Apple Silicon) build and tests
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
