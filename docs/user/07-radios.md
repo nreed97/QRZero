@@ -20,7 +20,7 @@ When radios are connected, the **Radio** box appears in the QSO panel's title ba
 
 - Typing a frequency and leaving the box tunes the radio.
 - Changing the mode sets the radio's mode (FT8, FT4 and other digital modes use the radio's USB data mode).
-- Double-clicking a spot (Cluster, Band map, Needed now, Watch list, DXpeditions) fills it in and tunes the radio to it. A single click only fills in the QSO panel. Picking a station in the FTx monitor never retunes the radio.
+- Double-clicking a spot (Cluster, Band map, Needed now, Watch list, DXpeditions, POTA spots) fills it in and tunes the radio to it. A single click only fills in the QSO panel. Picking a station in the FTx monitor never retunes the radio.
 
 Choose **manual** to type frequency and mode yourself.
 

@@ -325,7 +325,7 @@ export default function App() {
     setWs({ ...cur, root: showPane(cur.root, "log") });
   };
 
-  const pick = (p: DecodePick) => setPrefill({ nonce: Date.now(), call: p.call, grid: p.grid, band: p.band, mode: p.mode, freq_hz: p.freq_hz, tx_freq_hz: p.tx_freq_hz, ftx: p.ftx, qsy: p.qsy });
+  const pick = (p: DecodePick) => setPrefill({ nonce: Date.now(), call: p.call, grid: p.grid, band: p.band, mode: p.mode, freq_hz: p.freq_hz, tx_freq_hz: p.tx_freq_hz, pota_ref: p.pota_ref, ftx: p.ftx, qsy: p.qsy });
 
   // F2: show New QSO (or its window) and put the cursor in the call box.
   useShortcut("gotocall", () => {

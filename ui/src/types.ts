@@ -434,3 +434,23 @@ export interface LogStats {
   entities_confirmed: number;
   text: string;
 }
+
+/** One activator on the POTA spot list. */
+export interface PotaSpot {
+  id: number;
+  /** Unix seconds. */
+  time: number;
+  call: string;
+  freq_hz: number;
+  band: string | null;
+  mode: string;
+  reference: string;
+  park: string;
+  location: string;
+  grid: string | null;
+  spotter: string;
+  comment: string;
+  entity: Entity | null;
+  needed: Needed | null;
+}
+export interface PotaList { spots: PotaSpot[]; fetched_at: number | null; error: string | null }

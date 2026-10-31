@@ -53,6 +53,8 @@ export interface Prefill {
   tx_freq_hz?: number;
   /** From the FTx monitor: choose the radio of the instance that decoded it (or one on that band) and don't retune. */
   ftx?: { rig_key: string | null };
+  /** Their park, from a POTA spot. */
+  pota_ref?: string;
   /** Double-click: tune the radio too. A single click only fills in the form. */
   qsy?: boolean;
 }
@@ -316,6 +318,7 @@ export default function EntryPanel({ logId, stationCall, location, layout: baseL
     setCall(prefill.call);
     setStart(new Date());
     if (prefill.grid) setForm((f) => ({ ...f, GRIDSQUARE: prefill.grid! }));
+    if (prefill.pota_ref) setForm((f) => ({ ...f, POTA_REF: prefill.pota_ref! }));
     const m = prefill.mode && MODES.some((x) => x.label === prefill.mode) ? prefill.mode : null;
     if (prefill.ftx) {
       // The program is already on the band: pick the slice it decoded on (or one already on that band), never QSY.

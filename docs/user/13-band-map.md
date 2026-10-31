@@ -45,3 +45,7 @@ A thin coloured strip down the left edge shows the band plan:
 | Red | Beacons |
 
 Choose **US plan** (the FCC CW/data and phone sub-bands), **IARU R1 plan** (the Region 1 HF band plan, simplified) or **No plan** from the list on the right. Hover over the strip to see the segment's edges. Parts of the scale outside the band are shaded.
+
+## POTA activators
+
+Tick **POTA** in the toolbar to show the activators from the POTA spot list on the map too. They look like other spots with a dashed edge and the park reference next to the call, and a click fills in the QSO panel, including the park, as in the [POTA spots](21-pota) pane. The list is read once a minute while the box is ticked and not at all when it isn't.

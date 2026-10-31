@@ -20,6 +20,9 @@ async fn main() -> anyhow::Result<()> {
     if let Ok(url) = std::env::var("QRZERO_MOSTWANTED_URL") {
         cfg.mostwanted_url = url;
     }
+    if let Ok(url) = std::env::var("QRZERO_POTA_URL") {
+        cfg.pota_url = url;
+    }
     if let Ok(url) = std::env::var("QRZERO_UPDATES_URL") {
         cfg.updates_url = url;
     }

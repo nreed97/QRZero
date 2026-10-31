@@ -61,3 +61,7 @@
 .bm-label.mode-digital .call { color: var(--mode-digital); }
 .bm-label.mode-phone .call { color: var(--mode-phone); }
 .bm-label.worked .call { color: var(--muted); }
+
+/* POTA activators on the band map: a dashed edge and the park reference */
+.bm-label.pota { border-style: dashed; }
+.bm-label .pota-ref { color: var(--muted); font-size: 11px; }
