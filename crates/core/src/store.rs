@@ -19,8 +19,20 @@ use crate::awards::{AwardIndex, AwardQso, CtyFacts};
 use crate::cwclubs::ClubQso;
 use crate::worked::WorkedIndex;
 
+/// A QSO with a park reference, as the POTA spots need it.
+#[derive(Debug, Clone)]
+pub struct PotaQso {
+    pub call: String,
+    pub band: Option<String>,
+    pub mode: String,
+    /// Unix seconds.
+    pub time_on: i64,
+    /// The POTA_REF field: one park, or several separated by commas.
+    pub refs: String,
+}
+
 /// Migrations in order; migration N brings the schema to user_version N.
-const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8, SCHEMA_V9, SCHEMA_V10];
+const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8, SCHEMA_V9, SCHEMA_V10, SCHEMA_V11];
 /// The newest schema this build knows (`PRAGMA user_version`).
 pub const SCHEMA_VERSION: i32 = MIGRATIONS.len() as i32;
 
@@ -91,6 +103,13 @@ const SCHEMA_V9: &str = "ALTER TABLE station_callsigns ADD COLUMN archived INTEG
 const SCHEMA_V10: &str = r#"
 CREATE INDEX qsos_paper_queue ON qsos (log_id, call, time_on)
     WHERE json_extract(fields, '$.QSL_SENT') = 'Q';
+"#;
+
+/// QSOs with a park (POTA_REF), so the POTA spots can be checked against the parks already worked.
+/// The WHERE clause must match `pota_qsos` exactly for SQLite to use the index.
+const SCHEMA_V11: &str = r#"
+CREATE INDEX qsos_pota ON qsos (log_id, time_on)
+    WHERE IFNULL(json_extract(fields, '$.POTA_REF'), '') <> '';
 "#;
 
 const SCHEMA_V8: &str = r#"
@@ -1145,6 +1164,18 @@ impl Store {
         Ok(idx)
     }
 
+    /// The QSOs of a log that carry a park reference (their POTA_REF), for checking POTA spots.
+    pub fn pota_qsos(&self, log_id: i64) -> Result<Vec<PotaQso>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT call, band, IFNULL(submode, mode), time_on, json_extract(fields, '$.POTA_REF') FROM qsos
+             WHERE log_id = ?1 AND IFNULL(json_extract(fields, '$.POTA_REF'), '') <> ''",
+        )?;
+        let rows = stmt.query_map([log_id], |r| {
+            Ok(PotaQso { call: r.get(0)?, band: r.get(1)?, mode: r.get::<_, Option<String>>(2)?.unwrap_or_default(), time_on: r.get(3)?, refs: r.get(4)? })
+        })?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
     /// A QSO already in the log with the same call, band and mode within a minute of this one.
     pub fn find_duplicate(&self, log_id: i64, fields: &Fields) -> Result<Option<i64>> {
         let cols = Columns::from_fields(&normalize(fields))?;
@@ -1868,6 +1899,23 @@ fn non_empty(s: &str, what: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn park_lookup_uses_its_index() {
+        let st = Store::open_in_memory().unwrap();
+        let plan: String = st
+            .conn
+            .prepare(
+                "EXPLAIN QUERY PLAN SELECT call, band, IFNULL(submode, mode), time_on, json_extract(fields, '$.POTA_REF') FROM qsos
+                 WHERE log_id = ?1 AND IFNULL(json_extract(fields, '$.POTA_REF'), '') <> ''",
+            )
+            .unwrap()
+            .query_map([1], |r| r.get::<_, String>(3))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert!(plan.contains("qsos_pota"), "{plan}");
+    }
 
     #[test]
     fn upgrade_merges_identical_locations_across_logs() {

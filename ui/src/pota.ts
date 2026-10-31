@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
 import { onLive } from "./live";
-import type { PotaList } from "./types";
+import { localGet } from "./prefs";
+import type { PotaList, PotaSpot } from "./types";
 
 export const POTA_EVERY_MS = 60000;
 
@@ -45,4 +46,24 @@ export function potaNeeds(n: import("./types").PotaSpot["needed"]): string[] {
   if (n.new_band) out.push("New band");
   if (n.new_mode) out.push("New mode");
   return out;
+}
+
+/** What counts as worked: the call on that band at any time, a park in the log, or the call at that park today (UTC). */
+export type PotaWorked = "band" | "park" | "day";
+export const POTA_WORKED: [PotaWorked, string][] = [
+  ["day", "Worked: today at this park"],
+  ["park", "Worked: park ever (unique parks)"],
+  ["band", "Worked: call on band ever"],
+];
+
+/** The choice made in the POTA spots pane, shared by the band map. */
+export const potaWorkedMode = (): PotaWorked => {
+  const w = localGet<{ worked?: PotaWorked }>("qrzero.pota", {}).worked;
+  return w === "park" || w === "band" ? w : "day";
+};
+
+export function isPotaWorked(s: PotaSpot, mode: PotaWorked): boolean {
+  if (mode === "park") return s.park_worked;
+  if (mode === "day") return s.worked_today;
+  return !!s.needed && !s.needed.new_call_band;
 }

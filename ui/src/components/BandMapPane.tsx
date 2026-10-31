@@ -4,7 +4,7 @@ import type { PopContext } from "../bus";
 import { onLive, useInstances, useRadios } from "../live";
 import { BANDS, MODE_GROUP_NAME, bandForFreq, modeGroup } from "../modes";
 import { needLabel, needRank } from "../needed";
-import { usePota, potaNeeds } from "../pota";
+import { usePota, potaNeeds, isPotaWorked, potaWorkedMode } from "../pota";
 import { potaPick } from "./PotaPane";
 import { localGet, localSet } from "../prefs";
 import type { FtxDecode, Spot } from "../types";
@@ -280,7 +280,7 @@ export default function BandMapPane({ ctx, act }: { ctx: PopContext; act: PaneAc
     if (!(s.band === band || (khz >= lo && khz <= hi))) continue;
     const needs = potaNeeds(s.needed);
     if (prefs.needed && !needs.length) continue;
-    const worked = !!s.needed && !s.needed.new_call_band;
+    const worked = isPotaWorked(s, potaWorkedMode());
     const group = modeGroup(s.mode);
     items.push({
       key: `p${s.id || s.call + s.freq_hz}`,

@@ -4,7 +4,15 @@ The **POTA spots** pane lists the activators on the air in Parks on the Air righ
 
 ## What it shows
 
-The newest spot is on top. Each row has the time (UTC), the activator, the frequency, the mode, the park reference and name, the location, the activator's country, who spotted them, the comment and flags. A green **New DXCC**, **New band** or **New mode** flag marks an activator that would be new for you, and **Worked** (the row is grey) marks one you have already worked on that band and mode. The flags use your open log, the same as in the Cluster and Band map panes, and they update when you log a QSO.
+The newest spot is on top. Each row has the time (UTC), the activator, the frequency, the mode, the park reference and name, the location, the activator's country, who spotted them, the comment and flags. A green **New DXCC**, **New band** or **New mode** flag marks an activator that would be new for you, and **Worked** (the row is grey) marks one you have already worked. The new-DXCC, band and mode flags use your open log, the same as in the Cluster and Band map panes, and everything updates when you log a QSO.
+
+What counts as worked is your choice in the **Worked** list, as people chase POTA in different ways:
+
+- **Worked: today at this park** (to start with): you logged that call from that park since 0000z today on that band and mode. Phone modes (SSB, USB, LSB and so on) count as one mode, so do the CW ones; other modes such as FT8 and FT4 count on their own. The flag clears at 0000z.
+- **Worked: park ever (unique parks)**: any QSO in your log from that park, whoever it was with and whatever the band or mode. Use this to chase parks you haven't had yet.
+- **Worked: call on band ever**: you have worked that callsign on that band at some time, wherever it was.
+
+The two park choices read the park from **Their POTA** (`POTA_REF`) of your QSOs, so QSOs logged without a park don't count. A QSO with several parks, separated by commas, counts for each of them.
 
 Choose a band, a mode group, **Needed only** or **Hide worked** to narrow the list; the choices are remembered. Drag a column heading to move it or its right edge to resize it, and double-click the edge to put the width back.
 
