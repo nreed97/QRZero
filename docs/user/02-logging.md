@@ -55,7 +55,7 @@ SKCC, NAQCC, FISTS and CWops numbers can be entered in the entry panel. Choose t
 
 After a lookup the panel shows:
 
-- **Station details** from the lookup service (when lookups are on), or from your last QSO with that call. Notes and club numbers (see below) carry over from that QSO; the Comment, serial numbers and reports do not, because they belong to one contact.
+- **Station details** from the lookup service (when lookups are on), or from your last QSO with that call. Notes and club numbers (see below) carry over from that QSO; the Comment, serial numbers, reports, contest name, POTA, SOTA and WWFF references, satellite details and power do not, because they belong to one contact. Fields marked as sticky in your entry layout still carry over from your own previous QSO.
 - **Note**: your station note for the call, if you have written one (see **Station notes**).
 - **Flags**: *First QSO with this call*, or *Already worked on …* when this would be a duplicate on the same band and mode.
 - **DXCC slots**: a small grid for the entity of the call, with the bands across and CW, Phone and Digital down. **W** means worked, **C** means confirmed (by the sources set in the Awards pane), and a blank cell is a slot you still need. The band and mode set in the entry panel are marked with a box and bold labels, so you can see at once whether this QSO fills a blank. It follows the DXCC number in the entry form, or the entity from the country file. Click a **W** or **C** cell to list every QSO in that slot, with any station, in the Worked before pane (see below). To keep the grid in view on its own, show the **DXCC slots** pane from **Layout** and pop it out: the grid fills the window and its text grows as you make the window bigger.
