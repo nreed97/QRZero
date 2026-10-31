@@ -75,7 +75,11 @@ function radioMode(r: Radio): string | null {
 const CARRIED = ["CQZ", "ITUZ", "CONT", "LAT", "LON", "IOTA", "EMAIL", "QSL_VIA", "DXCC", "COUNTRY", "GRIDSQUARE", "STATE", "CNTY", "NAME", "QTH", "NOTES"];
 // About one contact only, so never filled in from the last QSO with the same call.
 // SKCC is here because a blank number means it wasn't exchanged on that QSO, and SKCC awards count only QSOs that have one.
-const PER_QSO = new Set(["SKCC", "COMMENT", "QSLMSG", "STX", "SRX", "STX_STRING", "SRX_STRING", "RST_SENT", "RST_RCVD"]);
+// The contest, park/summit references, satellite and propagation details and power are the same: they describe how that one QSO was made.
+const PER_QSO = new Set([
+  "SKCC", "COMMENT", "QSLMSG", "STX", "SRX", "STX_STRING", "SRX_STRING", "RST_SENT", "RST_RCVD",
+  "CONTEST_ID", "POTA_REF", "SOTA_REF", "WWFF_REF", "SIG", "SIG_INFO", "PROP_MODE", "SAT_NAME", "SAT_MODE", "TX_PWR", "RX_PWR",
+]);
 
 // Picked equipment ids; -1 is "none", and antenna 0 is "Auto (by band)".
 interface Gear { rig?: number; antenna?: number; amplifier?: number }
