@@ -331,12 +331,26 @@ fn parse_when(text: &str, today: NaiveDate) -> Option<(i64, i64)> {
     }
     for pair in halves.chunks(2) {
         let (t1, d1) = pair[0];
-        let start = at(d1, t1.unwrap_or(0))?;
+        let mut start = at(d1, t1.unwrap_or(0))?;
         let end = match pair.get(1) {
             Some((t2, d2)) => {
                 let e = at(*d2, t2.unwrap_or(23 * 60 + 59))?;
-                // A range that wraps the new year.
-                if e < start { e + 365 * 86_400 } else { e }
+                if e >= start {
+                    e
+                } else if start - e < 60 * 86_400 {
+                    // A range that wraps the new year.
+                    e + 365 * 86_400
+                } else {
+                    // Too far back for a new year: the calendar has a typo in the start month
+                    // ("Mar 3 to Nov 4"). Take the end's month for the start.
+                    let fixed = at((d2.0, d1.1), t1.unwrap_or(0))?;
+                    if fixed < e && e - fixed < 14 * 86_400 {
+                        start = fixed;
+                        e
+                    } else {
+                        return None;
+                    }
+                }
             }
             None => start + if t1.is_some() { 3600 } else { 86_399 },
         };
@@ -389,6 +403,8 @@ mod tests {
             parse_when("0100Z-0300Z, Oct 12 and 1900Z-2100Z, Oct 12 and 0100Z-0300Z, Oct 13", today),
             Some((ts(2026, 10, 12, 1, 0), ts(2026, 10, 13, 3, 0)))
         );
+        // A typo in the calendar ("Mar 3" for "Nov 3") must not push the end a year out.
+        assert_eq!(parse_when("1400Z, Nov 1 to 0800Z, Nov 2 and 1400Z, Mar 3 to 0800Z, Nov 4", day(2026, 11, 1)), Some((ts(2026, 11, 1, 14, 0), ts(2026, 11, 4, 8, 0))));
         // The new year.
         assert_eq!(parse_when("1500Z, Dec 31 to 1500Z, Jan 1", day(2026, 12, 20)), Some((ts(2026, 12, 31, 15, 0), ts(2027, 1, 1, 15, 0))));
         assert_eq!(parse_when("0000Z, Jan 2 to 2359Z, Jan 3", day(2026, 12, 20)), Some((ts(2027, 1, 2, 0, 0), ts(2027, 1, 3, 23, 59))));
