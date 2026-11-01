@@ -22,7 +22,7 @@ Choose a band, a mode group, **Needed only** or **Hide worked** to narrow the li
 
 ## How often it reads the list
 
-QRZero reads the POTA list when the pane is open and then once a minute, and keeps it for half a minute so that several panes share one request. **Refresh** reads it at once. Nothing is read while the pane is closed. If the list can't be reached, the last one stays on screen with the reason above it.
+QRZero reads the POTA list when the pane is open and then once a minute, and keeps it for half a minute so that several panes share one request. **Refresh** reads it at once. Nothing is read while the pane is hidden from your layout, while it is a tab behind another one, or while the window is minimised; it reads the list again as soon as you bring it back. If the list can't be reached, the last one stays on screen with the reason above it.
 
 ## On the band map
 

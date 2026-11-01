@@ -48,4 +48,4 @@ Choose **US plan** (the FCC CW/data and phone sub-bands), **IARU R1 plan** (the 
 
 ## POTA activators
 
-Tick **POTA** in the toolbar to show the activators from the POTA spot list on the map too. They look like other spots with a dashed edge and the park reference next to the call, and a click fills in the QSO panel, including the park, as in the [POTA spots](21-pota) pane. Whether a spot counts as worked follows the **Worked** choice in the POTA spots pane. The list is read once a minute while the box is ticked and not at all when it isn't.
+Tick **POTA** in the toolbar to show the activators from the POTA spot list on the map too. They look like other spots with a dashed edge and the park reference next to the call, and a click fills in the QSO panel, including the park, as in the [POTA spots](21-pota) pane. Whether a spot counts as worked follows the **Worked** choice in the POTA spots pane. The list is read once a minute only while the box is ticked and the band map is showing (not as a tab behind another, and not while the window is minimised).

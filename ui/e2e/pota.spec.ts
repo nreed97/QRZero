@@ -59,3 +59,21 @@ test("POTA spots pane lists activators, flags and filters them", async ({ page }
   await expect(rows).toHaveCount(2);
   await expect(pane.locator(".spot-row:not(.head)", { hasText: "K1WRK" })).toHaveCount(0);
 });
+
+test("POTA spots are not read while the pane is in a background tab", async ({ page }) => {
+  let reads = 0;
+  await page.route("**/api/pota*", (r) => { reads++; return r.fulfill({ json: list }); });
+  await page.goto("/?token=e2e");
+  await closeWizard(page);
+  if (!(await page.getByRole("tab", { name: "POTA spots" }).isVisible())) {
+    await page.getByRole("button", { name: /^Layout/ }).click();
+    await page.getByRole("menu").getByLabel("POTA spots").check();
+    await page.getByRole("button", { name: /^Layout/ }).click();
+  }
+  await page.getByRole("tab", { name: "POTA spots" }).click();
+  await expect.poll(() => reads).toBe(1);
+  // Another tab in front: no new read when the pane comes back unless it is shown again.
+  await page.getByRole("tab", { name: "Cluster" }).click();
+  await page.getByRole("tab", { name: "POTA spots" }).click();
+  await expect.poll(() => reads).toBe(2);
+});

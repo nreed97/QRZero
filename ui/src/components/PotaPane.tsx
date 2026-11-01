@@ -37,7 +37,7 @@ export const potaPick = (s: PotaSpot, qsy = false): DecodePick => ({ call: s.cal
 
 /** Activators on the air in Parks on the Air, read from the POTA spot list while this pane is open. */
 export default function PotaPane({ onPick }: { onPick: (p: DecodePick) => void }) {
-  const { list, err, refresh } = usePota(true);
+  const { list, err, refresh, ref } = usePota(true, true);
   const [filters, setFilters] = useState<Filters>(() => ({ ...DEFAULTS, ...localGet<Partial<Filters>>("qrzero.pota", {}), worked: potaWorkedMode() }));
   const head = useRef<HTMLDivElement>(null);
   const colDrag = useColumnDrag("qrzero.potaCols", COLS.map((c) => c.key), head);
@@ -65,7 +65,7 @@ export default function PotaPane({ onPick }: { onPick: (p: DecodePick) => void }
   );
 
   return (
-    <div className="ftx cluster">
+    <div className="ftx cluster" ref={ref}>
       <div className="grid-tools">
         <select value={filters.band} onChange={(e) => setFilter({ band: e.target.value })} aria-label="Band">
           <option value="">All bands</option>
