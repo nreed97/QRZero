@@ -452,5 +452,9 @@ export interface PotaSpot {
   comment: string;
   entity: Entity | null;
   needed: Needed | null;
+  /** The park is in the log already (any call, band or mode). */
+  park_worked: boolean;
+  /** This call from this park, band and mode is in the log since 0000z today. */
+  worked_today: boolean;
 }
 export interface PotaList { spots: PotaSpot[]; fetched_at: number | null; error: string | null }

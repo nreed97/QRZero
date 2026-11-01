@@ -1,21 +1,45 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 import { onLive } from "./live";
-import type { PotaList } from "./types";
+import { localGet } from "./prefs";
+import type { PotaList, PotaSpot } from "./types";
 
 export const POTA_EVERY_MS = 60000;
 
 /**
  * The POTA spot list, read now and then once a minute while `active`. Nothing runs when it is
  * off. A logged QSO reloads it too, so the worked flags follow the log.
+ *
+ * With `watch` set, the hook also stops while the element given to `ref` is out of sight (the pane
+ * is a background tab) or the window is hidden, and reads the list again when it comes back.
  */
-export function usePota(active: boolean): { list: PotaList | null; err: string; refresh: () => void } {
+export function usePota(active: boolean, watch = false): { list: PotaList | null; err: string; refresh: () => void; ref: (el: HTMLElement | null) => void } {
   const [list, setList] = useState<PotaList | null>(null);
   const [err, setErr] = useState("");
   const [nonce, setNonce] = useState(0);
+  const [seen, setSeen] = useState(true);
+  const [shown, setShown] = useState(() => document.visibilityState !== "hidden");
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  const ref = useCallback((e: HTMLElement | null) => setEl(e), []);
 
   useEffect(() => {
-    if (!active) return;
+    if (!watch || !el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver((entries) => setSeen(entries[entries.length - 1].isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, [watch, el]);
+
+  useEffect(() => {
+    if (!watch) return;
+    const h = () => setShown(document.visibilityState !== "hidden");
+    document.addEventListener("visibilitychange", h);
+    return () => document.removeEventListener("visibilitychange", h);
+  }, [watch]);
+
+  const on = active && (!watch || (seen && shown));
+
+  useEffect(() => {
+    if (!on) return;
     let live = true;
     const load = (force: boolean) =>
       api
@@ -32,9 +56,9 @@ export function usePota(active: boolean): { list: PotaList | null; err: string; 
       clearInterval(timer);
       off();
     };
-  }, [active, nonce]);
+  }, [on, nonce]);
 
-  return { list, err, refresh: () => setNonce((n) => n + 1) };
+  return { list, err, refresh: () => setNonce((n) => n + 1), ref };
 }
 
 /** What a POTA spot would be new for, as short labels. */
@@ -45,4 +69,24 @@ export function potaNeeds(n: import("./types").PotaSpot["needed"]): string[] {
   if (n.new_band) out.push("New band");
   if (n.new_mode) out.push("New mode");
   return out;
+}
+
+/** What counts as worked: the call on that band at any time, a park in the log, or the call at that park today (UTC). */
+export type PotaWorked = "band" | "park" | "day";
+export const POTA_WORKED: [PotaWorked, string][] = [
+  ["day", "Worked: today at this park"],
+  ["park", "Worked: park ever (unique parks)"],
+  ["band", "Worked: call on band ever"],
+];
+
+/** The choice made in the POTA spots pane, shared by the band map. */
+export const potaWorkedMode = (): PotaWorked => {
+  const w = localGet<{ worked?: PotaWorked }>("qrzero.pota", {}).worked;
+  return w === "park" || w === "band" ? w : "day";
+};
+
+export function isPotaWorked(s: PotaSpot, mode: PotaWorked): boolean {
+  if (mode === "park") return s.park_worked;
+  if (mode === "day") return s.worked_today;
+  return !!s.needed && !s.needed.new_call_band;
 }

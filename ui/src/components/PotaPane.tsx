@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, Fragment, type ReactNode } from "react";
 import { useColumnDrag } from "../columnDrag";
 import { BANDS, MODE_GROUP_NAME, modeGroup } from "../modes";
 import { localGet, localSet } from "../prefs";
-import { potaNeeds, usePota } from "../pota";
+import { POTA_WORKED, isPotaWorked, potaNeeds, potaWorkedMode, usePota, type PotaWorked } from "../pota";
 import type { PotaSpot } from "../types";
 import type { DecodePick } from "./FtxMonitor";
 
@@ -11,7 +11,7 @@ interface Col {
   label: string;
   track: string;
   min: number;
-  cell: (s: PotaSpot, needs: string[]) => ReactNode;
+  cell: (s: PotaSpot, needs: string[], worked: boolean) => ReactNode;
 }
 
 const utc = (t: number) => (t ? new Date(t * 1000).toISOString().slice(11, 16) : "");
@@ -27,18 +27,18 @@ const COLS: Col[] = [
   { key: "country", label: "Country", track: "minmax(80px, 1fr)", min: 80, cell: (s) => <span>{s.entity?.name ?? ""}</span> },
   { key: "spotter", label: "Spotter", track: "96px", min: 96, cell: (s) => <span className="mono">{s.spotter}</span> },
   { key: "comment", label: "Comment", track: "minmax(120px, 2fr)", min: 120, cell: (s) => <span className="comment">{s.comment}</span> },
-  { key: "flags", label: "Flags", track: "minmax(90px, 1fr)", min: 90, cell: (s, needs) => <span className="flags">{needs.map((n) => <span key={n} className="flag new">{n}</span>)}{s.needed && !s.needed.new_call_band ? <span className="flag dupe">Worked</span> : null}</span> },
+  { key: "flags", label: "Flags", track: "minmax(90px, 1fr)", min: 90, cell: (_s, needs, worked) => <span className="flags">{needs.map((n) => <span key={n} className="flag new">{n}</span>)}{worked ? <span className="flag dupe">Worked</span> : null}</span> },
 ];
 
-interface Filters { band: string; modes: "" | "cw" | "phone" | "digital"; needed: boolean; hideWorked: boolean }
-const DEFAULTS: Filters = { band: "", modes: "", needed: false, hideWorked: false };
+interface Filters { band: string; modes: "" | "cw" | "phone" | "digital"; needed: boolean; hideWorked: boolean; worked: PotaWorked }
+const DEFAULTS: Filters = { band: "", modes: "", needed: false, hideWorked: false, worked: "day" };
 
 export const potaPick = (s: PotaSpot, qsy = false): DecodePick => ({ call: s.call, grid: s.grid, band: s.band, mode: s.mode, freq_hz: s.freq_hz, pota_ref: s.reference, qsy: qsy || undefined });
 
 /** Activators on the air in Parks on the Air, read from the POTA spot list while this pane is open. */
 export default function PotaPane({ onPick }: { onPick: (p: DecodePick) => void }) {
-  const { list, err, refresh } = usePota(true);
-  const [filters, setFilters] = useState<Filters>(() => ({ ...DEFAULTS, ...localGet<Partial<Filters>>("qrzero.pota", {}) }));
+  const { list, err, refresh, ref } = usePota(true, true);
+  const [filters, setFilters] = useState<Filters>(() => ({ ...DEFAULTS, ...localGet<Partial<Filters>>("qrzero.pota", {}), worked: potaWorkedMode() }));
   const head = useRef<HTMLDivElement>(null);
   const colDrag = useColumnDrag("qrzero.potaCols", COLS.map((c) => c.key), head);
   const cols = colDrag.order.map((k) => COLS.find((c) => c.key === k)!);
@@ -59,13 +59,13 @@ export default function PotaPane({ onPick }: { onPick: (p: DecodePick) => void }
           (!filters.band || s.band === filters.band) &&
           (!filters.modes || modeGroup(s.mode) === filters.modes) &&
           (!filters.needed || potaNeeds(s.needed).length > 0) &&
-          (!filters.hideWorked || !s.needed || s.needed.new_call_band),
+          (!filters.hideWorked || !isPotaWorked(s, filters.worked)),
       ),
     [spots, filters],
   );
 
   return (
-    <div className="ftx cluster">
+    <div className="ftx cluster" ref={ref}>
       <div className="grid-tools">
         <select value={filters.band} onChange={(e) => setFilter({ band: e.target.value })} aria-label="Band">
           <option value="">All bands</option>
@@ -78,7 +78,10 @@ export default function PotaPane({ onPick }: { onPick: (p: DecodePick) => void }
           <option value="digital">Digital</option>
         </select>
         <label className="check" title="Only activators that would be a new DXCC entity, band or mode for you"><input type="checkbox" checked={filters.needed} onChange={(e) => setFilter({ needed: e.target.checked })} /> Needed only</label>
-        <label className="check" title="Hide activators you have already worked on that band and mode"><input type="checkbox" checked={filters.hideWorked} onChange={(e) => setFilter({ hideWorked: e.target.checked })} /> Hide worked</label>
+        <select value={filters.worked} onChange={(e) => setFilter({ worked: e.target.value as PotaWorked })} aria-label="Worked" title="What counts as worked: the call from this park since 0000z today, a park already in your log, or the call on that band at any time. Parks are read from the POTA field of your QSOs.">
+          {POTA_WORKED.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+        </select>
+        <label className="check" title="Hide the activators that count as worked"><input type="checkbox" checked={filters.hideWorked} onChange={(e) => setFilter({ hideWorked: e.target.checked })} /> Hide worked</label>
         <button onClick={refresh} title="Read the POTA spot list now">Refresh</button>
         <span className="muted small">{shown.length} spot{shown.length === 1 ? "" : "s"}</span>
         <span className="spacer" />
@@ -105,18 +108,19 @@ export default function PotaPane({ onPick }: { onPick: (p: DecodePick) => void }
         {shown.length === 0 && <div className="empty muted">{!list ? "Reading the POTA spot list…" : spots.length ? "No spots match the filters." : "No activators are spotted right now."}</div>}
         {shown.map((s) => {
           const needs = potaNeeds(s.needed);
+          const isWorked = isPotaWorked(s, filters.worked);
           const group = modeGroup(s.mode);
           return (
             <div
               key={s.id || `${s.call}${s.freq_hz}${s.time}`}
-              className={`spot-row ${group ? `mode-${group}` : ""} ${needs.length ? "needed" : ""} ${s.needed && !s.needed.new_call_band ? "worked" : ""}`}
+              className={`spot-row ${group ? `mode-${group}` : ""} ${needs.length ? "needed" : ""} ${isWorked ? "worked" : ""}`}
               role="row"
               style={rowStyle}
               onClick={() => onPick(potaPick(s))}
               onDoubleClick={() => onPick(potaPick(s, true))}
               title={`Click to fill in ${s.call} (${s.reference}); double-click to tune too`}
             >
-              {cols.map((c) => <Fragment key={c.key}>{c.cell(s, needs)}</Fragment>)}
+              {cols.map((c) => <Fragment key={c.key}>{c.cell(s, needs, isWorked)}</Fragment>)}
             </div>
           );
         })}

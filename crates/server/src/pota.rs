@@ -5,6 +5,7 @@
 //! half a minute, so several panes share one request. A failed fetch keeps the old list and
 //! reports the error next to it.
 
+use std::collections::HashSet;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -38,6 +39,10 @@ pub struct PotaSpot {
     pub comment: String,
     pub entity: Option<Entity>,
     pub needed: Option<Needed>,
+    /// A park already in the log (any call, band or mode): for chasing unique parks.
+    pub park_worked: bool,
+    /// This call from this park on this band and mode already today (UTC): for the daily reset.
+    pub worked_today: bool,
 }
 
 #[derive(Default)]
@@ -97,7 +102,36 @@ fn parse_spot(v: &Value) -> Option<PotaSpot> {
         comment: text(v, "comments"),
         entity: None,
         needed: None,
+        park_worked: false,
+        worked_today: false,
     })
+}
+
+/// CW and phone count as one mode each (SSB, USB and LSB are the same), any other mode on its own.
+fn mode_key(mode: &str) -> String {
+    match qrzero_core::awards::mode_group(mode) {
+        Some(g @ ("CW" | "PHONE")) => g.to_string(),
+        _ => mode.trim().to_uppercase(),
+    }
+}
+
+/// A QSO's call, park, band and mode.
+type DayKey = (String, String, String, String);
+
+/// The parks in the open log, and which (call, park, band, mode) were worked since 0000z today.
+fn worked_parks(hub: &Hub) -> (HashSet<String>, HashSet<DayKey>) {
+    let midnight = chrono::Utc::now().date_naive().and_time(chrono::NaiveTime::MIN).and_utc().timestamp();
+    let (mut parks, mut today) = (HashSet::new(), HashSet::new());
+    let Some(log_id) = hub.active().log_id else { return (parks, today) };
+    for q in hub.with_store(|st| st.pota_qsos(log_id)).unwrap_or_default() {
+        for r in q.refs.split(',').map(|r| r.trim().to_uppercase()).filter(|r| !r.is_empty()) {
+            if q.time_on >= midnight {
+                today.insert((q.call.to_uppercase(), r.clone(), q.band.clone().unwrap_or_default(), mode_key(&q.mode)));
+            }
+            parks.insert(r);
+        }
+    }
+    (parks, today)
 }
 
 impl Pota {
@@ -156,12 +190,15 @@ impl Pota {
             let st = self.lock();
             (st.items.clone(), st.fetched_at, st.error.clone())
         };
+        let (parks, today) = worked_parks(hub);
         let mut spots: Vec<PotaSpot> = items
             .iter()
             .filter_map(parse_spot)
             .map(|mut s| {
                 s.band = band_for_freq(s.freq_hz as f64 / 1e6).map(str::to_string);
                 s.entity = hub.entity(&s.call);
+                s.park_worked = parks.contains(&s.reference);
+                s.worked_today = today.contains(&(s.call.clone(), s.reference.clone(), s.band.clone().unwrap_or_default(), mode_key(&s.mode)));
                 s.needed = hub.needed(&s.call, s.entity.as_ref().and_then(|e| e.dxcc), s.band.as_deref(), Some(s.mode.as_str()).filter(|m| !m.is_empty()));
                 s
             })

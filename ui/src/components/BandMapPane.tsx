@@ -4,7 +4,7 @@ import type { PopContext } from "../bus";
 import { onLive, useInstances, useRadios } from "../live";
 import { BANDS, MODE_GROUP_NAME, bandForFreq, modeGroup } from "../modes";
 import { needLabel, needRank } from "../needed";
-import { usePota, potaNeeds } from "../pota";
+import { usePota, potaNeeds, isPotaWorked, potaWorkedMode } from "../pota";
 import { potaPick } from "./PotaPane";
 import { localGet, localSet } from "../prefs";
 import type { FtxDecode, Spot } from "../types";
@@ -118,7 +118,7 @@ export default function BandMapPane({ ctx, act }: { ctx: PopContext; act: PaneAc
   const instances = useInstances();
   const [prefs, setPrefs] = useState<Prefs>(() => localGet<Prefs>(PREFS_KEY, { band: "20m", zoom: {}, plan: "us", needed: false, follow: true }));
   const [spots, setSpots] = useState<Spot[]>([]);
-  const pota = usePota(!!prefs.pota);
+  const pota = usePota(!!prefs.pota, true);
   const [decodes, setDecodes] = useState<StampedDecode[]>([]);
   const [now, setNow] = useState(Date.now() / 1000);
   const [size, setSize] = useState({ w: 600, h: 400 });
@@ -280,7 +280,7 @@ export default function BandMapPane({ ctx, act }: { ctx: PopContext; act: PaneAc
     if (!(s.band === band || (khz >= lo && khz <= hi))) continue;
     const needs = potaNeeds(s.needed);
     if (prefs.needed && !needs.length) continue;
-    const worked = !!s.needed && !s.needed.new_call_band;
+    const worked = isPotaWorked(s, potaWorkedMode());
     const group = modeGroup(s.mode);
     items.push({
       key: `p${s.id || s.call + s.freq_hz}`,
@@ -376,7 +376,7 @@ export default function BandMapPane({ ctx, act }: { ctx: PopContext; act: PaneAc
       : "No radio selected";
 
   return (
-    <div className="bandmap">
+    <div className="bandmap" ref={pota.ref}>
       <div className="grid-tools">
         <select
           value={band}
