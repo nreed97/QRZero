@@ -1,0 +1,46 @@
+name: Problem report
+description: Something doesn't work, or works differently than you expect
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: QRZero version
+      description: Shown under ☰ → About QRZero.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [Windows, macOS, Linux, Other]
+    validations:
+      required: true
+  - type: dropdown
+    id: how
+    attributes:
+      label: How you run QRZero
+      options: [Desktop app, "Browser (qrzero-server)"]
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What did you do, what did you expect, and what happened instead? Include any message shown, word for word.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to repeat it
+      placeholder: "1. Open ...\n2. Click ...\n3. ..."
+  - type: textarea
+    id: setup
+    attributes:
+      label: Radio and other programs
+      description: If it involves a radio, the rig control method and radio model; for FTx or N1MM problems, the program and its version. For lookups, uploads or the cluster, which service or node.
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots help. Please do not post passwords or API keys. Do not attach your whole log; if a particular QSO matters, paste its ADIF line.
