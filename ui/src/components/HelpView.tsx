@@ -44,6 +44,24 @@ const docs = Object.entries(pages)
     };
   });
 
+// The sidebar groups the pages by what they are for. A page not listed here still shows, under "More".
+const groups: { name: string; pages: string[] }[] = [
+  { name: "Start", pages: ["01-getting-started", "12-browser", "22-troubleshooting", "23-getting-help"] },
+  { name: "Logging", pages: ["02-logging", "03-log-grid", "04-import-export"] },
+  { name: "Radios and programs", pages: ["07-radios", "08-ftx-monitor", "16-udp-and-startup"] },
+  { name: "Spots and band map", pages: ["09-cluster", "13-band-map", "21-pota", "14-watch-list", "17-dxpeditions", "18-contests", "15-propagation", "20-alerts"] },
+  { name: "Awards and QSL", pages: ["11-awards", "19-statistics", "10-qsl"] },
+  { name: "Settings and window", pages: ["05-setup", "06-layout"] },
+];
+
+function grouped() {
+  const listed = new Set(groups.flatMap((g) => g.pages));
+  const out = groups.map((g) => ({ name: g.name, docs: g.pages.map((id) => docs.find((d) => d.id === id)).filter((d): d is (typeof docs)[number] => !!d) }));
+  const rest = docs.filter((d) => !listed.has(d.id));
+  if (rest.length) out.push({ name: "More", docs: rest });
+  return out.filter((g) => g.docs.length);
+}
+
 type Hit = { doc: string; title: string; heading: string; snippet: string; score: number };
 
 function search(query: string): Hit[] {
@@ -143,8 +161,13 @@ export default function HelpView({ onClose }: { onClose: () => void }) {
               ))}
             </div>
           ) : (
-            docs.map((d) => (
-              <button key={d.id} className={d.id === current ? "active" : ""} onClick={() => { setJump(""); setCurrent(d.id); }}>{d.title}</button>
+            grouped().map((g) => (
+              <div key={g.name} className="help-group">
+                <div className="help-group-name">{g.name}</div>
+                {g.docs.map((d) => (
+                  <button key={d.id} className={d.id === current ? "active" : ""} onClick={() => { setJump(""); setCurrent(d.id); }}>{d.title}</button>
+                ))}
+              </div>
             ))
           )}
         </nav>

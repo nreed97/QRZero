@@ -431,6 +431,8 @@ table.fields .w-default { width: 90px; }
 .help nav { position: sticky; top: 0; align-self: flex-start; max-height: 80vh; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; width: 180px; flex-shrink: 0; }
 .help nav button { text-align: left; background: none; border: 1px solid transparent; white-space: normal; }
 .help nav button.active { border-color: var(--line); background: var(--panel-2); font-weight: 600; }
+.help-group { display: flex; flex-direction: column; gap: 1px; margin-bottom: 6px; }
+.help-group-name { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; opacity: .65; padding: 2px 4px; }
 .help-search { width: 100%; box-sizing: border-box; margin-bottom: 4px; }
 .help-results { display: flex; flex-direction: column; gap: 1px; max-height: 60vh; overflow-y: auto; }
 .help-results button { text-align: left; background: none; border: 1px solid transparent; white-space: normal; }

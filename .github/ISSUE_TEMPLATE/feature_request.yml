@@ -1,0 +1,15 @@
+name: Suggestion
+description: An idea for a change or a new feature
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What would you like to do?
+      description: Describe what you are trying to do at the radio, rather than how the program should do it.
+    validations:
+      required: true
+  - type: textarea
+    id: now
+    attributes:
+      label: How do you do it now?

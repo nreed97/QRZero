@@ -363,26 +363,17 @@ It prints a link that includes a session token; open it. The token keeps other p
 
 The full user guide is in [docs/user](docs/user/01-getting-started.md) and is built into the app under ☰ → **Help** (<kbd>F1</kbd>). It opens on a **Getting started** page that takes you from install to a first QSO, a connected radio, your logging programs and your QSLs, and a search box at the top finds any word on any page and jumps to it. Its chapters:
 
-1. [Getting started](docs/user/01-getting-started.md)
-2. [Logging QSOs](docs/user/02-logging.md)
-3. [The log grid](docs/user/03-log-grid.md)
-4. [Importing and exporting ADIF](docs/user/04-import-export.md)
-5. [Callsigns, locations, logs and settings](docs/user/05-setup.md)
-6. [Arranging the window](docs/user/06-layout.md)
-7. [Radios, split and rotator](docs/user/07-radios.md)
-8. [FTx monitor, WSJT-X and N1MM](docs/user/08-ftx-monitor.md)
-9. [DX cluster](docs/user/09-cluster.md)
-10. [QSL](docs/user/10-qsl.md)
-11. [Awards](docs/user/11-awards.md)
-12. [Using QRZero in a browser](docs/user/12-browser.md)
-13. [Band map](docs/user/13-band-map.md)
-14. [Watch list](docs/user/14-watch-list.md)
-15. [Propagation](docs/user/15-propagation.md)
-16. [UDP connections and startup programs](docs/user/16-udp-and-startup.md)
-17. [DXpeditions](docs/user/17-dxpeditions.md)
-18. [Contests](docs/user/18-contests.md)
-19. [Statistics](docs/user/19-statistics.md)
-20. [Push alerts (ntfy)](docs/user/20-alerts.md)
+**Start**: [Getting started](docs/user/01-getting-started.md), [Using QRZero in a browser](docs/user/12-browser.md), [Troubleshooting](docs/user/22-troubleshooting.md), [Getting help](docs/user/23-getting-help.md)
+
+**Logging**: [Logging QSOs](docs/user/02-logging.md), [The log grid](docs/user/03-log-grid.md), [Importing and exporting ADIF](docs/user/04-import-export.md)
+
+**Radios and programs**: [Radios, split and rotator](docs/user/07-radios.md), [FTx monitor, WSJT-X and N1MM](docs/user/08-ftx-monitor.md), [UDP connections and startup programs](docs/user/16-udp-and-startup.md)
+
+**Spots and band map**: [DX cluster](docs/user/09-cluster.md), [Band map](docs/user/13-band-map.md), [POTA spots](docs/user/21-pota.md), [Watch list](docs/user/14-watch-list.md), [DXpeditions](docs/user/17-dxpeditions.md), [Contests](docs/user/18-contests.md), [Propagation](docs/user/15-propagation.md), [Push alerts (ntfy)](docs/user/20-alerts.md)
+
+**Awards and QSL**: [Awards](docs/user/11-awards.md), [Statistics](docs/user/19-statistics.md), [QSL](docs/user/10-qsl.md)
+
+**Settings and window**: [Callsigns, locations, logs and settings](docs/user/05-setup.md), [Arranging the window](docs/user/06-layout.md)
 
 | | |
 | --- | --- |

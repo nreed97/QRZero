@@ -79,6 +79,8 @@ Choose **QSL** from the **☰** menu, then the **Online services** tab. Enter yo
 | Send confirmations | **QSL** in the ☰ menu |
 | See my totals, DXCC progress by year, confirmation rates and most-worked stations | **Statistics…** in the ☰ menu; [Statistics](19-statistics) |
 | Back up or restore my log | **Settings → Backups** |
+| Fix something that isn't working | [Troubleshooting](22-troubleshooting) |
+| Report a problem or ask for a feature | [Getting help](23-getting-help) |
 | Search this guide | The search box at the top of the Help window |
 | See which version I have, or find the website (qrzero.app), project page, releases and issue tracker | **About QRZero** in the ☰ menu |
 
