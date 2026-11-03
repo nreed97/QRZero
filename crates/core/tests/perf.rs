@@ -71,9 +71,10 @@ fn large_log_speed() {
     println!("DXCC award table ({rows} rows): {award:?}");
     assert!(award.as_millis() < 1000, "the awards tab should open quickly");
     let t = Instant::now();
-    let mut stats = qrzero_core::stats::StatsTally::default();
-    st.for_each_stats_qso(log, &[], |c| Some(c.len() as u32), |q| stats.add(q)).unwrap();
-    let stats = stats.finish(&Default::default());
+    let filter = qrzero_core::stats::StatsFilter::default();
+    let mut stats = qrzero_core::stats::StatsTally::new(Default::default(), &filter);
+    st.for_each_stats_qso(log, &[], &filter, |c| Some(c.len() as u32), |q| stats.add(q)).unwrap();
+    let stats = stats.finish("");
     let took = t.elapsed();
     println!("statistics over {} QSOs ({} entities): {took:?}", stats.total_qsos, stats.entities_worked);
     assert!(took.as_millis() < 1000, "the statistics window should open quickly");

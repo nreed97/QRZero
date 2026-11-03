@@ -432,8 +432,17 @@ export interface LogStats {
   unique_calls: number;
   entities_worked: number;
   entities_confirmed: number;
+  /** The summary as plain text, ready to copy. */
   text: string;
+  /** Places worked, biggest first: a 4-character grid square, or an entity's middle when the QSO has no grid. */
+  points: { lat: number; lon: number; qsos: number; label: string }[];
+  /** Years and bands with QSOs; they don't change with the filters. */
+  years_available: number[];
+  bands_available: string[];
 }
+
+/** What the Statistics window counts. Dates are YYYY-MM-DD (UTC), both included; empty means no limit. */
+export interface StatsFilter { from: string; to: string; band: string; mode: string }
 
 /** One activator on the POTA spot list. */
 export interface PotaSpot {
