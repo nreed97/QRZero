@@ -296,7 +296,7 @@ The **Queue** tab shows each queued card with the station's contact information 
 
 ## Statistics
 
-**Statistics…** in the ☰ menu opens a plain-text summary of the log, counted when the window opens (about half a second on 200,000 QSOs) with nothing running in the background: totals, DXCC progress by year (new entities and running total), confirmation rates for LoTW, paper, QRZ, Club Log and eQSL, and your ten most worked entities and callsigns. **Copy** puts it on the clipboard.
+**Statistics…** in the ☰ menu opens a plain-text summary of the log, counted when the window opens or a filter changes (about half a second on 200,000 QSOs) with nothing running in the background. Filter by year or date range, band and mode (CW, Phone, Digital). It shows totals, busiest day and longest streak, DXCC progress by year (new entities and running total), QSOs by band, mode and continent, confirmation rates for LoTW, paper, QRZ, Club Log and eQSL, and your ten most worked entities and callsigns. The **Map** tab plots every place you have worked. **Copy summary** puts the text on the clipboard.
 
 ## ADIF import and export
 

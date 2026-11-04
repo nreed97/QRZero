@@ -849,27 +849,97 @@ struct StatsQuery {
     /// Comma-separated station callsigns; empty means all.
     #[serde(default)]
     calls: String,
+    /// First and last day counted ("YYYY-MM-DD", UTC, both included); empty means no limit.
+    #[serde(default)]
+    from: String,
+    #[serde(default)]
+    to: String,
+    /// One band, as stored ("20m"); empty means all.
+    #[serde(default)]
+    band: String,
+    /// "cw", "phone" or "digital"; empty or "mixed" counts every mode.
+    #[serde(default)]
+    mode: String,
+}
+
+/// The statistics plus the choices for the filters (which are not themselves filtered).
+#[derive(serde::Serialize)]
+struct StatsReply {
+    #[serde(flatten)]
+    stats: qrzero_core::stats::Stats,
+    /// Years with QSOs, newest first.
+    years_available: Vec<i32>,
+    /// Bands with QSOs, longest wavelength first.
+    bands_available: Vec<String>,
 }
 
 /// The log's statistics, counted when asked for (nothing runs in the background).
-async fn log_stats(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Query<StatsQuery>) -> ApiResult<qrzero_core::stats::Stats> {
+async fn log_stats(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Query<StatsQuery>) -> ApiResult<StatsReply> {
+    use qrzero_core::stats::{EntityInfo, StatsFilter, StatsTally};
     let cty = s.hub.cty();
     let calls: Vec<String> = q.calls.split(',').map(|c| c.trim().to_ascii_uppercase()).filter(|c| !c.is_empty()).collect();
-    let names: std::collections::BTreeMap<u32, String> = cty
+    let day = |t: &str, end: bool| {
+        let d = chrono::NaiveDate::parse_from_str(t.trim(), "%Y-%m-%d").ok()?;
+        Some(d.and_hms_opt(0, 0, 0)?.and_utc().timestamp() + if end { 86_400 } else { 0 })
+    };
+    let mut filter = StatsFilter {
+        from: day(&q.from, false).unwrap_or(i64::MIN),
+        to: day(&q.to, true).unwrap_or(i64::MAX),
+        band: Some(q.band.trim().to_string()).filter(|b| !b.is_empty()),
+        group: match q.mode.to_ascii_lowercase().as_str() {
+            "cw" => Some("CW"),
+            "phone" => Some("PHONE"),
+            "digital" => Some("DIGITAL"),
+            _ => None,
+        },
+    };
+    let entities: std::collections::BTreeMap<u32, EntityInfo> = cty
         .as_ref()
-        .map(|c| c.entities().iter().filter_map(|e| e.dxcc.map(|d| (d, e.name.clone()))).collect())
-        .unwrap_or_default();
-    let key = format!("stats|{id}|{}|{}", calls.join(","), cty.as_ref().map_or(0, |c| c.len()));
-    let cache = s.award_cache.clone();
-    let out = dbr(&s, move |st| {
-        cached_count(&cache, st, key, || {
-            let mut tally = qrzero_core::stats::StatsTally::default();
-            st.for_each_stats_qso(id, &calls, |c| cty_facts(cty.as_deref(), c).dxcc, |qso| tally.add(qso))?;
-            Ok(tally.finish(&names))
+        .map(|c| {
+            c.entities()
+                .iter()
+                .filter_map(|e| e.dxcc.map(|d| (d, EntityInfo { name: e.name.clone(), cont: e.cont.clone(), lat: e.lat, lon: e.lon })))
+                .collect()
         })
+        .unwrap_or_default();
+    let label = format!(
+        "{} · {} · {}",
+        match (q.from.trim(), q.to.trim()) {
+            ("", "") => "All dates".to_string(),
+            (f, "") => format!("From {f}"),
+            ("", t) => format!("Up to {t}"),
+            (f, t) if f == t => f.to_string(),
+            (f, t) => format!("{f} to {t}"),
+        },
+        filter.band.clone().unwrap_or_else(|| "all bands".into()),
+        match filter.group {
+            Some("CW") => "CW",
+            Some("PHONE") => "Phone",
+            Some(_) => "Digital",
+            None => "all modes",
+        },
+    );
+    // The mode groups are the user's own (Settings > Modes), so they are part of the key.
+    let key = format!("stats|{id}|{}|{}|{}|{:?}|{}|{}", calls.join(","), filter.from, filter.to, filter.band, filter.group.unwrap_or(""), cty.as_ref().map_or(0, |c| c.len()));
+    let cache = s.award_cache.clone();
+    let calls2 = calls.clone();
+    let (stats, range, bands) = dbr(&s, move |st| {
+        let stats = cached_count(&cache, st, key, || {
+            let mut tally = StatsTally::new(entities, &filter);
+            let band = filter.band.take();
+            let filter = StatsFilter { band, ..filter };
+            st.for_each_stats_qso(id, &calls2, &filter, |c| cty_facts(cty.as_deref(), c).dxcc, |qso| tally.add(qso))?;
+            Ok(tally.finish(&label))
+        })?;
+        Ok((stats, st.qso_time_range(id, &calls2)?, st.used_bands(id, &calls2)?))
     })
     .await?;
-    Ok(Json(out.as_ref().clone()))
+    let year_of = |t: i64| chrono::DateTime::from_timestamp(t, 0).map_or(1970, |d| chrono::Datelike::year(&d));
+    let years_available = range.map(|(a, b)| (year_of(a)..=year_of(b)).rev().collect()).unwrap_or_default();
+    let mut bands_available = bands;
+    let rank = |b: &str| qrzero_core::band::BANDS.iter().position(|x| x.0.eq_ignore_ascii_case(b)).unwrap_or(usize::MAX);
+    bands_available.sort_by(|a, b| rank(a).cmp(&rank(b)).then_with(|| a.cmp(b)));
+    Ok(Json(StatsReply { stats: stats.as_ref().clone(), years_available, bands_available }))
 }
 
 #[derive(Deserialize)]

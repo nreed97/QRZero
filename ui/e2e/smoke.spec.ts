@@ -375,6 +375,12 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await expect(stats.getByLabel("Statistics summary")).toContainText("Confirmation rates");
   await expect(stats.getByLabel("Statistics summary")).toContainText("K1ABC");
   await stats.screenshot({ path: "e2e-results/stats.png" });
+  // The filters head the copyable text, and the Map tab draws the places worked.
+  await stats.getByLabel("Mode").selectOption("cw");
+  await expect(stats.getByLabel("Statistics summary")).toContainText("all bands · CW");
+  await stats.getByRole("tab", { name: "Map" }).click();
+  await expect(stats.getByRole("img", { name: "Map of the places worked" })).toBeVisible();
+  await stats.screenshot({ path: "e2e-results/stats-map.png" });
   await stats.getByRole("button", { name: "Close", exact: true }).last().click();
   await expect(stats).toHaveCount(0);
   // About names the installed version and links to the project.
