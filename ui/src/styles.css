@@ -761,6 +761,14 @@ pre.udp-sent { font: 11px var(--mono); background: var(--panel-2); border: 1px s
 .upload-log pre { margin: 2px 0 0; padding: 4px 6px; max-height: 9em; overflow: auto; font-size: 11px; line-height: 1.35; white-space: pre-wrap; word-break: break-word; background: var(--panel-2, var(--bg)); border: 1px solid var(--border-line); border-radius: 2px; }
 
 .stats-text { margin: 0 0 8px; padding: 6px 8px; border: 1px solid var(--line); background: var(--bg); font-family: ui-monospace, Consolas, monospace; font-size: 12px; max-height: 60vh; overflow: auto; user-select: text; }
+.stats-filters { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.stats-map svg { display: block; width: 100%; height: auto; border: 1px solid var(--line); }
+.stats-map .sea { fill: var(--sea); }
+.stats-map .graticule { fill: none; stroke: var(--line); stroke-width: 0.4; opacity: 0.6; }
+.stats-map .land { fill: var(--land); }
+.stats-map .borders { fill: none; stroke: var(--border-line); stroke-width: 0.4; }
+.stats-map circle { fill: var(--new); fill-opacity: 0.65; stroke: #000; stroke-width: 0.5; }
+.stats-map p { margin: 4px 0 8px; }
 .stats-bar { display: flex; justify-content: flex-end; gap: 6px; }
 
 /* Keyboard row selection in the spot and decode lists. */

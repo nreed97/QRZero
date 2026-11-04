@@ -1,4 +1,4 @@
-import type { Spot, LogStats, UpdateInfo, ContestList, DxpedList, MostWanted, DxpedPlanned, PropagationReport, PotaList } from "./types";
+import type { Spot, LogStats, StatsFilter, UpdateInfo, ContestList, DxpedList, MostWanted, DxpedPlanned, PropagationReport, PotaList } from "./types";
 import type { ClubAwards, Goals, Marathon, NtfyConfig, NtfyView, QslQueue, QslService, QslDownload, AwardHint, SlotGrid, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
@@ -78,7 +78,7 @@ export const api = {
     return json<AwardTable>("GET", `/logs/${logId}/awards/${award}?${q}`);
   },
   /** The log's statistics as plain text, counted now. */
-  stats: (logId: number) => json<LogStats>("GET", `/logs/${logId}/stats`),
+  stats: (logId: number, f: StatsFilter) => json<LogStats>("GET", `/logs/${logId}/stats?${new URLSearchParams({ ...f })}`),
   clubAwards: (logId: number, o: { calls: string[]; region: "na_eu" | "other"; cwtTagged: boolean }) => {
     const q = new URLSearchParams({ calls: o.calls.join(","), region: o.region, cwt_tagged: String(o.cwtTagged) });
     return json<ClubAwards>("GET", `/logs/${logId}/club-awards?${q}`);

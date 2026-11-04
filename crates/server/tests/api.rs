@@ -309,6 +309,22 @@ async fn statistics_and_club_awards_follow_the_log() {
     assert_eq!(api.get(&stats).await["total_qsos"], 1);
     assert_eq!(api.get(&clubs).await, empty_clubs);
 
+    // The filters narrow the counts, and the choices for them stay complete.
+    api.post(&format!("/logs/{log}/qsos"), json!({"fields": {"CALL": "DL1X", "QSO_DATE": "20230605", "TIME_ON": "0900", "FREQ": "14.074", "MODE": "FT8", "GRIDSQUARE": "JO62"}})).await;
+    let all = api.get(&stats).await;
+    assert_eq!(all["total_qsos"], 2);
+    assert_eq!(all["bands_available"], json!(["40m", "20m"]));
+    assert_eq!(all["years_available"], json!([2024, 2023]));
+    let year = api.get(&format!("{stats}?from=2024-01-01&to=2024-12-31")).await;
+    assert_eq!(year["total_qsos"], 1);
+    assert_eq!(year["years_available"], all["years_available"]);
+    assert_eq!(api.get(&format!("{stats}?band=20m")).await["total_qsos"], 1);
+    assert_eq!(api.get(&format!("{stats}?mode=digital")).await["total_qsos"], 1);
+    assert_eq!(api.get(&format!("{stats}?mode=cw&band=20m")).await["total_qsos"], 0);
+    let digital = api.get(&format!("{stats}?mode=digital")).await;
+    assert_eq!(digital["points"][0]["label"], "JO62");
+    assert!(digital["text"].as_str().unwrap().contains("Digital"));
+
     // Points added by hand are not QSOs, but still change the CWT answer.
     api.call(reqwest::Method::PUT, &format!("/logs/{log}/cwt-extra"), Some(json!({"year": 2024, "points": 7}))).await;
     assert_ne!(api.get(&clubs).await, empty_clubs);

@@ -739,6 +739,17 @@ impl Store {
     }
 
     /// The first and last QSO times in the log (Unix seconds), optionally only for some station callsigns.
+    /// The bands that have QSOs, as stored.
+    pub fn used_bands(&self, log_id: i64, callsigns: &[String]) -> Result<Vec<String>> {
+        let marks = vec!["?"; callsigns.len()].join(", ");
+        let calls = if callsigns.is_empty() { String::new() } else { format!(" AND station_callsign IN ({marks})") };
+        let mut args: Vec<Value> = vec![log_id.into()];
+        args.extend(callsigns.iter().map(|c| Value::from(c.to_ascii_uppercase())));
+        let mut stmt = self.conn.prepare(&format!("SELECT DISTINCT band FROM qsos WHERE log_id = ?{calls} AND band IS NOT NULL AND band <> ''"))?;
+        let rows = stmt.query_map(params_from_iter(args), |r| r.get::<_, String>(0))?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
     pub fn qso_time_range(&self, log_id: i64, callsigns: &[String]) -> Result<Option<(i64, i64)>> {
         let marks = vec!["?"; callsigns.len()].join(", ");
         let calls = if callsigns.is_empty() { String::new() } else { format!(" AND station_callsign IN ({marks})") };
@@ -791,14 +802,17 @@ impl Store {
         &self,
         log_id: i64,
         callsigns: &[String],
+        filter: &crate::stats::StatsFilter,
         resolve: impl Fn(&str) -> Option<u32>,
         mut f: impl FnMut(&crate::stats::StatsQso),
     ) -> Result<()> {
         let marks = vec!["?"; callsigns.len()].join(", ");
         let calls = if callsigns.is_empty() { String::new() } else { format!(" AND station_callsign IN ({marks})") };
-        let mut stmt = self.conn.prepare(&format!("SELECT call, time_on, dxcc, fields FROM qsos WHERE log_id = ?{calls}"))?;
+        let band = if filter.band.is_some() { " AND band = ?" } else { "" };
+        let mut stmt = self.conn.prepare(&format!("SELECT call, time_on, dxcc, fields, band, IFNULL(submode, mode) FROM qsos WHERE log_id = ?{calls}{band}"))?;
         let mut args: Vec<Value> = vec![log_id.into()];
         args.extend(callsigns.iter().map(|c| Value::from(c.to_ascii_uppercase())));
+        args.extend(filter.band.iter().map(|b| Value::from(b.clone())));
         let mut rows = stmt.query(params_from_iter(args))?;
         #[derive(serde::Deserialize)]
         #[allow(non_snake_case)]
@@ -823,16 +837,33 @@ impl Store {
             EQSL_QSL_SENT: Option<std::borrow::Cow<'a, str>>,
             #[serde(borrow)]
             EQSL_QSL_RCVD: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            GRIDSQUARE: Option<std::borrow::Cow<'a, str>>,
+            #[serde(borrow)]
+            MY_GRIDSQUARE: Option<std::borrow::Cow<'a, str>>,
         }
         let yes = |v: &Option<std::borrow::Cow<str>>| matches!(v.as_deref(), Some("Y") | Some("V"));
         let mut q = crate::stats::StatsQso::default();
         while let Some(r) = rows.next()? {
+            q.mode = r.get::<_, Option<String>>(5)?.unwrap_or_default();
+            if filter.group.is_some_and(|g| crate::awards::mode_group(&q.mode) != Some(g)) {
+                continue;
+            }
             q.call = r.get(0)?;
             q.time_on = r.get(1)?;
             let dxcc: Option<i64> = r.get(2)?;
             q.dxcc = dxcc.and_then(|d| u32::try_from(d).ok()).or_else(|| resolve(&q.call));
+            q.in_range = q.time_on >= filter.from && q.time_on < filter.to;
+            if !q.in_range {
+                // Only the year and entity count for the by-year progress; skip reading the fields.
+                f(&q);
+                continue;
+            }
+            q.band = r.get::<_, Option<String>>(4)?.unwrap_or_default();
             let raw = r.get_ref(3)?.as_str().map_err(rusqlite::Error::from)?;
             let x: Facts = serde_json::from_str(raw)?;
+            q.grid = x.GRIDSQUARE.as_deref().unwrap_or_default().to_string();
+            q.my_grid = x.MY_GRIDSQUARE.as_deref().unwrap_or_default().to_string();
             q.lotw_sent = yes(&x.LOTW_QSL_SENT);
             q.lotw = yes(&x.LOTW_QSL_RCVD);
             q.paper_sent = yes(&x.QSL_SENT);

@@ -77,7 +77,7 @@ Choose **QSL** from the **☰** menu, then the **Online services** tab. Enter yo
 | Check what I still need for DXCC, WAS and other awards | The **Awards** tab; [Awards](11-awards) |
 | Send or answer paper QSL cards | Queue them in the Log tab, then **QSL Queue…** in the ☰ menu, or Alt+Q |
 | Send confirmations | **QSL** in the ☰ menu |
-| See my totals, DXCC progress by year, confirmation rates and most-worked stations | **Statistics…** in the ☰ menu; [Statistics](19-statistics) |
+| See my totals, DXCC progress by year, activity by band and mode, a map of everyone I worked, confirmation rates and most-worked stations | **Statistics…** in the ☰ menu; [Statistics](19-statistics) |
 | Back up or restore my log | **Settings → Backups** |
 | Fix something that isn't working | [Troubleshooting](22-troubleshooting) |
 | Report a problem or ask for a feature | [Getting help](23-getting-help) |
