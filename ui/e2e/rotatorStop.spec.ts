@@ -22,8 +22,12 @@ test("Rotator pane Stop button sends a stop request", async ({ page }) => {
     await page.getByRole("menu").getByLabel("Rotator").check();
     await page.getByRole("button", { name: /^Layout/ }).click();
   }
+  // The map has its own Stop beside the heading while rotor control is on.
+  await page.getByRole("tab", { name: "Map", exact: true }).click();
+  await page.locator(".map-info").getByRole("button", { name: "Stop", exact: true }).click();
+  await expect.poll(() => stops).toBe(1);
   await page.getByRole("tab", { name: "Rotator" }).click();
   await page.getByRole("button", { name: "Stop", exact: true }).click();
-  await expect.poll(() => stops).toBe(1);
+  await expect.poll(() => stops).toBe(2);
   await page.request.put("/api/integrations", { headers, data: before });
 });

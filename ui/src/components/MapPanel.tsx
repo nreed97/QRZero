@@ -211,6 +211,19 @@ export default function MapPanel({ home, homeLabel, dx, dxLabel, units, view, on
           </>
         )}
         {rotator !== undefined && <span className="muted rot" title="Rotator heading (dotted line on the map). Right-click the map to turn the antenna to a spot.">Rot {rotator === null ? "?" : `${Math.round(rotator)}°`}{target !== null ? ` → ${target}°` : ""}</span>}
+        {rotator !== undefined && (
+          <button
+            className="tiny"
+            onClick={() => {
+              setTurnErr("");
+              setTarget(null);
+              api.rotatorStop().catch((e) => setTurnErr((e as Error).message));
+            }}
+            title="Stop the antenna turning now"
+          >
+            Stop
+          </button>
+        )}
         {turnErr && <span className="err">{turnErr}</span>}
       </div>
       <SunInfo home={home} homeLabel={homeLabel} dx={dx} dxLabel={dxLabel} now={now} local={display.localTime} />
