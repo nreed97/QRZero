@@ -82,7 +82,7 @@ GS-232 replies don't need a line break at the end, which is how the WRC answers.
 
 Tick **Let N1MM (or another program) turn the rotator through QRZero** under the rotator settings. QRZero then listens for PstRotatorAz-style UDP commands (default `127.0.0.1:12040`) and passes every bearing, and stop, to whichever rotator connection you set up above, and answers when the program asks for the heading. N1MM's own rotor messages (what **Alt+J** sends) work as well as PstRotatorAz-style ones. In N1MM, under **Config → Configure Ports**, set the rotor's UDP address to the one above. Use this when N1MM is the program you want to drive the antenna and QRZero holds the connection to the controller. Don't point it at the same port PstRotatorAz itself uses.
 
-With a rotator set up, the map shows the rotator's heading and **Turn SP** / **LP** buttons that turn the antenna to the short or long path of the station you're working.
+With a rotator set up, the map shows the rotator's heading and **Turn SP** / **LP** buttons that turn the antenna to the short or long path of the station you're working. The map also has a **Stop** button beside the heading that halts the antenna.
 
 For another rotator program, or to send the heading somewhere else as well, add a UDP connection that sends on **Rotator turn request** (see *UDP connections and startup programs*). The Rotator pane works with that alone too, though it only shows the current heading when the rotator above is on.
 
@@ -99,6 +99,7 @@ There are several ways to turn the antenna:
 - **Click anywhere on the dial** to turn to that bearing. As you move the mouse over the dial, QRZero shows the bearing you'd turn to.
 - **Short path** and **Long path** turn to the station in the QSO panel.
 - Type a bearing in the box and press **Go** (or <kbd>Enter</kbd>).
+- **Stop** (next to **Go**) halts the antenna where it is. It works with rotctld, GS-232 and PstRotatorAz. You can also give it a key under **Settings → Keyboard** (*Stop the rotator*).
 - The preset buttons, for example **EU 45°** or **JA 330°**, turn to places you call often. Click **Edit presets** to rename them, change their bearings, remove them or add your own. **Add** starts a new preset at the current heading. Presets are kept on this computer.
 
 While the antenna is moving you'll see **Turning to 123°**. It clears once the heading is within 3° of where you asked for, or after a minute and a half if the rotator doesn't get there.

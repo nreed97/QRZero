@@ -328,6 +328,14 @@ mod tests {
         assert!(wait_heading(90.0));
         tx.send(Cmd::Turn(200.0)).unwrap();
         assert!(wait_heading(200.0), "{:?}", seen.lock().unwrap());
+        tx.send(Cmd::Stop).unwrap();
+        for _ in 0..20 {
+            if seen.lock().unwrap().iter().any(|c| c == "S") {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        panic!("no stop command: {:?}", seen.lock().unwrap());
     }
 
     #[test]

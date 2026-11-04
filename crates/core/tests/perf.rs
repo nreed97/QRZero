@@ -22,7 +22,7 @@ fn synthetic_adif(n: usize) -> String {
         let year = 2000 + i / (1440 * 28 * 12);
         let date = format!("{year}{month:02}{day:02}");
         let time = format!("{:02}{:02}", (i / 60) % 24, i % 60);
-        for (k, v) in [("CALL", call.as_str()), ("QSO_DATE", &date), ("TIME_ON", &time), ("BAND", band), ("FREQ", freq), ("MODE", mode), ("RST_SENT", "599"), ("RST_RCVD", "599"), ("NAME", "Operator Name"), ("COMMENT", "synthetic test QSO"), ("STATION_CALLSIGN", "N0CALL")] {
+        for (k, v) in [("CALL", call.as_str()), ("QSO_DATE", &date), ("TIME_ON", &time), ("BAND", band), ("FREQ", freq), ("MODE", mode), ("RST_SENT", "599"), ("RST_RCVD", "599"), ("NAME", "Operator Name"), ("COMMENT", "synthetic test QSO"), ("STATION_CALLSIGN", "N0CALL"), ("STATE", ["OH", "MI", "CT", "TX", "CA"][i % 5])] {
             out.push_str(&format!("<{k}:{}>{v} ", v.len()));
         }
         out.push_str("<EOR>\n");
@@ -59,6 +59,8 @@ fn large_log_speed() {
     let exact_pfx = timed("exact call EA8/K5Q100", &|| st.search(log, &QsoFilter { exact_call: Some("EA8/K5Q100".into()), ..Default::default() }, Sort::Newest, 0, 10_000).unwrap().0);
     let band = timed("20m CW", &|| st.search(log, &QsoFilter { bands: vec!["20m".into()], modes: vec!["CW".into()], ..Default::default() }, Sort::Newest, 0, 200).unwrap().0);
     let band_only = timed("all 20m", &|| st.search(log, &QsoFilter { bands: vec!["20m".into()], ..Default::default() }, Sort::Newest, 0, 200).unwrap().0);
+    let by_call = timed("sort by call, page from the middle", &|| st.search(log, &QsoFilter::default(), Sort::Call, (QSOS / 2) as i64, 200).unwrap().0);
+    let by_state = timed("field filter STATE=OH", &|| st.search(log, &QsoFilter { fields: [("STATE".to_string(), "OH".to_string())].into(), ..Default::default() }, Sort::Newest, 0, 200).unwrap().0);
     let wb = timed("worked before", &|| st.worked_before(log, "K5Q100", Some(291)).unwrap().call_count);
     let calls = vec!["N0CALL".to_string()];
     let pending = timed("QSOs waiting for QRZ", &|| st.count_pending(log, "QRZCOM_QSO_UPLOAD_STATUS", &calls, None, 0).unwrap());
@@ -105,8 +107,9 @@ fn large_log_speed() {
     println!("award hints plus one QSO added ({hints} hints over 1000 rounds): {per:?} each");
     assert!(per.as_millis() < 5, "award hints run on every call entered: {per:?}");
     let t = Instant::now();
-    let (_, n) = st.export_adif(log, &QsoFilter::default(), ExportProfile::Full, "perf").unwrap();
-    println!("export {n} QSOs: {:?}", t.elapsed());
+    let mut bytes = 0;
+    let n = st.export_adif_chunks(log, &QsoFilter::default(), ExportProfile::Full, "perf", &mut |c| { bytes += c.len(); true }).unwrap();
+    println!("export {n} QSOs ({} MB, streamed): {:?}", bytes / 1_000_000, t.elapsed());
 
     for i in 0..5_000 {
         st.set_note(log, &format!("K{}{}{}", i % 10, (b'A' + (i / 10 % 26) as u8) as char, i / 260), "a station note\nsecond line").unwrap();
@@ -117,6 +120,9 @@ fn large_log_speed() {
     let notes_q = timed("notes matching 5Q", &|| st.list_notes(log, "5Q", 0, 200).unwrap().0);
     for e in [note, notes, notes_q] {
         assert!(e.as_millis() < 100, "notes query too slow: {e:?}");
+    }
+    for e in [by_call, by_state] {
+        assert!(e.as_millis() < 500, "sort or field filter too slow: {e:?}");
     }
     for e in [page, call, exact, exact_pfx, band, band_only, wb, pending, batch] {
         assert!(e.as_millis() < 100, "interactive query too slow: {e:?}");
