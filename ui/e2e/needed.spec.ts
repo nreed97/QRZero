@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { AlertGate, compareNeeded, needRank, spotKey, type NeededAlertConfig } from "../src/needed";
+import { AlertGate, compareNeeded, isBeacon, needRank, spotKey, type NeededAlertConfig } from "../src/needed";
 import type { Spot } from "../src/types";
 
 const flags = (o: Partial<NonNullable<Spot["needed"]>>) => ({ new_call: true, new_call_band: true, new_dxcc: false, new_band: false, new_mode: false, ...o });
@@ -47,4 +47,17 @@ test("within a need, the most wanted entity comes first, then the newest spot", 
     { id: "entity, wanted 5", rank: 0 as const, wanted: 5, received: 10 },
   ];
   expect(rows.sort(compareNeeded).map((r) => r.id)).toEqual(["entity, wanted 5", "entity, wanted 50 new", "entity, wanted 50 old", "unranked new", "band, wanted 3"]);
+});
+
+test("beacons are recognised by call, comment or frequency", () => {
+  const b = (call: string, khz: number, comment = "") => isBeacon({ call, comment, freq_hz: khz * 1000 });
+  expect(b("DK0WCY/B", 10144)).toBe(true);
+  expect(b("4U1UN", 14100.2, "")).toBe(true);
+  expect(b("OH2B", 28200)).toBe(true);
+  expect(b("ZS6DN", 21150.0)).toBe(true);
+  expect(b("VK6RBP", 14110, "NCDXF beacon")).toBe(true);
+  expect(b("JA2IGY", 7040, "BCN")).toBe(true);
+  expect(b("VP8LP", 14025.3, "up 2")).toBe(false);
+  expect(b("K1ABC/BB", 14025)).toBe(false);
+  expect(new AlertGate().check({ ...spot("DK0WCY/B", { new_dxcc: true }), comment: "", freq_hz: 10144000 } as Spot, cfg, 0)).toBe(false);
 });

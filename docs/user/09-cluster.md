@@ -33,6 +33,8 @@ The **Needed now** pane (Layout menu; it starts as a tab beside Cluster) lists o
 
 The **Wanted** column is the entity's rank on Club Log's public Most Wanted list (1 is the entity the most Club Log users still need), and it decides the order within a group. QRZero reads that list at most once a day, keeps it in your log database, and never asks Club Log about individual spots. Entities not on the list, or all of them when the list can't be read (offline, say), show a blank and fall back to newest first. No Club Log account is needed.
 
+Beacons are left out, here and in the alerts: a call ending in /B or /BCN, a spot whose comment says beacon, BCN, NCDXF or IBP, and spots on the beacon frequencies (14.100, 18.110, 21.150, 24.930 and 28.190 to 28.225 MHz). The Cluster and Band map panes still show them.
+
 A call on the same band and mode is listed once, however many people spot it. Spots drop off after the time chosen in the pane (30 minutes to start with). It works for every mode: CW, phone and digital spots are ranked together, with the mode coloured as in the Cluster pane.
 
 Drag the right edge of a column heading to make it wider or narrower, and double-click the edge to put it back; the widths are remembered.
