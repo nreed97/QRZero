@@ -324,7 +324,7 @@ button.caption svg { fill: none; stroke: currentColor; stroke-width: 1; shape-re
 .map-box .home circle { fill: var(--accent); stroke: #000; stroke-width: 0.5; }
 .map-box .dx circle { fill: var(--path); stroke: #000; stroke-width: 0.5; }
 .map-box text { font: 600 11px var(--mono); fill: var(--text); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
-.map-info { display: flex; gap: 14px; padding: 3px 8px; border-top: 1px solid var(--line); font: 12px var(--mono); white-space: nowrap; overflow: hidden; }
+.map-info { display: flex; gap: 14px; padding: 3px 8px; border-top: 1px solid var(--line); font: 12px var(--mono); flex-wrap: wrap; row-gap: 2px; overflow: hidden; }
 
 /* Log grid */
 .grid { flex: 1; min-height: 0; min-width: 0; margin: 0 6px 6px; overflow: hidden; }
@@ -541,6 +541,7 @@ label.button-like:hover { border-color: var(--accent); }
 .map-sun { display: flex; flex-wrap: wrap; gap: 2px 14px; padding: 3px 8px; border-top: 1px solid var(--line); font: 12px var(--mono); }
 .map-info .turn { display: inline-flex; gap: 2px; }
 .map-info .rot { margin-left: auto; }
+.map-info > * { white-space: nowrap; }
 
 /* Cluster */
 .pane-tabs .beside { margin: 0 0 0 auto; font-size: 12px; }

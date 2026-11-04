@@ -20,6 +20,7 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: "gotocall", label: "Go to the call box (shows New QSO)", where: "Anywhere", def: "F2" },
   { id: "editlast", label: "Edit the newest QSO in the log", where: "Anywhere", def: "Ctrl+E" },
   { id: "rotate", label: "Turn the rotator to the entered call", where: "Anywhere", def: "Alt+J" },
+  { id: "rotatorstop", label: "Stop the rotator", where: "Anywhere", def: null },
   { id: "panenext", label: "Next pane in this group of tabs", where: "Anywhere", def: "Alt+PageDown" },
   { id: "paneprev", label: "Previous pane in this group of tabs", where: "Anywhere", def: "Alt+PageUp" },
   { id: "radioswap", label: "Swap between radio 1 and 2", where: "QSO entry (SO2R)", def: "`" },

@@ -89,6 +89,12 @@ export default function RotatorPane({ ctx, act }: { ctx: PopContext; act: PaneAc
     });
   };
 
+  const stop = () => {
+    setErr("");
+    setTarget(null);
+    api.rotatorStop().catch((e) => setErr((e as Error).message));
+  };
+
   const bearingAt = (e: React.MouseEvent<SVGSVGElement>): number | null => {
     const svg = svgRef.current;
     const m = svg?.getScreenCTM();
@@ -240,6 +246,7 @@ export default function RotatorPane({ ctx, act }: { ctx: PopContext; act: PaneAc
               onKeyDown={(e) => e.key === "Enter" && go()}
             />
             <button onClick={go}>Go</button>
+            <button className="rot-stop" onClick={stop} title="Stop the antenna turning now">Stop</button>
           </div>
           <div className="rot-presets">
             {!editing &&
