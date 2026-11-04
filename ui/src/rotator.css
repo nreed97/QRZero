@@ -24,6 +24,7 @@
 .rot-dx { width: 100%; font-family: var(--mono); }
 .rot-go { display: flex; gap: 4px; }
 .rot-go input { width: 72px; }
+.rot-go .rot-stop { margin-left: auto; }
 .rot-presets { display: flex; flex-wrap: wrap; gap: 4px; }
 .rot-presets > button { padding: 1px 8px; }
 .rot-presets .rot-edit-btn { margin-left: auto; }

@@ -344,6 +344,12 @@ export default function App() {
     api.search(logId, {}, 0, 1).then((r) => (r.rows[0] ? openEditor(r.rows[0]) : setNotice("The log is empty."))).catch((e) => setNotice((e as Error).message));
   });
 
+  // Stop the rotator (no key by default; bind one in Settings, Keyboard).
+  useShortcut("rotatorstop", () => {
+    if (dialog !== null) return false;
+    api.rotatorStop().then(() => setNotice("Rotator stopped.")).catch((e) => setNotice((e as Error).message));
+  });
+
   // Alt+J: turn the rotator to the call in the entry box. A call not looked up yet is looked up first.
   useShortcut("rotate", () => {
     if (dialog !== null) return false;

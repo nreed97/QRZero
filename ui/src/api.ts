@@ -184,6 +184,7 @@ export const api = {
   ftxClear: (instance: string, window: 0 | 1 | 2) => json<null>("POST", "/ftx/clear", { instance, window }),
   ftxSwitchConfiguration: (instance: string, name: string) => json<null>("POST", "/ftx/switch-configuration", { instance, name }),
   rotate: (azimuth: number) => json<null>("POST", "/rotator", { azimuth }),
+  rotatorStop: () => json<null>("POST", "/rotator/stop"),
   cty: () => json<CtyStatus>("GET", "/cty"),
   updateCty: () => json<CtyStatus>("POST", "/cty/update"),
   ctyEntities: () => json<CtyEntityInfo[]>("GET", "/cty/entities"),

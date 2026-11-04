@@ -322,6 +322,7 @@ fn router(state: Shared, loopback_only: bool) -> Router {
         .route("/ftx/clear", post(ftx_clear))
         .route("/ftx/switch-configuration", post(ftx_switch_configuration))
         .route("/rotator", post(rotate))
+        .route("/rotator/stop", post(rotator_stop))
         .route("/cty", get(cty_status).post(cty_install))
         .route("/cty/update", post(cty_update))
         .route("/cty/entities", get(cty_entities))
@@ -1907,6 +1908,11 @@ struct RotateBody {
 
 async fn rotate(State(s): State<Shared>, Json(b): Json<RotateBody>) -> ApiResult<()> {
     s.hub.rotate(b.azimuth).await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(()))
+}
+
+async fn rotator_stop(State(s): State<Shared>) -> ApiResult<()> {
+    s.hub.rotator_stop().await;
     Ok(Json(()))
 }
 
