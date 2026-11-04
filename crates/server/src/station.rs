@@ -504,7 +504,7 @@ impl Hub {
         let cty = self.cty();
         let mut idx = MarathonIndex::new(year);
         let (from, to) = (qrzero_core::marathon::year_start(year), qrzero_core::marathon::year_start(year + 1));
-        let res = self.with_store(|st| {
+        let res = self.with_reader(|st| {
             st.for_each_qso_between(log_id, &[], from, to, |_, call, _, dxcc, cqz, _| {
                 idx.add(qrzero_core::marathon::country(cty.as_deref(), call, dxcc), qrzero_core::marathon::zone(cty.as_deref(), call, cqz));
             })
@@ -592,6 +592,16 @@ impl Hub {
         });
     }
 
+    /// Runs a long whole-log read on its own database connection, so it never holds the main one
+    /// (logging a QSO, the UI's other calls and startup keep going while it counts). Falls back to
+    /// the main connection if a second one can't be opened.
+    pub(crate) fn with_reader<T>(&self, f: impl FnOnce(&mut Store) -> qrzero_core::Result<T>) -> qrzero_core::Result<T> {
+        match Store::open_reader(&qrzero_core::backup::db_path(&self.data_dir)) {
+            Ok(mut st) => f(&mut st),
+            Err(_) => self.with_store(f),
+        }
+    }
+
     fn lock(&self) -> std::sync::MutexGuard<'_, Inner> {
         self.inner.lock().unwrap_or_else(|p| p.into_inner())
     }
@@ -667,7 +677,7 @@ impl Hub {
         let hub = self.clone();
         let cty = hub.cty.read().unwrap_or_else(|p| p.into_inner()).clone();
         tokio::task::spawn_blocking(move || {
-            match hub.with_store(|st| st.worked_index(log_id, |call| cty.as_ref()?.lookup(call)?.dxcc)) {
+            match hub.with_reader(|st| st.worked_index(log_id, |call| cty.as_ref()?.lookup(call)?.dxcc)) {
                 Ok(idx) => {
                     let mut inner = hub.lock();
                     if inner.active.log_id == Some(log_id) {
@@ -718,7 +728,7 @@ impl Hub {
     /// Counts a log's award cells and keeps them, unless newer ones are already kept.
     fn build_award_cells(&self, log_id: i64) -> qrzero_core::Result<()> {
         let cty = self.cty();
-        let (version, index) = self.with_store(|st| st.award_index(log_id, |call| cty_facts(cty.as_deref(), call)))?;
+        let (version, index) = self.with_reader(|st| st.award_index(log_id, |call| cty_facts(cty.as_deref(), call)))?;
         let mut inner = self.lock();
         if inner.awards.as_ref().is_none_or(|a| a.log_id != log_id || a.version <= version) {
             inner.awards = Some(AwardCells { log_id, version, index });

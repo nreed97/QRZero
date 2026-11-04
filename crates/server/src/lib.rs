@@ -464,6 +464,20 @@ where
     .map_err(ApiError::from)
 }
 
+/// Like `db`, for long whole-log reads: runs on its own connection so it doesn't hold up the main
+/// one (see `Hub::with_reader`).
+async fn dbr<T, F>(s: &Shared, f: F) -> Result<T, ApiError>
+where
+    T: Send + 'static,
+    F: FnOnce(&mut Store) -> qrzero_core::Result<T> + Send + 'static,
+{
+    let hub = s.hub.clone();
+    tokio::task::spawn_blocking(move || hub.with_reader(f))
+        .await
+        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(ApiError::from)
+}
+
 // ---- handlers ----------------------------------------------------------
 
 async fn info(State(s): State<Shared>) -> Json<serde_json::Value> {
@@ -818,7 +832,7 @@ async fn award(State(s): State<Shared>, Path((id, award)): Path<(i64, Award)>, Q
     // Counting a big log takes a moment, so keep the last few tables until a QSO changes.
     let key = format!("{id}|{award:?}|{}|{}{}{}{}|{}|{}", calls.join(","), q.lotw, q.paper, q.eqsl, q.verified, q.unworked, cty.as_ref().map_or(0, |c| c.len()));
     let cache = s.award_cache.clone();
-    let table = db(&s, move |st| {
+    let table = dbr(&s, move |st| {
         cached_count(&cache, st, key, || {
             let mut tally = Tally::new(award, counts, names).with_verified(q.verified);
             let resolve = |c: &str| cty_facts(cty.as_deref(), c);
@@ -847,7 +861,7 @@ async fn log_stats(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Query
         .unwrap_or_default();
     let key = format!("stats|{id}|{}|{}", calls.join(","), cty.as_ref().map_or(0, |c| c.len()));
     let cache = s.award_cache.clone();
-    let out = db(&s, move |st| {
+    let out = dbr(&s, move |st| {
         cached_count(&cache, st, key, || {
             let mut tally = qrzero_core::stats::StatsTally::default();
             st.for_each_stats_qso(id, &calls, |c| cty_facts(cty.as_deref(), c).dxcc, |qso| tally.add(qso))?;
@@ -883,7 +897,7 @@ async fn marathon(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Query<
         "digital" => Some("DIGITAL"),
         _ => None,
     };
-    let out = db(&s, move |st| {
+    let out = dbr(&s, move |st| {
         let year_of = |t: i64| chrono::DateTime::from_timestamp(t, 0).map_or(this_year, |d| chrono::Datelike::year(&d));
         let mut years: Vec<i32> = match st.qso_time_range(id, &calls)? {
             Some((first, last)) => (year_of(first)..=year_of(last).max(this_year)).rev().collect(),
@@ -926,7 +940,7 @@ async fn club_awards(State(s): State<Shared>, Path(id): Path<i64>, Query(q): Que
     let calls: Vec<String> = q.calls.split(',').map(|c| c.trim().to_ascii_uppercase()).filter(|c| !c.is_empty()).collect();
     let opts = qrzero_core::cwclubs::CwtOptions { region: q.region, tagged_only: q.cwt_tagged };
     let cache = s.award_cache.clone();
-    let out = db(&s, move |st| {
+    let out = dbr(&s, move |st| {
         // The hand-added CWT points live in settings, not in QSOs, so they are part of the key.
         let extra = load_cwt_extra(st, id);
         let key = format!("clubs|{id}|{}|{:?}|{}|{}|{extra:?}", calls.join(","), q.region, q.cwt_tagged, cty.as_ref().map_or(0, |c| c.len()));
@@ -1521,11 +1535,25 @@ struct ExportBody {
 }
 
 async fn export(State(s): State<Shared>, Path(id): Path<i64>, Json(b): Json<ExportBody>) -> Result<Response, ApiError> {
-    let (text, count) = db(&s, move |st| st.export_adif(id, &b.filter, b.profile, VERSION)).await?;
+    // The file is written in pieces as it is read, so a very large log never sits in memory whole.
+    let filter = b.filter.clone();
+    let count = dbr(&s, move |st| st.count_matching(id, &filter)).await?;
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<axum::body::Bytes, std::io::Error>>(4);
+    let hub = s.hub.clone();
+    tokio::task::spawn_blocking(move || {
+        let err_tx = tx.clone();
+        let res = hub.with_reader(|st| {
+            st.export_adif_chunks(id, &b.filter, b.profile, VERSION, &mut |chunk| tx.blocking_send(Ok(axum::body::Bytes::copy_from_slice(chunk.as_bytes()))).is_ok())
+        });
+        if let Err(e) = res {
+            let _ = err_tx.blocking_send(Err(std::io::Error::other(e.to_string())));
+        }
+    });
+    let stream = futures_util::stream::unfold(rx, |mut rx| async move { rx.recv().await.map(|item| (item, rx)) });
     let mut headers = HeaderMap::new();
     headers.insert(header::CONTENT_TYPE, "text/plain; charset=utf-8".parse().unwrap());
     headers.insert("x-qso-count", count.into());
-    Ok((headers, text).into_response())
+    Ok((headers, axum::body::Body::from_stream(stream)).into_response())
 }
 
 #[derive(Serialize, Deserialize, Default)]

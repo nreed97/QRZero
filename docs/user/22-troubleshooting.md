@@ -31,5 +31,6 @@ Short answers to common problems, with a link to the page that explains the deta
 
 - **Restoring a backup.** Nothing changes until you close QRZero and start it again. See [Callsigns, locations and logs](05-setup).
 - **Where is my log?** In `qrzero.db`, in `%APPDATA%\QRZero` on Windows, `~/Library/Application Support/QRZero` on a Mac or `~/.local/share/QRZero` on Linux. See [Getting started](01-getting-started).
+- **The first start after an update takes a moment on a very large log.** Some updates add a compact copy of the facts that Awards and the filters read, and building it takes a few seconds per 100,000 QSOs (about 20 seconds for 750,000). It happens once, and the window opens as soon as it is done.
 - **A pane has gone missing.** Use the **Layout** menu to show it again, or load a saved layout. See [Arranging the window](06-layout).
 - **Using a browser instead of the app.** Close the desktop app first, because both would use the same log and UDP ports. See [Using QRZero in a browser](12-browser).

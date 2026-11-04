@@ -32,7 +32,7 @@ pub struct PotaQso {
 }
 
 /// Migrations in order; migration N brings the schema to user_version N.
-const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8, SCHEMA_V9, SCHEMA_V10, SCHEMA_V11];
+const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8, SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12];
 /// The newest schema this build knows (`PRAGMA user_version`).
 pub const SCHEMA_VERSION: i32 = MIGRATIONS.len() as i32;
 
@@ -110,6 +110,39 @@ CREATE INDEX qsos_paper_queue ON qsos (log_id, call, time_on)
 const SCHEMA_V11: &str = r#"
 CREATE INDEX qsos_pota ON qsos (log_id, time_on)
     WHERE IFNULL(json_extract(fields, '$.POTA_REF'), '') <> '';
+"#;
+
+/// A narrow copy of what the award, worked-before and field-filter scans read, so counting a very
+/// large log reads about a tenth of the data it would from the full ADIF JSON. Triggers keep it
+/// in step with `qsos`, so every way of writing a QSO is covered.
+const SCHEMA_V12: &str = r#"
+CREATE TABLE qso_scan (
+    log_id INTEGER NOT NULL,
+    qso_id INTEGER NOT NULL,
+    call TEXT NOT NULL,
+    band TEXT,
+    mode TEXT,
+    dxcc INTEGER,
+    time_on INTEGER,
+    station_callsign TEXT,
+    state TEXT, cqz TEXT, cont TEXT, ituz TEXT, gridsquare TEXT, iota TEXT, cnty TEXT,
+    lotw_rcvd TEXT, qsl_rcvd TEXT, eqsl_rcvd TEXT, credit_granted TEXT, app_credit TEXT,
+    PRIMARY KEY (log_id, qso_id)
+) WITHOUT ROWID;
+INSERT INTO qso_scan (log_id, qso_id, call, band, mode, dxcc, time_on, station_callsign, state, cqz, cont, ituz, gridsquare, iota, cnty, lotw_rcvd, qsl_rcvd, eqsl_rcvd, credit_granted, app_credit)
+    SELECT qsos.log_id, qsos.id, qsos.call, qsos.band, IFNULL(qsos.submode, qsos.mode), qsos.dxcc, qsos.time_on, qsos.station_callsign, CAST(json_extract(qsos.fields, '$.STATE') AS TEXT), CAST(json_extract(qsos.fields, '$.CQZ') AS TEXT), CAST(json_extract(qsos.fields, '$.CONT') AS TEXT), CAST(json_extract(qsos.fields, '$.ITUZ') AS TEXT), CAST(json_extract(qsos.fields, '$.GRIDSQUARE') AS TEXT), CAST(json_extract(qsos.fields, '$.IOTA') AS TEXT), CAST(json_extract(qsos.fields, '$.CNTY') AS TEXT), CAST(json_extract(qsos.fields, '$.LOTW_QSL_RCVD') AS TEXT), CAST(json_extract(qsos.fields, '$.QSL_RCVD') AS TEXT), CAST(json_extract(qsos.fields, '$.EQSL_QSL_RCVD') AS TEXT), CAST(json_extract(qsos.fields, '$.CREDIT_GRANTED') AS TEXT), CAST(json_extract(qsos.fields, '$.APP_LOTW_CREDIT_GRANTED') AS TEXT) FROM qsos;
+CREATE TRIGGER qso_scan_ins AFTER INSERT ON qsos BEGIN
+    INSERT INTO qso_scan (log_id, qso_id, call, band, mode, dxcc, time_on, station_callsign, state, cqz, cont, ituz, gridsquare, iota, cnty, lotw_rcvd, qsl_rcvd, eqsl_rcvd, credit_granted, app_credit)
+    VALUES (NEW.log_id, NEW.id, NEW.call, NEW.band, IFNULL(NEW.submode, NEW.mode), NEW.dxcc, NEW.time_on, NEW.station_callsign, CAST(json_extract(NEW.fields, '$.STATE') AS TEXT), CAST(json_extract(NEW.fields, '$.CQZ') AS TEXT), CAST(json_extract(NEW.fields, '$.CONT') AS TEXT), CAST(json_extract(NEW.fields, '$.ITUZ') AS TEXT), CAST(json_extract(NEW.fields, '$.GRIDSQUARE') AS TEXT), CAST(json_extract(NEW.fields, '$.IOTA') AS TEXT), CAST(json_extract(NEW.fields, '$.CNTY') AS TEXT), CAST(json_extract(NEW.fields, '$.LOTW_QSL_RCVD') AS TEXT), CAST(json_extract(NEW.fields, '$.QSL_RCVD') AS TEXT), CAST(json_extract(NEW.fields, '$.EQSL_QSL_RCVD') AS TEXT), CAST(json_extract(NEW.fields, '$.CREDIT_GRANTED') AS TEXT), CAST(json_extract(NEW.fields, '$.APP_LOTW_CREDIT_GRANTED') AS TEXT));
+END;
+CREATE TRIGGER qso_scan_upd AFTER UPDATE ON qsos BEGIN
+    DELETE FROM qso_scan WHERE log_id = OLD.log_id AND qso_id = OLD.id;
+    INSERT INTO qso_scan (log_id, qso_id, call, band, mode, dxcc, time_on, station_callsign, state, cqz, cont, ituz, gridsquare, iota, cnty, lotw_rcvd, qsl_rcvd, eqsl_rcvd, credit_granted, app_credit)
+    VALUES (NEW.log_id, NEW.id, NEW.call, NEW.band, IFNULL(NEW.submode, NEW.mode), NEW.dxcc, NEW.time_on, NEW.station_callsign, CAST(json_extract(NEW.fields, '$.STATE') AS TEXT), CAST(json_extract(NEW.fields, '$.CQZ') AS TEXT), CAST(json_extract(NEW.fields, '$.CONT') AS TEXT), CAST(json_extract(NEW.fields, '$.ITUZ') AS TEXT), CAST(json_extract(NEW.fields, '$.GRIDSQUARE') AS TEXT), CAST(json_extract(NEW.fields, '$.IOTA') AS TEXT), CAST(json_extract(NEW.fields, '$.CNTY') AS TEXT), CAST(json_extract(NEW.fields, '$.LOTW_QSL_RCVD') AS TEXT), CAST(json_extract(NEW.fields, '$.QSL_RCVD') AS TEXT), CAST(json_extract(NEW.fields, '$.EQSL_QSL_RCVD') AS TEXT), CAST(json_extract(NEW.fields, '$.CREDIT_GRANTED') AS TEXT), CAST(json_extract(NEW.fields, '$.APP_LOTW_CREDIT_GRANTED') AS TEXT));
+END;
+CREATE TRIGGER qso_scan_del AFTER DELETE ON qsos BEGIN
+    DELETE FROM qso_scan WHERE log_id = OLD.log_id AND qso_id = OLD.id;
+END;
 "#;
 
 const SCHEMA_V8: &str = r#"
@@ -229,6 +262,16 @@ fn now() -> i64 {
 impl Store {
     pub fn open(path: &Path) -> Result<Self> {
         Self::init(Connection::open(path)?)
+    }
+
+    /// A second connection for long whole-log reads (awards, statistics, indexes, export). With the
+    /// log in WAL mode it reads alongside the main connection, so a scan of a very large log never
+    /// holds up logging a QSO or starting the app. It cannot write.
+    pub fn open_reader(path: &Path) -> Result<Self> {
+        let conn = Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX)?;
+        conn.busy_timeout(std::time::Duration::from_secs(30))?;
+        conn.execute_batch("PRAGMA query_only = ON;")?;
+        Ok(Store { conn })
     }
 
     pub fn open_in_memory() -> Result<Self> {
@@ -658,42 +701,22 @@ impl Store {
         let marks = vec!["?"; callsigns.len()].join(", ");
         let calls = if callsigns.is_empty() { String::new() } else { format!(" AND station_callsign IN ({marks})") };
         let mut stmt = self.conn.prepare(&format!(
-            "SELECT id, call, band, IFNULL(submode, mode), dxcc, fields, time_on FROM qsos WHERE log_id = ?{calls}"
+            "SELECT qso_id, call, band, mode, dxcc, time_on, state, cqz, cont, ituz, gridsquare, iota, cnty,
+                    lotw_rcvd, qsl_rcvd, eqsl_rcvd, credit_granted, app_credit
+             FROM qso_scan WHERE log_id = ?{calls}"
         ))?;
         let mut args: Vec<Value> = vec![log_id.into()];
         args.extend(callsigns.iter().map(|c| Value::from(c.to_ascii_uppercase())));
         let mut rows = stmt.query(params_from_iter(args))?;
-        // Parsing the JSON once in Rust, keeping only these keys, is several times
-        // faster than one json_extract per key.
-        #[derive(serde::Deserialize)]
-        #[allow(non_snake_case)]
-        struct Facts<'a> {
-            #[serde(borrow)]
-            STATE: Option<std::borrow::Cow<'a, str>>,
-            #[serde(borrow)]
-            CQZ: Option<std::borrow::Cow<'a, str>>,
-            #[serde(borrow)]
-            CONT: Option<std::borrow::Cow<'a, str>>,
-            #[serde(borrow)]
-            ITUZ: Option<std::borrow::Cow<'a, str>>,
-            #[serde(borrow)]
-            GRIDSQUARE: Option<std::borrow::Cow<'a, str>>,
-            #[serde(borrow)]
-            IOTA: Option<std::borrow::Cow<'a, str>>,
-            #[serde(borrow)]
-            CNTY: Option<std::borrow::Cow<'a, str>>,
-            #[serde(borrow)]
-            LOTW_QSL_RCVD: Option<std::borrow::Cow<'a, str>>,
-            #[serde(borrow)]
-            QSL_RCVD: Option<std::borrow::Cow<'a, str>>,
-            #[serde(borrow)]
-            EQSL_QSL_RCVD: Option<std::borrow::Cow<'a, str>>,
-            #[serde(borrow)]
-            CREDIT_GRANTED: Option<std::borrow::Cow<'a, str>>,
-            #[serde(borrow)]
-            APP_LOTW_CREDIT_GRANTED: Option<std::borrow::Cow<'a, str>>,
-        }
-        let yes = |v: &Option<std::borrow::Cow<str>>| matches!(v.as_deref(), Some("Y") | Some("V"));
+        let text = |r: &rusqlite::Row, i: usize| -> rusqlite::Result<Option<String>> {
+            Ok(match r.get_ref(i)? {
+                rusqlite::types::ValueRef::Text(t) => Some(String::from_utf8_lossy(t).into_owned()),
+                rusqlite::types::ValueRef::Integer(n) => Some(n.to_string()),
+                rusqlite::types::ValueRef::Real(f) => Some(f.to_string()),
+                _ => None,
+            })
+        };
+        let yes = |v: &Option<String>| matches!(v.as_deref(), Some("Y") | Some("V"));
         let mut q = AwardQso::default();
         while let Some(r) = rows.next()? {
             q.id = r.get(0)?;
@@ -702,37 +725,27 @@ impl Store {
             q.mode = r.get(3)?;
             let dxcc: Option<i64> = r.get(4)?;
             q.dxcc = dxcc.and_then(|d| u32::try_from(d).ok());
-            let raw = r.get_ref(5)?.as_str().map_err(rusqlite::Error::from)?;
-            let facts: Facts = serde_json::from_str(raw)?;
-            q.state = facts.STATE.map(|s| s.trim().to_ascii_uppercase()).filter(|s| !s.is_empty());
-            q.cq_zone = facts.CQZ.and_then(|z| z.trim().parse().ok());
-            q.cont = facts.CONT.map(|c| c.trim().to_ascii_uppercase()).filter(|c| !c.is_empty());
-            q.itu = facts.ITUZ.and_then(|z| z.trim().parse().ok());
-            q.grid = facts.GRIDSQUARE.and_then(|g| crate::awards::grid4(&g));
-            q.iota = facts.IOTA.and_then(|i| crate::awards::iota_ref(&i));
-            q.cnty = facts.CNTY.and_then(|c| crate::awards::county(&c));
+            q.time_on = r.get(5)?;
+            q.state = text(r, 6)?.map(|s| s.trim().to_ascii_uppercase()).filter(|s| !s.is_empty());
+            q.cq_zone = text(r, 7)?.and_then(|z| z.trim().parse().ok());
+            q.cont = text(r, 8)?.map(|c| c.trim().to_ascii_uppercase()).filter(|c| !c.is_empty());
+            q.itu = text(r, 9)?.and_then(|z| z.trim().parse().ok());
+            q.grid = text(r, 10)?.and_then(|g| crate::awards::grid4(&g));
+            q.iota = text(r, 11)?.and_then(|i| crate::awards::iota_ref(&i));
+            q.cnty = text(r, 12)?.and_then(|c| crate::awards::county(&c));
             if q.dxcc.is_none() || q.cont.is_none() || q.itu.is_none() {
                 let r = resolve(&q.call);
                 q.dxcc = q.dxcc.or(r.dxcc);
                 q.cont = q.cont.take().or(r.cont);
                 q.itu = q.itu.or(r.itu);
             }
-            q.lotw = yes(&facts.LOTW_QSL_RCVD);
-            q.paper = yes(&facts.QSL_RCVD);
-            q.eqsl = yes(&facts.EQSL_QSL_RCVD);
-            let (credit, app_credit) = (
-                facts.CREDIT_GRANTED.as_deref().unwrap_or(""),
-                facts.APP_LOTW_CREDIT_GRANTED.as_deref().unwrap_or(""),
-            );
-            q.credit = crate::awards::credit_mask(credit) | crate::awards::credit_mask(app_credit);
-            q.credit_cols = crate::awards::dxcc_credit_cols(
-                credit,
-                app_credit,
-                q.mode.as_deref(),
-                q.band.as_deref(),
-            );
-            q.was_credit_cols = crate::awards::was_credit_cols(credit, app_credit, q.mode.as_deref(), q.band.as_deref());
-            q.time_on = r.get(6)?;
+            q.lotw = yes(&text(r, 13)?);
+            q.paper = yes(&text(r, 14)?);
+            q.eqsl = yes(&text(r, 15)?);
+            let (credit, app_credit) = (text(r, 16)?.unwrap_or_default(), text(r, 17)?.unwrap_or_default());
+            q.credit = crate::awards::credit_mask(&credit) | crate::awards::credit_mask(&app_credit);
+            q.credit_cols = crate::awards::dxcc_credit_cols(&credit, &app_credit, q.mode.as_deref(), q.band.as_deref());
+            q.was_credit_cols = crate::awards::was_credit_cols(&credit, &app_credit, q.mode.as_deref(), q.band.as_deref());
             f(&q);
         }
         Ok(())
@@ -1037,7 +1050,7 @@ impl Store {
         offset: i64,
         limit: i64,
     ) -> Result<(i64, Vec<Qso>)> {
-        let (where_sql, mut args) = build_where(log_id, filter);
+        let (where_sql, mut args) = build_where_with(log_id, filter, true);
         let total: i64 = self.conn.query_row(
             &format!("SELECT COUNT(*) FROM qsos WHERE {where_sql}"),
             params_from_iter(args.iter()),
@@ -1055,9 +1068,17 @@ impl Store {
         };
         args.push(Value::Integer(limit.clamp(0, 10_000)));
         args.push(Value::Integer(offset.max(0)));
+        // The inner query picks the page's ids from the indexes alone; only those rows are then read.
+        // Sorting the matches with every row's JSON attached would read most of a very large log.
+        let outer = match sort {
+            Sort::Newest => "time_on DESC, id DESC",
+            Sort::Oldest => "time_on ASC, id ASC",
+            Sort::Call => "call ASC, time_on DESC",
+        };
         let mut stmt = self.conn.prepare(&format!(
-            "SELECT id, log_id, location_id, fields FROM qsos WHERE {where_sql}
-             ORDER BY {order} LIMIT ? OFFSET ?"
+            "SELECT id, log_id, location_id, fields FROM qsos WHERE id IN
+             (SELECT id FROM qsos WHERE {where_sql} ORDER BY {order} LIMIT ? OFFSET ?)
+             ORDER BY {outer}"
         ))?;
         let rows = stmt.query_map(params_from_iter(args.iter()), row_to_qso)?;
         Ok((total, rows.collect::<std::result::Result<_, _>>()?))
@@ -1147,7 +1168,7 @@ impl Store {
         let mut idx = WorkedIndex::default();
         let mut stmt = self
             .conn
-            .prepare("SELECT call, dxcc, band, IFNULL(submode, mode), json_extract(fields, '$.GRIDSQUARE') FROM qsos WHERE log_id = ?1")?;
+            .prepare("SELECT call, dxcc, band, mode, gridsquare FROM qso_scan WHERE log_id = ?1")?;
         let mut rows = stmt.query([log_id])?;
         while let Some(r) = rows.next()? {
             let call: String = r.get(0)?;
@@ -1287,26 +1308,76 @@ impl Store {
         profile: ExportProfile,
         program_version: &str,
     ) -> Result<(String, usize)> {
+        let mut out = String::new();
+        let count = self.export_adif_chunks(log_id, filter, profile, program_version, &mut |chunk| {
+            out.push_str(chunk);
+            true
+        })?;
+        Ok((out, count))
+    }
+
+    /// How many QSOs match the filter.
+    pub fn count_matching(&self, log_id: i64, filter: &QsoFilter) -> Result<usize> {
         let (where_sql, args) = build_where(log_id, filter);
+        let n: i64 = self.conn.query_row(&format!("SELECT COUNT(*) FROM qsos WHERE {where_sql}"), params_from_iter(args.iter()), |r| r.get(0))?;
+        Ok(n as usize)
+    }
+
+    /// Writes the ADIF file in pieces of about 64 KB through `sink`, so a very large log is never
+    /// held in memory whole. `sink` returns false to stop early (the reader went away). Returns the
+    /// number of QSOs written.
+    pub fn export_adif_chunks(
+        &self,
+        log_id: i64,
+        filter: &QsoFilter,
+        profile: ExportProfile,
+        program_version: &str,
+        sink: &mut dyn FnMut(&str) -> bool,
+    ) -> Result<usize> {
+        // One read transaction, so the count in the header matches the records that follow.
+        self.conn.execute_batch("BEGIN")?;
+        let result = self.export_adif_inner(log_id, filter, profile, program_version, sink);
+        let _ = self.conn.execute_batch("COMMIT");
+        result
+    }
+
+    fn export_adif_inner(
+        &self,
+        log_id: i64,
+        filter: &QsoFilter,
+        profile: ExportProfile,
+        program_version: &str,
+        sink: &mut dyn FnMut(&str) -> bool,
+    ) -> Result<usize> {
+        const CHUNK: usize = 64 * 1024;
+        let (where_sql, args) = build_where(log_id, filter);
+        let total: i64 = self.conn.query_row(&format!("SELECT COUNT(*) FROM qsos WHERE {where_sql}"), params_from_iter(args.iter()), |r| r.get(0))?;
+        let mut buf = String::with_capacity(CHUNK + 4096);
+        adif::write_header(&mut buf, program_version, total as usize);
         let mut stmt = self.conn.prepare(&format!(
             "SELECT fields FROM qsos WHERE {where_sql} ORDER BY time_on ASC, id ASC"
         ))?;
         let mut rows = stmt.query(params_from_iter(args.iter()))?;
-        let mut body = String::new();
         let mut count = 0;
         while let Some(row) = rows.next()? {
-            let json: String = row.get(0)?;
-            let fields: Fields = serde_json::from_str(&json)?;
+            let json = row.get_ref(0)?.as_str().map_err(rusqlite::Error::from)?;
+            let fields: Fields = serde_json::from_str(json)?;
             match profile {
-                ExportProfile::Standard => adif::write_record(&mut body, &fields, adif::is_standard_field),
-                ExportProfile::Full => adif::write_record(&mut body, &fields, |_| true),
+                ExportProfile::Standard => adif::write_record(&mut buf, &fields, adif::is_standard_field),
+                ExportProfile::Full => adif::write_record(&mut buf, &fields, |_| true),
             }
             count += 1;
+            if buf.len() >= CHUNK {
+                if !sink(&buf) {
+                    return Ok(count);
+                }
+                buf.clear();
+            }
         }
-        let mut out = String::with_capacity(body.len() + 256);
-        adif::write_header(&mut out, program_version, count);
-        out.push_str(&body);
-        Ok((out, count))
+        if !buf.is_empty() {
+            sink(&buf);
+        }
+        Ok(count)
     }
 
     // ---- equipment -----------------------------------------------------
@@ -1711,6 +1782,29 @@ fn clean_location_fields(fields: &Fields) -> Fields {
 }
 
 fn build_where(log_id: i64, f: &QsoFilter) -> (String, Vec<Value>) {
+    build_where_with(log_id, f, false)
+}
+
+/// The scan-table column holding an ADIF field, for the fields kept there.
+fn scan_column(field: &str) -> Option<&'static str> {
+    Some(match field {
+        "STATE" => "state",
+        "CQZ" => "cqz",
+        "CONT" => "cont",
+        "ITUZ" => "ituz",
+        "GRIDSQUARE" => "gridsquare",
+        "IOTA" => "iota",
+        "CNTY" => "cnty",
+        "LOTW_QSL_RCVD" => "lotw_rcvd",
+        "QSL_RCVD" => "qsl_rcvd",
+        "EQSL_QSL_RCVD" => "eqsl_rcvd",
+        _ => return None,
+    })
+}
+
+/// `scan` lets a field filter read the narrow scan table instead of every QSO's JSON. Only reads
+/// pass it: a statement that changes `qsos` keeps to the JSON.
+fn build_where_with(log_id: i64, f: &QsoFilter, scan: bool) -> (String, Vec<Value>) {
     let mut sql = vec!["log_id = ?".to_string()];
     let mut args = vec![Value::Integer(log_id)];
     let in_list = |sql: &mut Vec<String>, args: &mut Vec<Value>, expr: &str, vals: Vec<Value>| {
@@ -1794,6 +1888,17 @@ fn build_where(log_id: i64, f: &QsoFilter) -> (String, Vec<Value>) {
             continue;
         }
         let path = format!("$.\"{}\"", k.to_ascii_uppercase());
+        if let Some(col) = scan.then(|| scan_column(&k.to_ascii_uppercase())).flatten() {
+            if v.is_empty() {
+                sql.push(format!("id IN (SELECT qso_id FROM qso_scan WHERE log_id = ? AND IFNULL({col}, '') = '')"));
+                args.push(Value::Integer(log_id));
+            } else {
+                sql.push(format!("id IN (SELECT qso_id FROM qso_scan WHERE log_id = ? AND {col} = ?)"));
+                args.push(Value::Integer(log_id));
+                args.push(Value::Text(v.clone()));
+            }
+            continue;
+        }
         if v.is_empty() {
             sql.push("IFNULL(json_extract(fields, ?), '') = ''".into());
             args.push(Value::Text(path));

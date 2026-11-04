@@ -447,3 +447,72 @@ fn move_qsos_takes_the_chosen_qsos_to_another_log() {
     assert_eq!(calls[0].callsign, "W1QBL");
     assert!(calls[0].is_default);
 }
+
+fn qso(call: &str, minute: u32, extra: &[(&str, &str)]) -> Fields {
+    let time = format!("12{minute:02}");
+    let mut v = vec![("CALL", call), ("QSO_DATE", "20240101"), ("TIME_ON", time.as_str()), ("BAND", "20m"), ("MODE", "CW")];
+    v.extend_from_slice(extra);
+    f(&v)
+}
+
+#[test]
+fn scan_table_follows_inserts_edits_moves_and_deletes() {
+    let (mut st, log) = setup();
+    let other = st.create_log("Other").unwrap().id;
+    let a = st.insert_qso(log, None, &qso("W1AW", 1, &[("STATE", "CT"), ("CQZ", "5"), ("LOTW_QSL_RCVD", "Y")])).unwrap();
+    st.insert_qso(log, None, &qso("K1ABC", 2, &[("STATE", "MA")])).unwrap();
+    let by_state = |st: &Store, log: i64, v: &str| st.search(log, &QsoFilter { fields: f(&[("STATE", v)]), ..Default::default() }, Sort::Newest, 0, 10).unwrap().0;
+    assert_eq!(by_state(&st, log, "CT"), 1);
+    assert_eq!(st.search(log, &QsoFilter { fields: f(&[("LOTW_QSL_RCVD", "")]), ..Default::default() }, Sort::Newest, 0, 10).unwrap().1[0].fields["CALL"], "K1ABC");
+    // An edit shows up.
+    st.update_qso(a.id, None, &qso("W1AW", 1, &[("STATE", "RI")])).unwrap();
+    assert_eq!((by_state(&st, log, "CT"), by_state(&st, log, "RI")), (0, 1));
+    // A move to another log takes the scan row with it.
+    st.move_qsos(log, &QsoFilter { fields: f(&[("STATE", "RI")]), ..Default::default() }, other).unwrap();
+    assert_eq!((by_state(&st, log, "RI"), by_state(&st, other, "RI")), (0, 1));
+    // So does a delete.
+    st.delete_qsos(&[a.id]).unwrap();
+    assert_eq!(by_state(&st, other, "RI"), 0);
+    let mut calls = 0;
+    st.for_each_award_qso(log, &[], |_| Default::default(), |_| calls += 1).unwrap();
+    assert_eq!(calls, 1);
+}
+
+#[test]
+fn page_of_a_sorted_search_matches_the_whole_sort() {
+    let (st, log) = setup();
+    for i in 0..30u32 {
+        st.insert_qso(log, None, &qso(&format!("K{}AB", i % 7), i, &[])).unwrap();
+    }
+    for sort in [Sort::Newest, Sort::Oldest, Sort::Call] {
+        let all = st.search(log, &QsoFilter { bands: vec!["20m".into()], ..Default::default() }, sort, 0, 100).unwrap().1;
+        let page = st.search(log, &QsoFilter { bands: vec!["20m".into()], ..Default::default() }, sort, 10, 7).unwrap();
+        assert_eq!(page.0, 30);
+        let ids: Vec<i64> = all[10..17].iter().map(|q| q.id).collect();
+        assert_eq!(page.1.iter().map(|q| q.id).collect::<Vec<_>>(), ids, "{sort:?}");
+    }
+}
+
+#[test]
+fn streamed_export_equals_the_whole_export() {
+    let (st, log) = setup();
+    for i in 0..400u32 {
+        st.insert_qso(log, None, &qso(&format!("K{}AB", i % 7), i % 60, &[("COMMENT", &"x".repeat(300))])).unwrap();
+    }
+    let (whole, n) = st.export_adif(log, &QsoFilter::default(), ExportProfile::Full, "t").unwrap();
+    let mut pieces = 0;
+    let mut joined = String::new();
+    let n2 = st
+        .export_adif_chunks(log, &QsoFilter::default(), ExportProfile::Full, "t", &mut |c| {
+            pieces += 1;
+            joined.push_str(c);
+            true
+        })
+        .unwrap();
+    assert_eq!((n, n2), (400, 400));
+    assert!(pieces > 1, "a large export arrives in several pieces");
+    // The header carries a timestamp that may differ by a second; the records must not.
+    let records = |s: &str| s.split("<EOH>").nth(1).unwrap().to_string();
+    assert_eq!(records(&whole), records(&joined));
+    assert!(joined.starts_with("Exported by QRZero t - 400 QSOs"));
+}
