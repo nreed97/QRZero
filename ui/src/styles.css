@@ -97,6 +97,8 @@
 }
 
 * { box-sizing: border-box; }
+/* Plain neutral scrollbars from the theme, so the system accent colour never shows through. */
+* { scrollbar-color: color-mix(in srgb, var(--muted) 55%, transparent) transparent; scrollbar-width: auto; }
 html, body, #root { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--text); font: var(--fs, 13px)/1.35 var(--ui); }
 
