@@ -381,24 +381,34 @@ export default function LogGrid({ logId, refreshKey, filter, onFilter, selection
         )}
         <span className="muted">
           {total.toLocaleString()} QSO{total === 1 ? "" : "s"}
-          {selection.size > 0 && ` · ${selection.size} selected`}
         </span>
         <span className="spacer" />
         {notice && !error && <span className="muted">{notice}</span>}
         {error && <span className="err">{error}</span>}
         <button onClick={() => setPicking(!picking)}>Columns</button>
         {selection.size > 0 && (
-          <>
-            <button onClick={() => onSelection(new Set())}>Clear selection</button>
-            <select value="" onChange={(e) => void markPaper(e.target.value)} aria-label="Paper QSL">
-              <option value="">Paper QSL…</option>
+          <select
+            value=""
+            aria-label="Selected QSOs"
+            onChange={(ev) => {
+              const v = ev.target.value;
+              if (v === "clear") onSelection(new Set());
+              else if (v === "export") onExportSelected();
+              else if (v === "bulk") onBulkEditSelected();
+              else if (v === "delete") void deleteSelected();
+              else if (v) void markPaper(v);
+            }}
+          >
+            <option value="">{selection.size.toLocaleString()} selected…</option>
+            <option value="clear">Clear selection</option>
+            <option value="export">Export selected</option>
+            <option value="bulk">Bulk edit</option>
+            <option value="delete">Delete…</option>
+            <optgroup label="Paper QSL">
               {PAPER_ACTIONS.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
               {OQRS_ACTIONS.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
-            </select>
-            <button onClick={onExportSelected}>Export selected</button>
-            <button onClick={onBulkEditSelected}>Bulk edit</button>
-            <button className="danger" onClick={deleteSelected}>Delete</button>
-          </>
+            </optgroup>
+          </select>
         )}
       </div>
       {picking && (
