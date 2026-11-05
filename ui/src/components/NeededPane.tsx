@@ -4,7 +4,7 @@ import { useColumnWidths, type Track } from "../columnDrag";
 import { onLive } from "../live";
 import { useListKeys } from "../listKeys";
 import { MODE_GROUP_NAME, modeGroup } from "../modes";
-import { compareNeeded, type NeedRank, needLabel, needRank, spotKey } from "../needed";
+import { compareNeeded, isBeacon, type NeedRank, needLabel, needRank, spotKey } from "../needed";
 import { setNeededConfig, useNeededConfig } from "../neededPrefs";
 import type { MostWanted, Spot } from "../types";
 import type { DecodePick } from "./FtxMonitor";
@@ -64,7 +64,7 @@ export default function NeededPane({ onPick, onSettings }: { onPick: (p: DecodeP
     const out: { s: Spot; rank: NeedRank; wanted: number }[] = [];
     for (const s of spots.values()) {
       const rank = needRank(s);
-      if (rank !== null && now - s.received < cfg.listMin * 60) {
+      if (rank !== null && !isBeacon(s) && now - s.received < cfg.listMin * 60) {
         const code = s.entity?.dxcc;
         out.push({ s, rank, wanted: (code != null && wanted?.ranks[code]) || Infinity });
       }

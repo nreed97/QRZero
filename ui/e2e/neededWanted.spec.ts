@@ -56,3 +56,23 @@ test("Needed now still lists spots when the Most Wanted list is not loaded", asy
   await expect(rows.locator(".call")).toHaveText(["JA1XYZ", "P5/4L4FN", "3Y0K", "ZL7A", "VK9XY"]);
   await expect(page.getByText("Most Wanted ranks not loaded")).toBeVisible();
 });
+
+test("Needed now leaves beacons out", async ({ page }) => {
+  const beacons = [
+    spot(10, "4U1UN", 14100, "CW", "20m", "United Nations HQ", 289, 20, "dxcc", "NCDXF"),
+    spot(11, "DK0WCY/B", 10144, "CW", "30m", "Germany", 230, 20, "dxcc", ""),
+    spot(12, "OH2B", 28200, "CW", "10m", "Finland", 224, 20, "dxcc", ""),
+    spot(13, "ZS6DN", 7040, "CW", "40m", "South Africa", 462, 20, "dxcc", "beacon"),
+  ];
+  await page.route("**/api/cluster", (r) => (r.request().method() === "GET" ? r.fulfill({ json: { ...snapshot, spots: [...snapshot.spots, ...beacons] } }) : r.continue()));
+  await page.route("**/api/mostwanted", (r) => r.fulfill({ json: wanted }));
+  await page.goto("/?token=e2e");
+  await closeWizard(page);
+  await page.getByRole("button", { name: /^Layout/ }).click();
+  await page.getByRole("menu").getByLabel("Needed now").check();
+  await page.getByRole("button", { name: /^Layout/ }).click();
+  const rows = page.locator(".needed-row:not(.head)");
+  await expect(rows).toHaveCount(5);
+  await expect(rows.locator(".call")).not.toContainText(["4U1UN"]);
+  if (process.env.SHOT2) await page.screenshot({ path: process.env.SHOT2 });
+});

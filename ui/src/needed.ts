@@ -26,6 +26,20 @@ export function needRank(s: Pick<Spot, "needed" | "goals" | "marathon">): NeedRa
   return null;
 }
 
+/** Beacon sub-bands in kHz: the NCDXF/IBP frequencies (a kHz either side) and the 10 m beacon segment. */
+const BEACON_KHZ: [number, number][] = [[14099, 14101], [18109, 18111], [21149, 21151], [24929, 24931], [28190, 28225]];
+
+/**
+ * A beacon, not a station to work: a call ending /B or /BCN, a comment that says beacon, BCN, NCDXF or IBP,
+ * or a spot inside a beacon sub-band.
+ */
+export function isBeacon(s: Pick<Spot, "call" | "comment" | "freq_hz">): boolean {
+  if (/\/(B|BCN)$/i.test(s.call.trim())) return true;
+  if (/\b(beacon|bcn|ncdxf|ibp)\b/i.test(s.comment ?? "")) return true;
+  const khz = s.freq_hz / 1000;
+  return BEACON_KHZ.some(([lo, hi]) => khz >= lo && khz <= hi);
+}
+
 export const NEED_NAME = ["New", "New band", "New mode", "Unconfirmed"] as const;
 
 const AWARD_NEW: Record<string, (key: string) => string> = {
@@ -93,7 +107,7 @@ export class AlertGate {
   private seen = new Map<string, number>();
   check(s: Spot, cfg: NeededAlertConfig, nowSec: number): boolean {
     const rank = needRank(s);
-    if (rank === null || rank > cfg.level) return false;
+    if (rank === null || rank > cfg.level || isBeacon(s)) return false;
     const key = spotKey(s);
     const last = this.seen.get(key);
     if (last !== undefined && nowSec - last < cfg.repeatMin * 60) return false;
