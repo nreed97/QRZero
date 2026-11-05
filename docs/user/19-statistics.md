@@ -18,7 +18,7 @@ The choices are counted from your log, so only years and bands you have QSOs on 
 
 - **Totals**: QSOs, different callsigns, first and last QSO, days on the air, your busiest day, your longest run of days in a row with a QSO, and your farthest contact. The farthest contact needs your own grid on the QSO (MY_GRIDSQUARE); the other station is placed by its grid, or by the middle of its entity when it has none, so treat it as a good estimate.
 - **DXCC progress by year**: for each year the QSOs made, the entities worked for the first time that year (**New**) and the running total of entities (**Total**). This always counts from the start of the log, so a year filter does not turn old entities into new ones. With a band or mode filter it shows your progress on that band or mode. Years are whole years even when a custom range starts or ends part way through.
-- **By band**, **By mode** and **By continent**: QSOs for each, and for bands and continents the entities worked.
+- **By band**, **By mode** and **By continent**: QSOs for each, and for bands and continents the entities worked. A QSO logged with the ASCII submode (ASCI) counts as RTTY.
 - **Busiest UTC hours**: the five hours of the day with the most QSOs.
 - **Confirmation rates**: for LoTW, paper QSL, QRZ Logbook, Club Log and eQSL, how many QSOs were sent, how many came back confirmed, and the percentage. A confirmed QSO counts as sent even if it was never marked sent. QRZ and Club Log confirmations are shown here but don't count towards the [Awards](11-awards).
 - **Most worked**: the ten entities and the ten callsigns with the most QSOs.

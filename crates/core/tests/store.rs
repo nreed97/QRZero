@@ -516,3 +516,16 @@ fn streamed_export_equals_the_whole_export() {
     assert_eq!(records(&whole), records(&joined));
     assert!(joined.starts_with("Exported by QRZero t - 400 QSOs"));
 }
+
+#[test]
+fn asci_submode_is_shown_as_rtty() {
+    let (st, log) = setup();
+    st.insert_qso(log, None, &f(&[("CALL", "W1AW"), ("BAND", "20m"), ("MODE", "RTTY"), ("SUBMODE", "ASCI"), ("DXCC", "291"), ("QSO_DATE", "20240101"), ("TIME_ON", "1200")]))
+        .unwrap();
+    let wb = st.worked_before(log, "w1aw", Some(291)).unwrap();
+    assert_eq!(wb.call_slots, [("20m".to_string(), "RTTY".to_string())]);
+    assert_eq!(wb.dxcc_modes, ["RTTY"]);
+    let mut modes = vec![];
+    st.for_each_stats_qso(log, &[], &Default::default(), |_| Some(291), |q| modes.push(q.mode.clone())).unwrap();
+    assert_eq!(modes, ["RTTY"]);
+}
