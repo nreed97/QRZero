@@ -32,6 +32,10 @@ pub struct PotaQso {
 }
 
 /// Migrations in order; migration N brings the schema to user_version N.
+/// The mode a QSO is shown and counted under: its submode, else its mode. ASCI (the ADIF submode some
+/// loggers write on every RTTY QSO) is shown as RTTY, since that is how it is known on the air.
+const SHOWN_MODE: &str = "CASE WHEN submode = 'ASCI' THEN 'RTTY' ELSE IFNULL(submode, mode) END";
+
 const MIGRATIONS: &[&str] = &[SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8, SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12];
 /// The newest schema this build knows (`PRAGMA user_version`).
 pub const SCHEMA_VERSION: i32 = MIGRATIONS.len() as i32;
@@ -822,7 +826,7 @@ impl Store {
         let marks = vec!["?"; callsigns.len()].join(", ");
         let calls = if callsigns.is_empty() { String::new() } else { format!(" AND station_callsign IN ({marks})") };
         let band = if filter.band.is_some() { " AND band = ?" } else { "" };
-        let mut stmt = self.conn.prepare(&format!("SELECT call, time_on, dxcc, fields, band, IFNULL(submode, mode) FROM qsos WHERE log_id = ?{calls}{band}"))?;
+        let mut stmt = self.conn.prepare(&format!("SELECT call, time_on, dxcc, fields, band, {SHOWN_MODE} FROM qsos WHERE log_id = ?{calls}{band}"))?;
         let mut args: Vec<Value> = vec![log_id.into()];
         args.extend(callsigns.iter().map(|c| Value::from(c.to_ascii_uppercase())));
         args.extend(filter.band.iter().map(|b| Value::from(b.clone())));
@@ -1166,10 +1170,10 @@ impl Store {
         wb.recent = stmt
             .query_map(params![log_id, call], row_to_qso)?
             .collect::<std::result::Result<_, _>>()?;
-        let mut stmt = self.conn.prepare(
-            "SELECT DISTINCT IFNULL(band, ''), IFNULL(submode, IFNULL(mode, '')) FROM qsos
-             WHERE log_id = ?1 AND call = ?2 ORDER BY 1, 2",
-        )?;
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT DISTINCT IFNULL(band, ''), IFNULL({SHOWN_MODE}, '') FROM qsos
+             WHERE log_id = ?1 AND call = ?2 ORDER BY 1, 2"
+        ))?;
         wb.call_slots = stmt
             .query_map(params![log_id, call], |r| Ok((r.get(0)?, r.get(1)?)))?
             .collect::<std::result::Result<_, _>>()?;
@@ -1188,7 +1192,7 @@ impl Store {
                 Ok(rows.collect::<std::result::Result<_, _>>()?)
             };
             wb.dxcc_bands = distinct("band")?;
-            wb.dxcc_modes = distinct("IFNULL(submode, mode)")?;
+            wb.dxcc_modes = distinct(SHOWN_MODE)?;
         }
         Ok(wb)
     }
