@@ -111,7 +111,7 @@ A call that would be new for you says so plainly:
 
 ### The map
 
-The **Map** shows your location, the other station and the short path (solid) and long path (dashed), with beam headings and distances in kilometres or miles. **Flat** is a world map; **Azimuthal** is centred on you so straight lines are true beam headings. The night shading shows the grey line, and the line under the map gives sunrise and sunset at both ends and the times today when the grey line covers both. With a rotator connected, a line shows where the beam points and **Turn SP** / **LP** buttons turn it.
+The **Map** shows your location, the other station and the short path (solid) and long path (dashed), with beam headings and distances in kilometres or miles. **Flat** is a world map; **Azimuthal** is centred on you so straight lines are true beam headings. The **Greyline** shading shows the night side, with the grey line at its edge, and the line under the map gives sunrise and sunset at both ends and the times today when the grey line covers both. With a rotator connected, a line shows where the beam points and **Turn SP** / **LP** buttons turn it.
 
 ![Map](docs/screenshots/map.png)
 

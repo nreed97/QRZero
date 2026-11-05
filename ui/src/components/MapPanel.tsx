@@ -161,7 +161,7 @@ export default function MapPanel({ home, homeLabel, dx, dxLabel, units, view, on
       <div className="panel-title">
         <span>Map</span>
         <span className="spacer" />
-        <label className="check" title="Shade the night side of the Earth (the grey line)"><input type="checkbox" checked={shade} onChange={(e) => onShade(e.target.checked)} /> Night</label>
+        <label className="check" title="Shade the night side of the Earth to show the grey line"><input type="checkbox" checked={shade} onChange={(e) => onShade(e.target.checked)} /> Greyline</label>
         <button className={`tiny ${view === "flat" ? "on" : ""}`} onClick={() => onView("flat")} title="Flat world map">Flat</button>
         <button className={`tiny ${view === "azimuthal" ? "on" : ""}`} onClick={() => onView("azimuthal")} title="Azimuthal equidistant, centred on your location">Azimuthal</button>
       </div>
