@@ -85,7 +85,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   const workedBefore = page.locator(".panel", { hasText: "Worked before" }).first();
   await expect(workedBefore).toContainText("W1AW");
   await expect(call).toHaveValue("");
-  await page.getByRole("button", { name: "Clear selection" }).click();
+  await page.getByLabel("Selected QSOs").selectOption("clear");
 
   // Show the rig column; the QSO logged from the keyboard recorded the K3 and its power.
   await page.locator("button:not(.tiny)", { hasText: /^Columns$/ }).click();
@@ -478,7 +478,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
 
   // Queue: queue a card from the log, review it in QSL, Queue (details and contact info), print its label, mark it sent.
   await page.locator(".grid-row", { hasText: "K1ABC" }).click();
-  await page.getByLabel("Paper QSL").selectOption("queue");
+  await page.getByLabel("Selected QSOs").selectOption("queue");
   await expect(page.getByText("1 QSO queued to send")).toBeVisible();
   await fromMenu(page, /^QSL Queue/);
   const queue = page.getByRole("dialog", { name: "QSL" });
@@ -526,7 +526,7 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByTestId("search").fill("K8TWO");
   await expect(page.locator(".grid-row", { hasText: "K8TWO" })).toHaveCount(2);
   await page.locator(".grid-row", { hasText: "K8TWO" }).first().click();
-  await page.getByLabel("Paper QSL").selectOption("queue");
+  await page.getByLabel("Selected QSOs").selectOption("queue");
   await expect(page.getByText("1 QSO queued to send")).toBeVisible();
   // A card that arrives puts a card back in the queue for you to send.
   await page.getByTestId("search").fill("W1AW");
