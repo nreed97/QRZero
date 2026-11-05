@@ -217,7 +217,8 @@ fn main() {
                 }
             }
             if matches!(event, tauri::WindowEvent::Destroyed) {
-                if window.label().starts_with("pane-") {
+                // QRZero's own close button destroys the window without a close request, so save here too.
+                if window.label().starts_with("pane-") || window.label() == "main" {
                     save_window(window);
                 }
                 MAXIMIZED.get_or_init(Default::default).lock().unwrap().remove(window.label());
