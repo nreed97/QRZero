@@ -289,16 +289,16 @@ export default function PaperQsl({ logId }: { logId: number }) {
           )}
           <div className="row">
             <span className="small">{what}:</span>
-            <button className="primary" disabled={!n} onClick={() => mark("sent-b")}>Sent via bureau</button>
-            <button disabled={!n} onClick={() => mark("sent-d")}>Sent direct</button>
+            <button className="primary" disabled={!n} onClick={() => mark("sent-d")}>Sent direct</button>
+            <button disabled={!n} onClick={() => mark("sent-b")}>Sent via bureau</button>
             <button disabled={!n} onClick={() => mark("none")} title="Take it out of the queue without sending a card">Remove from queue</button>
             <span className="muted small">{picked.size ? "the ticked ones" : "the one you're looking at"}</span>
           </div>
           {printed && (
             <p className="ql-after">
               Printed. Mark {printed.length} QSO{printed.length === 1 ? "" : "s"} sent?{" "}
+              <button className="primary" onClick={() => mark("sent-d", printed)}>Direct</button>{" "}
               <button onClick={() => mark("sent-b", printed)}>Via bureau</button>{" "}
-              <button onClick={() => mark("sent-d", printed)}>Direct</button>{" "}
               <button onClick={() => setPrinted(null)}>Not now</button>
             </p>
           )}
