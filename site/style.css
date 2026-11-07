@@ -148,3 +148,8 @@ footer .sig { font-family: var(--mono); color: var(--amber); letter-spacing: 2px
   .readout { animation: glow 3s ease-in-out infinite alternate; }
   @keyframes glow { from { text-shadow: 0 0 6px rgba(255,176,46,.4); } to { text-shadow: 0 0 14px rgba(255,176,46,.9); } }
 }
+
+/* GitHub link in the top bar stays visible on small screens */
+nav a.gh { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 6px; padding: 5px 12px; color: var(--text); font-size: 14px; }
+nav a.gh:hover { border-color: var(--amber-d); color: var(--amber); text-decoration: none; }
+@media (max-width: 560px) { nav { gap: 10px; } nav a:not(.gh):not(.btn) { display: none; } header.top .wrap { gap: 10px; } }
