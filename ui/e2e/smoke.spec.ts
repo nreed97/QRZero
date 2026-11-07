@@ -526,13 +526,21 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByTestId("search").fill("K8TWO");
   await expect(page.locator(".grid-row", { hasText: "K8TWO" })).toHaveCount(2);
   await page.locator(".grid-row", { hasText: "K8TWO" }).first().click();
-  await page.getByLabel("Selected QSOs").selectOption("queue");
+  // The earlier notice reads the same, so wait for the marking itself to finish.
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes("/api/qsos/mark") && r.request().method() === "POST"),
+    page.getByLabel("Selected QSOs").selectOption("queue"),
+  ]);
   await expect(page.getByText("1 QSO queued to send")).toBeVisible();
   // A card that arrives puts a card back in the queue for you to send.
   await page.getByTestId("search").fill("W1AW");
   await page.locator(".grid-row", { hasText: "W1AW" }).click({ button: "right" });
+  // Two marks (received, then queued): wait for the second before opening the queue.
+  const marks: Promise<unknown>[] = [];
+  page.on("request", (r) => r.url().includes("/api/qsos/mark") && marks.push(r.response()));
   await page.getByRole("menuitem", { name: /Card received, queue a reply/ }).click();
-  await expect(page.getByText("1 QSO queued to send")).toBeVisible();
+  await expect(page.getByText(/^Card received\. 1 QSO queued to send/)).toBeVisible();
+  await Promise.all(marks);
   await fromMenu(page, /^QSL Queue/);
   await expect(queue.locator(".paper-queue tbody tr")).toHaveCount(2); // one K8TWO and W1AW, nothing else
   await expect(queue.locator(".paper-queue")).toContainText("W1AW");
@@ -581,6 +589,9 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
     await page.getByLabel("Name (shown when logging)").fill(antName);
     for (const b of bands) await page.getByTestId("antenna-bands").getByLabel(b, { exact: true }).check();
     await page.getByRole("button", { name: "Save" }).click();
+    // Saving closes the form once the server has answered; don't start the next antenna before that.
+    await expect(page.getByTestId("antenna-bands")).toHaveCount(0);
+    await expect(page.locator(".tree .item", { hasText: antName })).toBeVisible();
   }
   await expect(page.locator(".tree .item", { hasText: "Hex beam" })).toContainText("20 15 m");
   await page.getByRole("button", { name: "Close", exact: true }).click();
@@ -667,7 +678,8 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.getByRole("menuitem", { name: "Save layout as…" }).click();
   await page.keyboard.press("Escape");
   await page.reload();
-  await expect(page.getByRole("button", { name: "Layout: Test layout" })).toBeVisible();
+  // After a reload the window waits for its saved settings (up to 3 s) before it draws.
+  await expect(page.getByRole("button", { name: "Layout: Test layout" })).toBeVisible({ timeout: 20_000 });
   await expect(page.locator(".ws-group", { has: page.getByRole("tab", { name: "Cluster" }) }).getByRole("tab")).toHaveCount(1);
   // The layout also remembers the Log tab's columns: hide Rig, then load the layout to bring it back.
   const rigHead = page.locator(".grid .grid-head .col-head").filter({ hasText: /^Rig$/ });
@@ -713,13 +725,13 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
               }
             });
         }),
-      { timeout: 10_000 },
+      { timeout: 20_000 },
     )
     .toBe(true);
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   try {
-    await expect(page.getByRole("button", { name: "Layout: Test layout" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Layout: Test layout" })).toBeVisible({ timeout: 20_000 });
   } catch (e) {
     // Say what the window and the database held, so a failure on a slow runner can be understood from its log.
     const info = await page.evaluate(async () => {
