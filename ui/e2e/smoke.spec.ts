@@ -707,27 +707,32 @@ test("first run, log, import, search, edit and export", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   // ...and even with the browser's storage wiped, as happens when the desktop app restarts on a new address.
   // The copy to the database is saved shortly after a change: wait until it has everything in this browser's storage.
-  await expect
-    .poll(
-      () =>
-        page.evaluate(async () => {
-          // The server keeps object keys in its own order, so compare with the keys sorted.
-          const canon = (v: unknown): string =>
-            JSON.stringify(v, (_k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
-          const db = (await (await fetch("/api/prefs/ui.local", { headers: { "x-qrzero-token": "e2e" } })).json()) ?? {};
-          return Object.keys(localStorage)
-            .filter((k) => k.startsWith("qrzero."))
-            .every((k) => {
-              try {
-                return canon(db[k]) === canon(JSON.parse(localStorage.getItem(k) ?? "null"));
-              } catch {
-                return true;
-              }
-            });
-        }),
-      { timeout: 20_000 },
-    )
-    .toBe(true);
+  const inSync = () =>
+    page.evaluate(async () => {
+      // The server keeps object keys in its own order, so compare with the keys sorted.
+      const canon = (v: unknown): string =>
+        JSON.stringify(v, (_k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
+      const db = (await (await fetch("/api/prefs/ui.local", { headers: { "x-qrzero-token": "e2e" } })).json()) ?? {};
+      return Object.keys(localStorage)
+        .filter((k) => k.startsWith("qrzero."))
+        .every((k) => {
+          try {
+            return canon(db[k]) === canon(JSON.parse(localStorage.getItem(k) ?? "null"));
+          } catch {
+            return true;
+          }
+        });
+    });
+  try {
+    await expect.poll(inSync, { timeout: 5_000 }).toBe(true);
+  } catch {
+    // The other specs run in parallel against this same server and write the same database copy
+    // from their own browsers, so one of them can save over this window's settings after its last
+    // change, and nothing here saves them again. A reload makes the window notice that the
+    // database copy lags its storage and save it again.
+    await page.reload();
+    await expect.poll(inSync, { timeout: 20_000 }).toBe(true);
+  }
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   try {
