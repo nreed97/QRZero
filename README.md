@@ -435,4 +435,4 @@ QRZero 1.0 is the first full release. Windows gets the most testing. Real-statio
 
 ## License
 
-MIT, as set in `Cargo.toml`.
+MIT, see [LICENSE](LICENSE) (also set in `Cargo.toml`).
