@@ -431,8 +431,8 @@ Pushing a tag builds the Windows, macOS and Linux packages and attaches them to 
 
 ## Status
 
-QRZero 1.0 is the first full release. Windows gets the most testing. Real-station testing covers WSJT-X, N1MM Logger+, AetherSDR over TCI, a WRC rotator controller over GS-232 (including turning from the map), split spots, pop-out windows, window placement and Club Log bulk upload. The Mac build is built and tested in CI and has been started on an Apple Silicon Mac, but has had little everyday use. Hamlib, serial CAT, CI-V, the other online services, QL-700 label printing, the contest calendar and the NAQCC and FISTS award rules are built from the protocol documentation and checked against stand-ins in the test suite, so reports and bug reports are welcome. Keep your own ADIF export and the automatic backups, as you would with any logbook.
+QRZero 1.0 is the first full release. Windows gets the most testing. Real-station testing covers WSJT-X, N1MM Logger+, AetherSDR over TCI (CAT control), a WRC rotator controller over GS-232 (including turning from the map), QRZ.com, LoTW and Club Log (lookups, uploads and confirmations, including bulk upload), split spots, pop-out windows and window placement. The Mac build is built and tested in CI and has been run on an Apple Silicon Mac, but has had little everyday use. Hamlib, serial CAT, CI-V, eQSL, QL-700 label printing, the contest calendar and the NAQCC and FISTS award rules are built from the protocol documentation and checked against stand-ins in the test suite, so bug reports are welcome. Keep your own ADIF export and the automatic backups, as you would with any logbook.
 
 ## License
 
-MIT, as set in `Cargo.toml`.
+MIT, see [LICENSE](LICENSE) (also set in `Cargo.toml`).
