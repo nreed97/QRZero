@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState, Fragment, type ReactNode } from "react";
 import { api } from "../api";
 import { useColumnDrag } from "../columnDrag";
-import { distanceKm } from "../geo";
 import { onLive } from "../live";
 import { useListKeys } from "../listKeys";
 import { BANDS, MODE_GROUP_NAME, modeGroup } from "../modes";
 import { needLabels, needRank } from "../needed";
-import { localGet, localSet } from "../prefs";
+import { localGet } from "../prefs";
+import { CLUSTER_KEY, ORIGIN_DEFAULTS, type Origin, type OriginFilters, passesOrigin, saveClusterFilters } from "../spotOrigin";
 import type { Entity, Spot } from "../types";
 import type { DecodePick } from "./FtxMonitor";
 import "../watch.css";
@@ -14,44 +14,15 @@ import ModeKey from "./ModeKey";
 
 const KEEP = 500;
 
-type Origin = "" | "continent" | "near";
-interface Filters {
+interface Filters extends OriginFilters {
   band: string;
   modes: "" | "cw" | "phone" | "digital";
   needed: boolean;
   hideWorked: boolean;
   maxAge: number;
-  /** Where the spotter must be: anywhere, on my continent, or within `km` of me. */
-  origin: Origin;
-  km: number;
-  /** Hide spots where the spotter and the station are in the same country. */
-  hideSelf: boolean;
-  /** Hide spots of stations in my own country. */
-  hideHome: boolean;
-  /** Hide spots of stations in these continents. */
-  hideCont: string[];
-  /** Hide spots with no usable country (bad calls, beacons). */
-  hideUnknown: boolean;
 }
 const CONTS: [string, string][] = [["NA", "North America"], ["SA", "South America"], ["EU", "Europe"], ["AF", "Africa"], ["AS", "Asia"], ["OC", "Oceania"], ["AN", "Antarctica"]];
-const DEFAULTS: Filters = { band: "", modes: "", needed: false, hideWorked: false, maxAge: 30, origin: "", km: 3000, hideSelf: false, hideHome: false, hideCont: [], hideUnknown: false };
-
-function sameCountry(a?: Entity | null, b?: Entity | null): boolean {
-  return !!a && !!b && (a.dxcc != null && b.dxcc != null ? a.dxcc === b.dxcc : a.prefix === b.prefix);
-}
-
-function passes(s: Spot, f: Filters, home: Entity | null): boolean {
-  if (f.hideSelf && sameCountry(s.entity, s.spotter_entity)) return false;
-  if (f.hideHome && sameCountry(s.entity, home)) return false;
-  if (f.hideUnknown && !s.entity) return false;
-  if (s.entity && f.hideCont.includes(s.entity.cont)) return false;
-  // Origin filters only apply when both ends are known; an unknown spotter is kept.
-  if (home && s.spotter_entity) {
-    if (f.origin === "continent" && s.spotter_entity.cont !== home.cont) return false;
-    if (f.origin === "near" && distanceKm(home, s.spotter_entity) > f.km) return false;
-  }
-  return true;
-}
+const DEFAULTS: Filters = { band: "", modes: "", needed: false, hideWorked: false, maxAge: 30, ...ORIGIN_DEFAULTS };
 
 function flagsOf(s: Spot): { text: string; cls: string }[] {
   const n = s.needed;
@@ -92,7 +63,7 @@ export default function ClusterPane({ onPick, onSettings }: { onPick: (p: Decode
   const [hasNodes, setHasNodes] = useState(true);
   const [home, setHome] = useState<Entity | null>(null);
   const [more, setMore] = useState(false);
-  const [filters, setFilters] = useState<Filters>(() => ({ ...DEFAULTS, ...localGet<Partial<Filters>>("qrzero.cluster", {}) }));
+  const [filters, setFilters] = useState<Filters>(() => ({ ...DEFAULTS, ...localGet<Partial<Filters>>(CLUSTER_KEY, {}) }));
   const [console_, setConsole] = useState(false);
   const [command, setCommand] = useState("");
   const [err, setErr] = useState("");
@@ -137,7 +108,7 @@ export default function ClusterPane({ onPick, onSettings }: { onPick: (p: Decode
   const setFilter = (f: Partial<Filters>) => {
     const next = { ...filters, ...f };
     setFilters(next);
-    localSet("qrzero.cluster", next);
+    saveClusterFilters(next);
   };
 
   const shown = useMemo(
@@ -149,7 +120,7 @@ export default function ClusterPane({ onPick, onSettings }: { onPick: (p: Decode
           (!filters.needed || isNeeded(s)) &&
           (!filters.hideWorked || !s.needed || s.needed.new_call_band) &&
           (!filters.maxAge || now - s.received < filters.maxAge * 60) &&
-          passes(s, filters, home),
+          passesOrigin(s, filters, home),
       ),
     [spots, filters, now, home],
   );
@@ -236,7 +207,7 @@ export default function ClusterPane({ onPick, onSettings }: { onPick: (p: Decode
             <label key={c} className="check" title={name}><input type="checkbox" checked={filters.hideCont.includes(c)} onChange={() => toggleCont(c)} /> {c}</label>
           ))}
           {!home && <span className="muted small">Add your callsign to use the continent and distance options.</span>}
-          <button onClick={() => { setFilters(DEFAULTS); localSet("qrzero.cluster", DEFAULTS); }}>Reset</button>
+          <button onClick={() => { setFilters(DEFAULTS); saveClusterFilters(DEFAULTS); }}>Reset</button>
         </div>
       )}
       {err && <div className="ftx-msg small err">{err}</div>}

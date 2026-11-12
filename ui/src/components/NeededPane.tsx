@@ -6,6 +6,7 @@ import { useListKeys } from "../listKeys";
 import { MODE_GROUP_NAME, modeGroup } from "../modes";
 import { compareNeeded, isBeacon, type NeedRank, needLabel, needRank, spotKey } from "../needed";
 import { setNeededConfig, useNeededConfig } from "../neededPrefs";
+import { originActive, passesOrigin, useOrigin } from "../spotOrigin";
 import type { MostWanted, Spot } from "../types";
 import type { DecodePick } from "./FtxMonitor";
 import "../watch.css";
@@ -34,6 +35,7 @@ export default function NeededPane({ onPick, onSettings }: { onPick: (p: DecodeP
   const [now, setNow] = useState(Date.now() / 1000);
   const [err, setErr] = useState("");
   const [wanted, setWanted] = useState<MostWanted | null>(null);
+  const { filters: origin, home } = useOrigin();
 
   useEffect(() => {
     api
@@ -64,14 +66,14 @@ export default function NeededPane({ onPick, onSettings }: { onPick: (p: DecodeP
     const out: { s: Spot; rank: NeedRank; wanted: number }[] = [];
     for (const s of spots.values()) {
       const rank = needRank(s);
-      if (rank !== null && !isBeacon(s) && now - s.received < cfg.listMin * 60) {
+      if (rank !== null && !isBeacon(s) && now - s.received < cfg.listMin * 60 && passesOrigin(s, origin, home)) {
         const code = s.entity?.dxcc;
         out.push({ s, rank, wanted: (code != null && wanted?.ranks[code]) || Infinity });
       }
     }
     // New entity first, then band, then mode; within each the most wanted entity, then the newest spot.
     return out.sort((a, b) => compareNeeded({ ...a, received: a.s.received }, { ...b, received: b.s.received }));
-  }, [spots, now, cfg.listMin, wanted]);
+  }, [spots, now, cfg.listMin, wanted, origin, home]);
 
   const kb = useListKeys(rows, (r) => spotKey(r.s), (r, tune) => onPick(spotPick(r.s, tune)));
 
@@ -88,6 +90,7 @@ export default function NeededPane({ onPick, onSettings }: { onPick: (p: DecodeP
             <option value={120}>2 hours</option>
           </select>
         </label>
+        {originActive(origin) && <span className="muted small" title="Set in the Cluster pane, under Origin and country">Origin filter on</span>}
         {wanted && Object.keys(wanted.ranks).length === 0 && <span className="muted small" title={wanted.error ?? ""}>Most Wanted ranks not loaded</span>}
         <span className="spacer" />
         <button onClick={onSettings} title="Sound and popup alerts for needed spots">Alerts…</button>
