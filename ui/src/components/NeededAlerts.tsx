@@ -3,6 +3,7 @@ import { beep } from "../display";
 import { onLive } from "../live";
 import { AlertGate, needLabel, needRank } from "../needed";
 import { useNeededConfig } from "../neededPrefs";
+import { getOrigin, loadHome, originActive, passesOrigin } from "../spotOrigin";
 import type { Spot } from "../types";
 import type { DecodePick } from "./FtxMonitor";
 import { spotPick } from "./NeededPane";
@@ -28,17 +29,23 @@ export default function NeededAlerts({ onPick }: { onPick: (p: DecodePick) => vo
         if (!c.sound && !c.popup) return;
         // A spot the cluster replays when it connects is old news.
         if (Date.now() / 1000 - e.spot.received > 120) return;
-        if (!gate.current.check(e.spot, c, Date.now() / 1000)) return;
-        if (c.sound) {
-          // A higher, double beep for a new entity.
-          beep(needRank(e.spot) === 0 ? 1100 : 780);
-          if (needRank(e.spot) === 0) setTimeout(() => beep(1100), 220);
-        }
-        if (c.popup) {
-          const id = next.current++;
-          setToasts((t) => [{ id, spot: e.spot }, ...t].slice(0, MAX));
-          setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), SHOW_SEC * 1000);
-        }
+        const spot = e.spot;
+        void (async () => {
+          // Spots the Cluster pane's origin filters hide don't alert either.
+          const origin = getOrigin();
+          if (originActive(origin) && !passesOrigin(spot, origin, await loadHome())) return;
+          if (!gate.current.check(spot, c, Date.now() / 1000)) return;
+          if (c.sound) {
+            // A higher, double beep for a new entity.
+            beep(needRank(spot) === 0 ? 1100 : 780);
+            if (needRank(spot) === 0) setTimeout(() => beep(1100), 220);
+          }
+          if (c.popup) {
+            const id = next.current++;
+            setToasts((t) => [{ id, spot }, ...t].slice(0, MAX));
+            setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), SHOW_SEC * 1000);
+          }
+        })();
       }),
     [],
   );

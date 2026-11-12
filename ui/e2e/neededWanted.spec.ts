@@ -76,3 +76,22 @@ test("Needed now leaves beacons out", async ({ page }) => {
   await expect(rows.locator(".call")).not.toContainText(["4U1UN"]);
   if (process.env.SHOT2) await page.screenshot({ path: process.env.SHOT2 });
 });
+
+test("Needed now follows the Cluster pane's origin filters", async ({ page }) => {
+  const from = (s: ReturnType<typeof spot>, cont: string) => ({ ...s, spotter_entity: { name: "X", prefix: "", cont, dxcc: 1, lat: 0, lon: 0 } });
+  const spots = [from(snapshot.spots[0], "AS"), from(snapshot.spots[1], "NA"), from(snapshot.spots[2], "NA")];
+  const home = { name: "United States", prefix: "K", cont: "NA", dxcc: 291, lat: 40, lon: -100 };
+  await page.route("**/api/cluster", (r) => (r.request().method() === "GET" ? r.fulfill({ json: { ...snapshot, spots, home } }) : r.continue()));
+  await page.route("**/api/mostwanted", (r) => r.fulfill({ json: wanted }));
+  await page.addInitScript(() => localStorage.setItem("qrzero.cluster", JSON.stringify({ origin: "continent" })));
+  await page.goto("/?token=e2e");
+  await closeWizard(page);
+  await page.getByRole("button", { name: /^Layout/ }).click();
+  await page.getByRole("menu").getByLabel("Needed now").check();
+  await page.getByRole("button", { name: /^Layout/ }).click();
+  await page.getByRole("tab", { name: "Needed now" }).click();
+  // JA1XYZ was spotted from Asia, so the "spotted from my continent" choice hides it here too.
+  await expect(page.locator(".needed-row:not(.head) .call")).toHaveText(["P5/4L4FN", "3Y0K"]);
+  await expect(page.getByText("Origin filter on")).toBeVisible();
+  if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+});

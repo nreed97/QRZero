@@ -61,3 +61,21 @@ test("beacons are recognised by call, comment or frequency", () => {
   expect(b("K1ABC/BB", 14025)).toBe(false);
   expect(new AlertGate().check({ ...spot("DK0WCY/B", { new_dxcc: true }), comment: "", freq_hz: 10144000 } as Spot, cfg, 0)).toBe(false);
 });
+
+test("the Cluster pane's origin filters decide which spots count", async () => {
+  const { passesOrigin, ORIGIN_DEFAULTS } = await import("../src/spotOriginFilter");
+  const ent = (prefix: string, cont: string, dxcc: number, lat = 0, lon = 0) => ({ prefix, cont, dxcc, name: prefix, lat, lon });
+  const home = ent("K", "NA", 291) as never;
+  const s = (entity: ReturnType<typeof ent> | null, spotter: ReturnType<typeof ent> | null) => ({ entity, spotter_entity: spotter }) as unknown as Spot;
+  const jaFromJa = s(ent("JA", "AS", 339), ent("JA", "AS", 339));
+  const euFromNa = s(ent("DL", "EU", 230), ent("K", "NA", 291));
+  expect(passesOrigin(jaFromJa, ORIGIN_DEFAULTS, home)).toBe(true);
+  expect(passesOrigin(jaFromJa, { ...ORIGIN_DEFAULTS, hideSelf: true }, home)).toBe(false);
+  expect(passesOrigin(jaFromJa, { ...ORIGIN_DEFAULTS, origin: "continent" }, home)).toBe(false);
+  expect(passesOrigin(euFromNa, { ...ORIGIN_DEFAULTS, origin: "continent" }, home)).toBe(true);
+  expect(passesOrigin(euFromNa, { ...ORIGIN_DEFAULTS, hideCont: ["EU"] }, home)).toBe(false);
+  expect(passesOrigin(s(ent("K", "NA", 291), null), { ...ORIGIN_DEFAULTS, hideHome: true }, home)).toBe(false);
+  expect(passesOrigin(s(null, null), { ...ORIGIN_DEFAULTS, hideUnknown: true }, home)).toBe(false);
+  // Without a home entity the continent choice can't be applied, so spots are kept.
+  expect(passesOrigin(jaFromJa, { ...ORIGIN_DEFAULTS, origin: "continent" }, null)).toBe(true);
+});

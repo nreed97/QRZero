@@ -7,6 +7,7 @@ import { needLabel, needRank } from "../needed";
 import { usePota, potaNeeds, isPotaWorked, potaWorkedMode } from "../pota";
 import { potaPick } from "./PotaPane";
 import { localGet, localSet } from "../prefs";
+import { passesOrigin, useOrigin } from "../spotOrigin";
 import type { FtxDecode, Spot } from "../types";
 import type { PaneActions } from "./SharedPanes";
 import "../bandmap.css";
@@ -215,14 +216,15 @@ export default function BandMapPane({ ctx, act }: { ctx: PopContext; act: PaneAc
   const maxAgeMin = localGet("qrzero.cluster", { maxAge: 30 }).maxAge;
   const fadeOver = (maxAgeMin || 60) * 60;
 
+  const { filters: origin, home } = useOrigin();
   const bandSpots = useMemo(
     () =>
       spots.filter((s) => {
         const khz = s.freq_hz / 1000;
         const age = now - s.received;
-        return (s.band === band || (khz >= lo && khz <= hi)) && (!maxAgeMin || age < maxAgeMin * 60) && (!prefs.needed || spotNeeded(s));
+        return (s.band === band || (khz >= lo && khz <= hi)) && (!maxAgeMin || age < maxAgeMin * 60) && (!prefs.needed || spotNeeded(s)) && passesOrigin(s, origin, home);
       }),
-    [spots, band, lo, hi, now, maxAgeMin, prefs.needed],
+    [spots, band, lo, hi, now, maxAgeMin, prefs.needed, origin, home],
   );
 
   // FTx: one compact group per WSJT-X/JTDX instance on this band, at its dial frequency.
