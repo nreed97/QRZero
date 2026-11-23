@@ -49,7 +49,7 @@ const groups: { name: string; pages: string[] }[] = [
   { name: "Start", pages: ["01-getting-started", "12-browser", "22-troubleshooting", "23-getting-help"] },
   { name: "Logging", pages: ["02-logging", "03-log-grid", "04-import-export"] },
   { name: "Radios and programs", pages: ["07-radios", "08-ftx-monitor", "16-udp-and-startup"] },
-  { name: "Spots and band map", pages: ["09-cluster", "13-band-map", "21-pota", "14-watch-list", "17-dxpeditions", "18-contests", "15-propagation", "20-alerts"] },
+  { name: "Spots and band map", pages: ["09-cluster", "13-band-map", "21-pota", "24-psk-reporter", "14-watch-list", "17-dxpeditions", "18-contests", "15-propagation", "20-alerts"] },
   { name: "Awards and QSL", pages: ["11-awards", "19-statistics", "10-qsl"] },
   { name: "Settings and window", pages: ["05-setup", "06-layout"] },
 ];

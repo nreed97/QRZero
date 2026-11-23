@@ -1,4 +1,4 @@
-import type { Spot, LogStats, StatsFilter, UpdateInfo, ContestList, DxpedList, MostWanted, DxpedPlanned, PropagationReport, PotaList } from "./types";
+import type { Spot, LogStats, StatsFilter, UpdateInfo, ContestList, DxpedList, MostWanted, DxpedPlanned, PropagationReport, PotaList, PskConfig, PskView } from "./types";
 import type { ClubAwards, Goals, Marathon, NtfyConfig, NtfyView, QslQueue, QslService, QslDownload, AwardHint, SlotGrid, AwardKind, AwardTable, ClusterConfig, ClusterSnapshot, QslConfig, QslOverview, QslRun, QslSecrets, CtyStatus, Equipment, Fields, FtxConfigure, FtxDecode, FtxInstance, IntegrationStatus, Integrations, ImportReport, Location, Log, LookupResult, Note, Qso, QsoFilter, RunStatus, Settings, StartupApp, StationCallsign, UdpConnection, WatchEntry, WatchHit, CtyEntityInfo } from "./types";
 
 // The session token arrives once in the URL (?token=...) and is kept for this tab.
@@ -207,6 +207,8 @@ export const api = {
   refreshDxpeditions: () => json<DxpedList>("POST", "/dxpeditions/refresh"),
   saveDxpeditions: (list: DxpedPlanned[]) => json<DxpedList>("PUT", "/dxpeditions", list),
   pota: (force = false) => json<PotaList>("GET", force ? "/pota?force=1" : "/pota"),
+  psk: () => json<PskView>("GET", "/psk"),
+  savePsk: (c: PskConfig) => json<PskView>("PUT", "/psk", c),
   watchHits: () => json<WatchHit[]>("GET", "/watch/hits"),
   installCty: async (file: Blob) => (await request("POST", "/cty", undefined, file)).json() as Promise<CtyStatus>,
 

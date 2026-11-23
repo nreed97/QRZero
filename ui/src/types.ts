@@ -466,4 +466,28 @@ export interface PotaSpot {
   /** This call from this park, band and mode is in the log since 0000z today. */
   worked_today: boolean;
 }
+/** The PSK Reporter feed settings: which transmitting stations to look for. */
+export interface PskConfig { enabled: boolean; calls: string[]; minutes: number; host: string; port: number }
+/** One station on one band and mode, from its PSK Reporter reception reports. */
+export interface PskSpot {
+  call: string;
+  band: string | null;
+  mode: string;
+  freq_hz: number;
+  /** Where a click tunes: the dial frequency for FT8 and the other digital modes. */
+  tune_hz: number;
+  /** Unix seconds of the first and latest report. */
+  first: number;
+  last: number;
+  reports: number;
+  receivers: number;
+  best_snr: number | null;
+  last_snr: number | null;
+  last_receiver: string;
+  last_receiver_grid: string;
+  grid: string;
+  entity: Entity | null;
+  needed: Needed | null;
+}
+export interface PskView { config: PskConfig; state: string; connected: boolean; spots: PskSpot[] }
 export interface PotaList { spots: PotaSpot[]; fetched_at: number | null; error: string | null }

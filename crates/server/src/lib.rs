@@ -39,6 +39,7 @@ mod updates;
 mod dxped;
 mod mostwanted;
 mod pota;
+mod psk;
 mod watch;
 
 pub use qsl::Endpoints as QslEndpoints;
@@ -130,6 +131,7 @@ struct AppState {
     data_dir: PathBuf,
     hub: Arc<Hub>,
     cluster: Arc<Cluster>,
+    psk: Arc<psk::Psk>,
     qsl: Arc<Qsl>,
     propagation: Arc<propagation::Propagation>,
     startup: Arc<startup::Startup>,
@@ -195,6 +197,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
         });
     }
     let cluster = Cluster::new(&hub);
+    let psk = psk::Psk::new(&hub);
     hub.notify.set_token(secrets::get(&store.lock().unwrap_or_else(|p| p.into_inner()), &cfg.secret_service, notify::TOKEN_SECRET).ok().flatten());
     let qsl = Qsl::new(store.clone(), hub.clone(), cfg.secret_service.clone(), cfg.data_dir.clone(), cfg.qsl_endpoints);
     qsl.start();
@@ -210,6 +213,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Running> {
         hub,
         startup,
         cluster,
+        psk,
         qsl,
         propagation: propagation::Propagation::new(cfg.propagation_url),
         qrz: tokio::sync::Mutex::new(None),
@@ -334,6 +338,7 @@ fn router(state: Shared, loopback_only: bool) -> Router {
         .route("/dxpeditions", get(dxped_get).put(dxped_put))
         .route("/dxpeditions/refresh", post(dxped_refresh))
         .route("/pota", get(pota_get))
+        .route("/psk", get(psk_get).put(psk_put))
         .route("/mostwanted", get(mostwanted_get))
         .route("/mostwanted/refresh", post(mostwanted_refresh))
         .route("/updates", get(updates_get).put(updates_put))
@@ -2233,6 +2238,17 @@ async fn dxped_refresh(State(s): State<Shared>) -> ApiResult<serde_json::Value> 
 
 async fn watch_hits(State(s): State<Shared>) -> ApiResult<Vec<watch::WatchHit>> {
     Ok(Json(s.hub.watch.hits(chrono::Utc::now().timestamp())))
+}
+
+// ---- PSK Reporter feed ----------------------------------------------------
+
+async fn psk_get(State(s): State<Shared>) -> Json<serde_json::Value> {
+    Json(s.psk.view())
+}
+
+async fn psk_put(State(s): State<Shared>, Json(cfg): Json<psk::PskConfig>) -> ApiResult<serde_json::Value> {
+    s.psk.save_config(cfg).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(s.psk.view()))
 }
 
 // ---- cluster -------------------------------------------------------------

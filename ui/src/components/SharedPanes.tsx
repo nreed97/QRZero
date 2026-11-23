@@ -20,6 +20,7 @@ import RotatorPane from "./RotatorPane";
 import NotesPane from "./NotesPane";
 import SpottedMePane from "./SpottedMePane";
 import PotaPane from "./PotaPane";
+import PskPane from "./PskPane";
 import ClubsPaneView from "./ClubsPane";
 import EntryHost from "./EntryHost";
 
@@ -136,6 +137,8 @@ export default function SharedPane({ id, ctx, act }: { id: PaneId; ctx: PopConte
       return <SpottedMePane onSettings={clusterSettings} />;
     case "pota":
       return <PotaPane onPick={act.onPick} />;
+    case "psk":
+      return <PskPane onPick={act.onPick} />;
     case "clubs":
       return <ClubsPane />;
     default:

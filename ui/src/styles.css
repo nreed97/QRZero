@@ -554,6 +554,8 @@ label.button-like:hover { border-color: var(--accent); }
 .spot-row.head { position: sticky; top: 0; background: var(--title); font-weight: 600; font-size: 12px; z-index: 1; }
 .spot-row.needed { background: color-mix(in srgb, var(--new) 12%, transparent); }
 .spot-row.worked { color: var(--muted); }
+.spot-row.psk-live { background: color-mix(in srgb, var(--accent) 14%, transparent); font-weight: 600; }
+.spot-row.psk-stale { color: var(--muted); }
 .spot-row:not(.head):hover { background: var(--row-sel); }
 .spot-row .flags { display: flex; gap: 8px; margin: 0; flex-wrap: nowrap; }
 .cluster-state { font-size: 12px; color: var(--muted); }

@@ -24,7 +24,7 @@ QRZero keeps your log in one SQLite file, stays quick with hundreds of thousands
 - **Logging.** One-key entry with QRZ.com and HamQTH lookups, customisable entry fields per mode, worked-before list (simple, or with a summary line), duplicate warnings, a Station pane that says what a contact is worth for every award, notes per callsign, a map with grey line and beam headings, DXCC slot grids for the entity you are working, and a fast log grid with a full QSO editor and bulk editing.
 - **Radios.** Hamlib, TCI, Kenwood/Elecraft/Flex, Yaesu and Icom CI-V control with split, several radios at once (SO2R, Flex slices) and rotator control.
 - **Digital and contest programs.** WSJT-X, JTDX and N1MM Logger+ over UDP, with an FTx monitor that flags every decode against your log.
-- **Chasing DX.** DX cluster with filters, a **Needed now** list ranked by Club Log's Most Wanted list with sound and popup alerts (also as phone notifications through ntfy), a **Spotted me** list, an optional **POTA spots** pane for activators on the air, band map, watch list, DXpedition calendar, contest calendar, propagation and a band forecast.
+- **Chasing DX.** DX cluster with filters, a **Needed now** list ranked by Club Log's Most Wanted list with sound and popup alerts (also as phone notifications through ntfy), a **Spotted me** list, an optional **POTA spots** pane for activators on the air, an optional **PSK Reporter** pane that shows live who hears the stations you are after and tunes to them with a click, band map, watch list, DXpedition calendar, contest calendar, propagation and a band forecast.
 - **Awards.** DXCC (with Challenge, 5BDXCC, Honor Roll and optional verified credit), WAS (5BWAS, Triple Play), WAZ (5BWAZ), WPX, WAC, ITU zones, VUCC, IOTA, US counties, the CQ DX Marathon, and SKCC, CWops, NAQCC and FISTS with CWT medals. 60 m is tracked like any other band.
 - **QSLs.** LoTW, QRZ Logbook, Club Log and eQSL uploads and confirmation downloads, plus a paper-card queue with label printing for bureau and direct mailings.
 - **Your data.** ADIF import and export with every field kept, several logs and callsigns, archived callsigns, locations and equipment shared between logs, daily backups, and a **Statistics** summary.
@@ -323,7 +323,7 @@ For everything QRZero does not know by name (an antenna switch, a band decoder, 
 
 ## Arranging the window
 
-Everything is a pane: New QSO, Station, Worked before, DXCC slots, Map, Log, FTx monitor, Cluster, Needed now, Awards, Band map, Watch list, DXpeditions, Contests, Propagation, Rotator, Spotted me, POTA spots, Notes and MyClubs. Some start as tabs behind others (Needed now beside Cluster, Contests beside DXpeditions); open or hide any of them from the **Layout** menu. Drag a tab to dock a pane beside another or stack it as a tab, drag the bars to resize, hide panes you don't use, and pop any pane except New QSO and the Log out to its own window for a second screen (in the desktop app a pop-out can be kept **Always on top**). Save arrangements by name (a laptop layout, a two-screen shack layout, an FT8 evening) and switch between them; **Lock panes** stops accidents. Layouts live in the log database, so they survive restarts and come back with a restored backup.
+Everything is a pane: New QSO, Station, Worked before, DXCC slots, Map, Log, FTx monitor, Cluster, Needed now, Awards, Band map, Watch list, DXpeditions, Contests, Propagation, Rotator, Spotted me, POTA spots, PSK Reporter, Notes and MyClubs. Some start as tabs behind others (Needed now beside Cluster, Contests beside DXpeditions); open or hide any of them from the **Layout** menu. Drag a tab to dock a pane beside another or stack it as a tab, drag the bars to resize, hide panes you don't use, and pop any pane except New QSO and the Log out to its own window for a second screen (in the desktop app a pop-out can be kept **Always on top**). Save arrangements by name (a laptop layout, a two-screen shack layout, an FT8 evening) and switch between them; **Lock panes** stops accidents. Layouts live in the log database, so they survive restarts and come back with a restored backup.
 
 | | |
 | --- | --- |
@@ -369,7 +369,7 @@ The full user guide is in [docs/user](docs/user/01-getting-started.md) and is bu
 
 **Radios and programs**: [Radios, split and rotator](docs/user/07-radios.md), [FTx monitor, WSJT-X and N1MM](docs/user/08-ftx-monitor.md), [UDP connections and startup programs](docs/user/16-udp-and-startup.md)
 
-**Spots and band map**: [DX cluster](docs/user/09-cluster.md), [Band map](docs/user/13-band-map.md), [POTA spots](docs/user/21-pota.md), [Watch list](docs/user/14-watch-list.md), [DXpeditions](docs/user/17-dxpeditions.md), [Contests](docs/user/18-contests.md), [Propagation](docs/user/15-propagation.md), [Push alerts (ntfy)](docs/user/20-alerts.md)
+**Spots and band map**: [DX cluster](docs/user/09-cluster.md), [Band map](docs/user/13-band-map.md), [POTA spots](docs/user/21-pota.md), [PSK Reporter](docs/user/24-psk-reporter.md), [Watch list](docs/user/14-watch-list.md), [DXpeditions](docs/user/17-dxpeditions.md), [Contests](docs/user/18-contests.md), [Propagation](docs/user/15-propagation.md), [Push alerts (ntfy)](docs/user/20-alerts.md)
 
 **Awards and QSL**: [Awards](docs/user/11-awards.md), [Statistics](docs/user/19-statistics.md), [QSL](docs/user/10-qsl.md)
 

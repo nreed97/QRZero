@@ -270,6 +270,17 @@ const DIALS: &[(f64, &str)] = &[
     (50260.0, "MSK144"), (50280.0, "MSK144"), (144150.0, "MSK144"), (144360.0, "MSK144"),
 ];
 
+/// The dial frequency (kHz) of a digital mode's watering hole that `freq_khz` (dial + audio
+/// offset) lies in: from the dial up to 4 kHz above it, the highest such dial of that mode.
+/// `None` for other modes or frequencies away from a known dial.
+pub fn dial_for(freq_khz: f64, mode: &str) -> Option<f64> {
+    DIALS
+        .iter()
+        .filter(|(d, m)| m.eq_ignore_ascii_case(mode.trim()) && (*d..*d + 4.0).contains(&freq_khz))
+        .map(|(d, _)| *d)
+        .reduce(f64::max)
+}
+
 /// PSK31 centres (kHz), matched within ±1 kHz before the dials above.
 const PSK31: &[f64] = &[3580.0, 7070.0, 10142.0, 14070.0, 21070.0, 28120.0];
 
@@ -778,6 +789,15 @@ mod tests {
     use super::*;
     use tokio::io::{AsyncBufReadExt, BufReader};
     use tokio::net::TcpListener;
+
+    #[test]
+    fn dial_for_digital_modes() {
+        assert_eq!(dial_for(14075.6, "FT8"), Some(14074.0));
+        assert_eq!(dial_for(14081.2, "ft4"), Some(14080.0));
+        assert_eq!(dial_for(50325.0, "FT8"), Some(50323.0), "the higher of two close dials");
+        assert_eq!(dial_for(14079.0, "FT8"), None, "too far above the dial");
+        assert_eq!(dial_for(14025.0, "CW"), None);
+    }
 
     fn spot(
         spotter: &str,

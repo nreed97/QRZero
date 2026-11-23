@@ -33,7 +33,7 @@ Search tip: each Rust module starts with a `//!` doc comment saying what it is, 
 
 - Rig control backends (Hamlib, TCI, Icom, Kenwood, Yaesu, serial): `rig/` (start at `rig/mod.rs`).
 - WSJT-X / JTDX: `wsjtx.rs`. N1MM Logger+: `n1mm.rs`. PstRotatorAz: `pst.rs`. Direct rotator control: `rotor.rs`.
-- DX cluster client: `cluster.rs`.
+- DX cluster client: `cluster.rs`. PSK Reporter live feed (a small MQTT client): `pskreporter.rs`.
 
 ## Server (`crates/server/src`)
 
@@ -45,6 +45,7 @@ Search tip: each Rust module starts with a `//!` doc comment saying what it is, 
 - Custom UDP connections and relay: `udp_out.rs`. Programs started with QRZero: `startup.rs`.
 - Backups API: `backups.rs`. Update check: `updates.rs`.
 - POTA activator spots (read when a pane asks, no background polling): `pota.rs`.
+- PSK Reporter feed of chosen calls (off by default, connected only while on): `psk.rs`.
 - Feeds: `propagation.rs`, `contests.rs`, `dxped.rs`, `mostwanted.rs` (Club Log Most Wanted ranks).
 - Tests: `crates/server/tests` (each file is named for its area; `api.rs` is the general one).
 
@@ -52,7 +53,7 @@ Search tip: each Rust module starts with a `//!` doc comment saying what it is, 
 
 - App shell, docked and pop-out layout: `App.tsx`, `components/Workspace.tsx`, `components/Popout.tsx`, `workspace.ts`.
 - Frameless windows (QRZero's own title bar, and the title commands it sends the desktop shell): `frame.ts`, `components/WindowControls.tsx`.
-- Panes and dialogs: `components/*.tsx`, named for what they show (for example `LogGrid`, `ClusterPane`, `SpottedMePane`, `BandMapPane`, `AwardsPane`, `QslDialog`, `StatsDialog`, `SettingsDialog`; `FolderBrowser` is the folder chooser of the export dialog; `ScopePicker` is the shared "which QSOs" chooser of the export and bulk edit dialogs). Header and radio readout: `MainMenu.tsx`, `VfoBar.tsx`.
+- Panes and dialogs: `components/*.tsx`, named for what they show (for example `LogGrid`, `ClusterPane`, `SpottedMePane`, `PskPane`, `BandMapPane`, `AwardsPane`, `QslDialog`, `StatsDialog`, `SettingsDialog`; `FolderBrowser` is the folder chooser of the export dialog; `ScopePicker` is the shared "which QSOs" chooser of the export and bulk edit dialogs). Header and radio readout: `MainMenu.tsx`, `VfoBar.tsx`.
 - Server calls: `api.ts` (everything goes over `/api`). Live events: `live.ts`. Shared types: `types.ts`. The user's mode list (`modes.ts`, ADIF mode table in `adifModes.ts`, edited in `components/ModesSettings.tsx`; its CW/Phone/Digital choices reach the server's `awards::mode_group` through the `modes` preference).
 - Per-feature helpers and saved preferences sit beside the components as `*.ts` and `*.css`. Settings search index: `settingsIndex.ts`. Keyboard shortcuts: `shortcuts.ts`, `shortcutKeys.ts`.
 - End-to-end tests: `ui/e2e/*.spec.ts` (Playwright; `smoke.spec.ts` is the broad one, config in `ui/playwright.config.ts`).
